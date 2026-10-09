@@ -22,9 +22,21 @@ export function hashPair(value: number, seed: number): HashPair {
   };
 }
 
-/** h_i = h1 + i * h2 (mod m), with both base hashes reduced mod m first so the arithmetic stays exact. */
+/**
+ * Enhanced double hashing (Dillinger & Manolios):
+ *
+ *   h_i = h1 + i * h2 + (i^3 - i) / 6   (mod m)
+ *
+ * This is Kirsch-Mitzenmacher double hashing, h_i = h1 + i * h2, plus a tetrahedral-number term
+ * (0, 0, 1, 4, 10, ...). Plain double hashing puts all k positions on one arithmetic progression, which collapses
+ * whenever h2 shares a factor with m: a value whose progression cycles in fewer than k steps behaves as if it had
+ * fewer hashes, inflating false positives by about 1.5 / m regardless of k (see notes/dev/2026-10-09.md).
+ * The cubic term stops positions from repeating in lockstep. Both base hashes are reduced mod m first so the
+ * arithmetic stays exact.
+ */
 export function nthHash(pair: HashPair, i: number, modulus: number): number {
-  return ((pair.h1 % modulus) + i * (pair.h2 % modulus)) % modulus;
+  const tetrahedral = (i * i * i - i) / 6;
+  return ((pair.h1 % modulus) + i * (pair.h2 % modulus) + (tetrahedral % modulus)) % modulus;
 }
 
 /** The k indices in [0, modulus) that a value maps to. */

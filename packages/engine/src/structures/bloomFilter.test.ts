@@ -82,33 +82,49 @@ describe("BloomFilter", () => {
   });
 
   describe(`statistical (${TRIALS} seeded trials)`, () => {
-    const m = 8192;
-    const n = 800;
-    const queries = 1000;
     const targetsPerChallenge = 12;
-    const theory = bloomFalsePositiveRate(m, n, bloomOptimalK(m, n));
 
-    it("never produces a false negative and its false-positive rate follows (1 - e^(-kn/m))^k", () => {
-      let falseNegatives = 0;
-      let falsePositives = 0;
-      for (let t = 0; t < TRIALS; t++) {
-        const rng = trialRng("bloom-fpr", t);
-        const values = distinctValues(rng, n + queries);
-        const b = make(m, n);
-        for (const v of values.slice(0, n)) b.ingest({ op: "insert", value: v });
-        const real = b.query({ kind: "presence", targets: values.slice(0, n) })?.estimate as number[];
-        falseNegatives += n - real.length;
-        const decoys = b.query({ kind: "presence", targets: values.slice(n) })?.estimate as number[];
-        falsePositives += decoys.length;
-      }
-      expect(falseNegatives).toBe(0);
-      const observed = falsePositives / (TRIALS * queries);
-      // The textbook formula slightly underestimates the true rate; allow 8% relative for that and sampling noise.
-      expect(observed / theory).toBeGreaterThan(0.92);
-      expect(observed / theory).toBeLessThan(1.08);
-    });
+    // Rare false positives need more queries to measure: the k = 14 rate is about 0.005%.
+    const configs = [
+      { m: 8192, n: 800, queries: 1000 }, // k = 7
+      { m: 2048, n: 200, queries: 1000 }, // k = 7, small m
+      { m: 5000, n: 700, queries: 1000 }, // k = 5, m not a power of two
+      { m: 8000, n: 400, queries: 10000 }, // k = 14, m not a power of two
+      { m: 8192, n: 400, queries: 10000 }, // k = 14, power of two
+    ];
+
+    for (const { m, n, queries } of configs) {
+      const k = bloomOptimalK(m, n);
+      it(`m = ${m}, n = ${n}, k = ${k}: no false negatives and a false-positive rate that follows (1 - e^(-kn/m))^k`, () => {
+        const theory = bloomFalsePositiveRate(m, n, k);
+        let falseNegatives = 0;
+        let falsePositives = 0;
+        for (let t = 0; t < TRIALS; t++) {
+          const rng = trialRng(`bloom-fpr-${m}-${n}`, t);
+          const values = distinctValues(rng, n + queries);
+          const b = make(m, n);
+          for (const v of values.slice(0, n)) b.ingest({ op: "insert", value: v });
+          const real = b.query({ kind: "presence", targets: values.slice(0, n) })?.estimate as number[];
+          falseNegatives += n - real.length;
+          const decoys = b.query({ kind: "presence", targets: values.slice(n) })?.estimate as number[];
+          falsePositives += decoys.length;
+        }
+        expect(falseNegatives).toBe(0);
+
+        const total = TRIALS * queries;
+        const observed = falsePositives / total;
+        // Tolerance: four Poisson standard deviations of the expected count, plus 3% of theory because the textbook
+        // formula slightly underestimates even ideal independent hashing. Plain double hashing missed this band by
+        // 10% to 290% on the small-m and k = 14 configs; see notes/dev/2026-10-09.md.
+        const sigma = Math.sqrt(theory * total) / total;
+        expect(Math.abs(observed - theory)).toBeLessThanOrEqual(4 * sigma + 0.03 * theory);
+      });
+    }
 
     it("reports bounds on the real-target count that hold at the stated confidence", () => {
+      const m = 8192;
+      const n = 800;
+      const queries = 1000;
       let covered = 0;
       for (let t = 0; t < TRIALS; t++) {
         const rng = trialRng("bloom-cover", t);

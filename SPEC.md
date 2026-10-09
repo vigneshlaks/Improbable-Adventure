@@ -33,7 +33,7 @@ TypeScript everywhere except RL training, which is Python talking to the TypeScr
 | Web build | Vite |
 | Content files | JSON, validated with Zod schemas |
 | Hashing | MurmurHash3 x86 32-bit, implemented in-repo, seedable |
-| Multiple hashes | Double hashing: h\_i = h1 + i × h2 (Kirsch–Mitzenmacher) |
+| Multiple hashes | Enhanced double hashing (Dillinger–Manolios): h\_i = h1 + i × h2 + (i³ − i) / 6. Plain Kirsch–Mitzenmacher (h\_i = h1 + i × h2) inflated Bloom false positives by 10% to 290% at small m or large k, so it was replaced (decided 2026-10-09) |
 | Random numbers | Seeded PRNG implemented in-repo (e.g. sfc32 or xoshiro128\*\*); never Math.random |
 | RL training | Python, Gymnasium, Stable-Baselines3 |
 
