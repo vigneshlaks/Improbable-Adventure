@@ -1,0 +1,80 @@
+import { PUBLIC_HASH_SEED } from "../hash/doubleHash";
+import type { Rng } from "../rng/rng";
+
+export type StructureKind =
+  | "exactMemory"
+  | "reservoirSampling"
+  | "bloomFilter"
+  | "countMinSketch"
+  | "logLog"
+  | "linearCounting";
+
+export interface StreamEvent {
+  op: "insert" | "delete";
+  value: number; // uint32
+}
+
+/**
+ * What a structure can be asked. Presence and Count take no player input beyond the targets;
+ * Frequency names the value whose count is wanted (the enemy's shielded value).
+ */
+export type Challenge =
+  | { kind: "presence"; targets: number[] }
+  | { kind: "frequency"; value: number }
+  | { kind: "count" };
+
+export interface Answer {
+  /** A number, or the flagged subset of targets for presence questions. */
+  estimate: number | number[];
+  /** Lower and upper bound at `confidence`. One-sided structures have a bound equal to the estimate. */
+  low: number;
+  high: number;
+  confidence: number;
+}
+
+/**
+ * Values injected from content/balance.json. The engine imports no other package,
+ * so whoever builds a run passes these in.
+ */
+export interface StructureConstants {
+  /** Bits paid per raw stored value (VALUE_BITS). */
+  valueBits: number;
+  /** Default confidence level for answer bounds. */
+  confidence: number;
+}
+
+export interface Structure {
+  readonly kind: StructureKind;
+  readonly params: Readonly<Record<string, number>>;
+  spaceBits(): number;
+  ingest(event: StreamEvent): void;
+  /** null means this structure cannot answer this kind of challenge. */
+  query(challenge: Challenge): Answer | null;
+  clone(): Structure;
+  merge?(other: Structure): Structure;
+}
+
+export interface StructureOptions {
+  /** Space the player assigned, in bits. */
+  spaceBits: number;
+  /** The one optional extra knob; its meaning depends on the structure. */
+  knob?: number;
+  /** Hash seed. Defaults to the public seed that Cunning enemies can attack. */
+  hashSeed?: number;
+  /** Randomness source, required by structures that sample (Reservoir Sampling). */
+  rng?: Rng;
+}
+
+export const DEFAULT_HASH_SEED = PUBLIC_HASH_SEED;
+
+/** Bits in one counter in a counter-based structure. Fixed by the spec's Space cost formulas. */
+export const COUNTER_BITS = 32;
+
+/** Bits in one LogLog register. */
+export const LOGLOG_REGISTER_BITS = 5;
+
+export function assertSpace(kind: StructureKind, spaceBits: number, minBits: number): void {
+  if (!Number.isInteger(spaceBits) || spaceBits < minBits) {
+    throw new RangeError(`${kind} needs an integer Space of at least ${minBits} bits, got ${spaceBits}`);
+  }
+}
