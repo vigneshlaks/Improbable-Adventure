@@ -29,6 +29,20 @@ describe("binomialUpper", () => {
   });
 });
 
+describe("binomialUpper at large sizes", () => {
+  // Binomial(100000, 0.5) has mean 50000 and standard deviation about 158, so the 95% upper bound is
+  // near 50000 + 1.645 * 158 = 50260. Before the log-space fix this returned 100000.
+  it("does not underflow", () => {
+    const q = binomialUpper(100000, 0.5, 0.95);
+    expect(q).toBeGreaterThan(50200);
+    expect(q).toBeLessThan(50320);
+  });
+
+  it("stays within the number of trials", () => {
+    expect(binomialUpper(1000000, 0.9, 0.99)).toBeLessThanOrEqual(1000000);
+  });
+});
+
 describe("clopperPearson", () => {
   // Published exact 95% intervals (e.g. from standard binomial CI tables).
   it.each([

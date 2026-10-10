@@ -26,12 +26,15 @@ export function zForConfidence(confidence: number): number {
 export function binomialUpper(n: number, p: number, confidence: number): number {
   if (n <= 0 || p <= 0) return 0;
   if (p >= 1) return n;
-  let pmf = Math.pow(1 - p, n);
-  let cdf = pmf;
+  // Walk up the distribution one step at a time. Probabilities are tracked as logs so that a tiny
+  // starting value for large `n` doesn't round to zero and stall the walk.
+  const logRatio = Math.log(p / (1 - p));
+  let logPmf = n * Math.log(1 - p);
+  let cdf = Math.exp(logPmf);
   let q = 0;
   while (cdf < confidence && q < n) {
-    pmf = (pmf * (n - q) * p) / ((q + 1) * (1 - p));
-    cdf += pmf;
+    logPmf += Math.log((n - q) / (q + 1)) + logRatio;
+    cdf += Math.exp(logPmf);
     q++;
   }
   return q;
