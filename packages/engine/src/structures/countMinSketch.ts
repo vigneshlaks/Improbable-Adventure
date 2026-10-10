@@ -1,4 +1,4 @@
-import { hashPair, nthHash } from "../hash/doubleHash";
+import { murmur3U32 } from "../hash/murmur3";
 import {
   assertSpace,
   COUNTER_BITS,
@@ -11,15 +11,18 @@ import {
   type StreamEvent,
 } from "./types";
 
-/** Depth used when the player does not choose one. Failure probability is e^-4, about 1.8%. */
+/** Rows used when the player does not choose a depth. */
 export const DEFAULT_CMS_DEPTH = 4;
 
 const COUNTER_MAX = 2 ** COUNTER_BITS - 1;
 
 /**
- * Count-Min Sketch: d rows of w 32-bit counters, w derived from Space. Knob: depth d.
- * Never underestimates a live value. With probability 1 - e^-d the overestimate is at most (e / w) * N,
- * where N is the live total. Deletes decrement counters and clamp at zero.
+ * Count-Min Sketch: a grid of 32-bit counters (depth rows by width columns), sized from Space.
+ * Knob: depth. It never underestimates a live value; it can only overshoot, by at most about
+ * (e / width) * N, where N is the number of live values. Deletes decrement counters and stop at zero.
+ *
+ * Each row uses its own seeded hash so rows collide independently. Deriving the rows from double
+ * hashing made them collide together (see notes/dev).
  */
 export class CountMinSketch implements Structure {
   readonly kind = "countMinSketch" as const;
@@ -30,6 +33,7 @@ export class CountMinSketch implements Structure {
   private readonly width: number;
   private readonly depth: number;
   private readonly seed: number;
+  private readonly rowSeeds: number[];
 
   constructor(
     private readonly options: StructureOptions,
@@ -39,6 +43,7 @@ export class CountMinSketch implements Structure {
     assertSpace("countMinSketch", options.spaceBits, COUNTER_BITS * this.depth);
     this.width = Math.floor(options.spaceBits / (COUNTER_BITS * this.depth));
     this.seed = options.hashSeed ?? DEFAULT_HASH_SEED;
+    this.rowSeeds = Array.from({ length: this.depth }, (_, row) => murmur3U32(row, this.seed));
     this.counters = new Uint32Array(this.width * this.depth);
     this.params = { width: this.width, depth: this.depth };
   }
@@ -47,25 +52,26 @@ export class CountMinSketch implements Structure {
     return COUNTER_BITS * this.width * this.depth;
   }
 
-  /** Live total N: inserts minus honored deletes. */
+  /** Live total N: inserts minus deletes. */
   get liveTotal(): number {
     return this.total;
   }
 
-  /** Probability that the overestimate bound holds for one query. */
+  /** Chance the overshoot bound holds for one query: 1 - e^(-depth). */
   get bandConfidence(): number {
     return 1 - Math.exp(-this.depth);
   }
 
-  /** The (e / w) * N overestimate band. */
+  /** How far an estimate is likely to overshoot: (e / width) * N. */
   get errorBand(): number {
     return (Math.E / this.width) * this.total;
   }
 
   private slots(value: number): number[] {
-    const pair = hashPair(value, this.seed);
     const out: number[] = [];
-    for (let row = 0; row < this.depth; row++) out.push(row * this.width + nthHash(pair, row, this.width));
+    for (let row = 0; row < this.depth; row++) {
+      out.push(row * this.width + (murmur3U32(value, this.rowSeeds[row] ?? 0) % this.width));
+    }
     return out;
   }
 

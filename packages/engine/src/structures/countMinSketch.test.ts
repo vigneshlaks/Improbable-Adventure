@@ -68,6 +68,28 @@ describe("CountMinSketch", () => {
     expect(() => a.merge(make(4096, 4, 99))).toThrow();
   });
 
+  describe("row independence", () => {
+    // Independent rows: two values should collide in every row only 1 in w^d times.
+    // Rows derived from double hashing collided together far more often (about 1 in w^2).
+    it("collides in all d rows with probability 1 / w^d, not 1 / w^2", () => {
+      const w = 7;
+      const d = 3;
+      const rng = trialRng("cms-rows", 0);
+      const pairs = 300000;
+      let allRows = 0;
+      for (let i = 0; i < pairs; i++) {
+        const x = rng.next();
+        const y = rng.next();
+        if (x === y) continue;
+        const s = make(32 * w * d, d);
+        s.ingest({ op: "insert", value: x });
+        if (s.estimate(y) > 0) allRows++;
+      }
+      const expected = pairs / w ** d; // about 875
+      expect(Math.abs(allRows - expected)).toBeLessThanOrEqual(4 * Math.sqrt(expected));
+    });
+  });
+
   describe(`statistical (${TRIALS} seeded trials)`, () => {
     const w = 128;
     const d = 4;

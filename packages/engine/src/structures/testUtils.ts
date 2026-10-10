@@ -14,10 +14,7 @@ export function distinctValues(rng: Rng, n: number): number[] {
   return [...seen];
 }
 
-/**
- * Lowest acceptable coverage for a nominal confidence over `trials` independent trials:
- * the nominal level minus three binomial standard deviations. A sound bound passes this essentially always.
- */
+/** Lowest coverage a sound bound should show over `trials` trials: the stated confidence minus three standard deviations of chance. */
 export function coverageFloor(confidence: number, trials: number): number {
   return confidence - 3 * Math.sqrt((confidence * (1 - confidence)) / trials);
 }

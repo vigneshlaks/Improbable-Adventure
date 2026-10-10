@@ -95,7 +95,7 @@ describe("Rng", () => {
     }
     const expected = draws / n;
     const chi2 = counts.reduce((acc, c) => acc + (c - expected) ** 2 / expected, 0);
-    // 9 degrees of freedom; 0.999 quantile is about 27.9.
+    // Chi-square test: draws should look uniform at the 99.9% level.
     expect(chi2).toBeLessThan(27.9);
     expect(() => rng.int(0)).toThrow(RangeError);
     expect(() => rng.int(1.5)).toThrow(RangeError);

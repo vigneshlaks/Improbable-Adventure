@@ -113,9 +113,8 @@ describe("BloomFilter", () => {
 
         const total = TRIALS * queries;
         const observed = falsePositives / total;
-        // Tolerance: four Poisson standard deviations of the expected count, plus 3% of theory because the textbook
-        // formula slightly underestimates even ideal independent hashing. Plain double hashing missed this band by
-        // 10% to 290% on the small-m and k = 14 configs; see notes/dev/2026-10-09.md.
+        // Allowed gap: four standard deviations of chance, plus 3% of theory.
+        // Plain double hashing missed this by 10% to 290% on the small-m and k = 14 configs (see notes/dev).
         const sigma = Math.sqrt(theory * total) / total;
         expect(Math.abs(observed - theory)).toBeLessThanOrEqual(4 * sigma + 0.03 * theory);
       });

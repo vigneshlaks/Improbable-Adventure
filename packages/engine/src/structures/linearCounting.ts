@@ -12,10 +12,9 @@ import {
 } from "./types";
 
 /**
- * Linear Counting (Whang et al.): a bitmap of m = Space bits; each value sets one bit.
- * Estimate n = -m ln(V) where V is the fraction of zero bits. Standard error is sqrt(m (e^t - t - 1)) with t = n / m.
- * When no zero bits remain the estimate is only a lower bound, so the upper bound becomes infinite.
- * Cannot delete.
+ * Linear Counting: a bitmap of m = Space bits where each value sets one bit. The share of bits still
+ * zero reveals how many distinct values were seen. Once no zero bits remain it can only give a lower
+ * bound, so its upper bound is infinite. Cannot delete.
  */
 export class LinearCounting implements Structure {
   readonly kind = "linearCounting" as const;

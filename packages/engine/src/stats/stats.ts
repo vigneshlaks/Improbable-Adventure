@@ -1,6 +1,6 @@
-// Small deterministic statistics helpers used to turn structure error theory into answer bounds.
+// Small statistics helpers that turn a structure's error theory into answer bounds.
 
-/** erf via Abramowitz & Stegun 7.1.26 (absolute error below 1.5e-7). */
+/** Error function (Abramowitz & Stegun approximation). */
 function erf(x: number): number {
   const sign = x < 0 ? -1 : 1;
   const ax = Math.abs(x);
@@ -9,7 +9,7 @@ function erf(x: number): number {
   return sign * (1 - poly * Math.exp(-ax * ax));
 }
 
-/** Two-sided z for a confidence level: P(|Z| <= z) = confidence. */
+/** How many standard deviations wide a range must be for a confidence level (about 1.96 for 95%). */
 export function zForConfidence(confidence: number): number {
   if (!(confidence > 0 && confidence < 1)) throw new RangeError(`confidence must be in (0, 1), got ${confidence}`);
   let lo = 0;
@@ -22,7 +22,7 @@ export function zForConfidence(confidence: number): number {
   return (lo + hi) / 2;
 }
 
-/** Smallest q such that P(Binomial(n, p) <= q) >= confidence. */
+/** The most successes plausible in `n` trials with success chance `p`, at the given confidence. */
 export function binomialUpper(n: number, p: number, confidence: number): number {
   if (n <= 0 || p <= 0) return 0;
   if (p >= 1) return n;
@@ -35,6 +35,44 @@ export function binomialUpper(n: number, p: number, confidence: number): number 
     q++;
   }
   return q;
+}
+
+/** Chance of `k` or fewer successes in `n` trials. Summed in log space so large `n` can't underflow. */
+function binomialCdf(k: number, n: number, p: number): number {
+  const logRatio = Math.log(p / (1 - p));
+  let logPmf = n * Math.log(1 - p);
+  let total = Math.exp(logPmf);
+  for (let i = 0; i < k; i++) {
+    logPmf += Math.log((n - i) / (i + 1)) + logRatio;
+    total += Math.exp(logPmf);
+  }
+  return Math.min(1, total);
+}
+
+/** Finds the p in [0, 1] where an increasing function first reaches `target` (bisection). */
+function invertIncreasing(f: (p: number) => number, target: number): number {
+  let lo = 0;
+  let hi = 1;
+  for (let i = 0; i < 60; i++) {
+    const mid = (lo + hi) / 2;
+    if (f(mid) < target) lo = mid;
+    else hi = mid;
+  }
+  return hi;
+}
+
+/**
+ * Confidence range for a share, given `hits` out of `n` (the Clopper-Pearson interval).
+ * Unlike the usual normal approximation, it stays valid when hits is 0 or close to `n`.
+ */
+export function clopperPearson(hits: number, n: number, confidence: number): { low: number; high: number } {
+  if (!(n >= 1) || hits < 0 || hits > n) throw new RangeError(`clopperPearson needs 0 <= hits <= n, got ${hits}/${n}`);
+  const tail = (1 - confidence) / 2;
+  // Low end: the smallest share for which `hits` or more is still plausible.
+  const low = hits === 0 ? 0 : invertIncreasing((p) => 1 - binomialCdf(hits - 1, n, p), tail);
+  // High end: the largest share for which `hits` or fewer is still plausible.
+  const high = hits === n ? 1 : invertIncreasing((p) => 1 - binomialCdf(hits, n, p), 1 - tail);
+  return { low, high };
 }
 
 export function clamp(x: number, lo: number, hi: number): number {

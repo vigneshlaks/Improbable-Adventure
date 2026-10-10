@@ -1,5 +1,5 @@
 import { Rng } from "../rng/rng";
-import { clamp, zForConfidence } from "../stats/stats";
+import { clamp, clopperPearson } from "../stats/stats";
 import {
   assertSpace,
   type Answer,
@@ -11,12 +11,9 @@ import {
 } from "./types";
 
 /**
- * Uniform sample of the insert stream (Algorithm R), one VALUE_BITS slot per sampled value.
- * It cannot see deletes, so deleted values linger in the sample as ghosts. Its raw values are shown to the player.
- *
- * Estimates scale by the sample fraction. Bounds:
- *  - frequency: normal approximation to the finite-population sample proportion;
- *  - distinct count: Charikar et al.'s GEE estimator, whose ratio error is at most sqrt(N / n).
+ * Reservoir sampling: a uniform random sample of the insert stream, one slot per VALUE_BITS of Space.
+ * Counts are estimated by scaling up from the sample. It cannot see deletes, so deleted values stay in
+ * the sample as ghosts. Its raw values are shown to the player.
  */
 export class ReservoirSampling implements Structure {
   readonly kind = "reservoirSampling" as const;
@@ -67,7 +64,7 @@ export class ReservoirSampling implements Structure {
       case "presence": {
         const inSample = new Set(this.sample);
         const flagged = challenge.targets.filter((t) => inSample.has(t));
-        // Sample membership proves the value was inserted at some point (it may be a ghost).
+        // A sampled value was inserted at some point (possibly deleted since).
         // Unsampled targets may still be present.
         return { estimate: flagged, low: flagged.length, high: challenge.targets.length, confidence };
       }
@@ -87,17 +84,10 @@ export class ReservoirSampling implements Structure {
     const N = this.seen;
     const scale = N / n;
     const estimate = c * scale;
-    const p = c / n;
-    const fpc = (N - n) / (N - 1);
-    let se = Math.sqrt((p * (1 - p) * fpc) / n) * N;
-    if (c === 0) {
-      // Zero hits carries information but no variance estimate: use the exact "rule of three" style bound.
-      const upper = N * (1 - Math.pow(1 - confidence, 1 / n));
-      return { estimate, low: 0, high: upper, confidence };
-    }
-    if (c === n) se = 0;
-    const z = zForConfidence(confidence);
-    return { estimate, low: Math.max(c, estimate - z * se), high: Math.min(N, estimate + z * se), confidence };
+    // Exact range on the sample's share, scaled to the stream. The usual normal approximation
+    // breaks down when almost none or almost all of the sample matches.
+    const { low, high } = clopperPearson(c, n, confidence);
+    return { estimate, low: Math.max(c, N * low), high: Math.min(N, N * high), confidence };
   }
 
   private distinct(confidence: number): Answer {

@@ -12,27 +12,26 @@ import {
   type StreamEvent,
 } from "./types";
 
-/** Smallest register count that still behaves like LogLog rather than noise. */
+/** Fewest registers that still behave like LogLog rather than noise. */
 export const MIN_LOGLOG_REGISTERS = 16;
 
-/** Asymptotic LogLog bias constant (Durand & Flajolet). */
+/** Bias-correction constant for large register counts (Durand & Flajolet). */
 const ALPHA_INFINITY = 0.39701;
 
-/** Relative standard error is LOGLOG_ERROR_COEFFICIENT / sqrt(m). */
+/** Relative error is this divided by sqrt(register count). */
 export const LOGLOG_ERROR_COEFFICIENT = 1.3;
 
 const MAX_REGISTER = 2 ** LOGLOG_REGISTER_BITS - 1;
 
-/** Finite-m bias correction, alpha_m ~ alpha_inf - (2 pi^2 + ln^2 2) / (48 m). */
+/** The bias correction adjusted for the actual register count. */
 function alphaFor(m: number): number {
   return ALPHA_INFINITY - (2 * Math.PI * Math.PI + Math.LN2 * Math.LN2) / (48 * m);
 }
 
 /**
- * LogLog counter: m = 2^b five-bit registers (m is the largest power of two with 5m <= Space).
- * Each register keeps the longest run of leading zeros seen among values routed to it.
- * Relative standard error is about 1.30 / sqrt(m), valid once the stream holds many times m distinct values;
- * small streams are biased, which is the structure's weakness. Cannot delete.
+ * LogLog counter: m five-bit registers, where m is the largest power of two that fits in Space.
+ * Each register remembers the rarest hash pattern (longest run of leading zeros) among the values routed to it.
+ * Accurate on large streams, biased on small ones. Cannot delete.
  */
 export class LogLog implements Structure {
   readonly kind = "logLog" as const;
@@ -82,9 +81,8 @@ export class LogLog implements Structure {
   query(challenge: Challenge): Answer | null {
     if (challenge.kind !== "count") return null;
     const est = this.estimate();
-    // The estimate is 2 raised to an almost-normal average, so est / n is close to lognormal with mean 1
-    // and relative standard deviation 1.30 / sqrt(m). A symmetric est +/- z*sigma interval under-covers
-    // when sigma is large (small m); inverting the lognormal quantiles keeps the stated confidence.
+    // The error is skewed high, so a symmetric range under-covers at small register counts.
+    // These bounds are lopsided (lognormal) to keep the stated confidence.
     const sigmaLn = Math.sqrt(Math.log(1 + this.standardError ** 2));
     const centre = (sigmaLn * sigmaLn) / 2;
     const z = zForConfidence(this.constants.confidence);

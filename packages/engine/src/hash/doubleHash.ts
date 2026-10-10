@@ -14,7 +14,7 @@ export interface HashPair {
   h2: number;
 }
 
-/** The two base hashes for Kirsch-Mitzenmacher double hashing. */
+/** The two base hashes that all of a value's positions are derived from. */
 export function hashPair(value: number, seed: number): HashPair {
   return {
     h1: murmur3U32(value, seed),
@@ -23,16 +23,10 @@ export function hashPair(value: number, seed: number): HashPair {
 }
 
 /**
- * Enhanced double hashing (Dillinger & Manolios):
+ * Position `i` of a value's positions in a table of size `modulus`: h1 + i*h2 + (i^3 - i)/6.
  *
- *   h_i = h1 + i * h2 + (i^3 - i) / 6   (mod m)
- *
- * This is Kirsch-Mitzenmacher double hashing, h_i = h1 + i * h2, plus a tetrahedral-number term
- * (0, 0, 1, 4, 10, ...). Plain double hashing puts all k positions on one arithmetic progression, which collapses
- * whenever h2 shares a factor with m: a value whose progression cycles in fewer than k steps behaves as if it had
- * fewer hashes, inflating false positives by about 1.5 / m regardless of k (see notes/dev/2026-10-09.md).
- * The cubic term stops positions from repeating in lockstep. Both base hashes are reduced mod m first so the
- * arithmetic stays exact.
+ * This is "enhanced double hashing". The extra cubic term keeps positions from lining up in a straight
+ * line, which plain double hashing does and which made Bloom filters less accurate (see notes/dev).
  */
 export function nthHash(pair: HashPair, i: number, modulus: number): number {
   const tetrahedral = (i * i * i - i) / 6;

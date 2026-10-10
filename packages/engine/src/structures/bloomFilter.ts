@@ -11,22 +11,22 @@ import {
   type StreamEvent,
 } from "./types";
 
-/** When the player gives no expected item count, assume this many bits per item (about 0.8% false positives). */
+/** Bits per item assumed when the player gives no expected item count (about 1% false positives). */
 export const DEFAULT_BITS_PER_ITEM = 10;
 
-/** Theoretical false-positive rate (1 - e^(-kn/m))^k. */
+/** Expected false-positive rate for m bits, n items and k hashes. */
 export function bloomFalsePositiveRate(m: number, n: number, k: number): number {
   return Math.pow(1 - Math.exp((-k * n) / m), k);
 }
 
-/** The optimal hash count k = round((m / n) ln 2), at least 1. */
+/** The hash count that minimizes false positives for m bits and n items. */
 export function bloomOptimalK(m: number, n: number): number {
   return Math.max(1, Math.round((m / n) * Math.LN2));
 }
 
 /**
- * Bloom filter over m = Space bits. Knob: expected item count n, from which k is derived optimally.
- * No false negatives; false positives follow (1 - e^(-kn/m))^k. Cannot delete, so deleted values become ghosts.
+ * Bloom filter: a bit array of m = Space bits. Knob: expected item count n, from which the hash count k is derived.
+ * It never misses a real value but can flag a decoy. It cannot delete, so deleted values stay flagged.
  */
 export class BloomFilter implements Structure {
   readonly kind = "bloomFilter" as const;
@@ -87,7 +87,7 @@ export class BloomFilter implements Structure {
     }
   }
 
-  /** False-positive rate right now, estimated from the fill ratio (exact for random-looking hashes). */
+  /** False-positive rate right now, estimated from how full the bit array is. */
   currentFalsePositiveRate(): number {
     return Math.pow(this.fill, this.k);
   }
@@ -95,8 +95,8 @@ export class BloomFilter implements Structure {
   query(challenge: Challenge): Answer | null {
     if (challenge.kind !== "presence") return null;
     const flagged = challenge.targets.filter((t) => this.test(t));
-    // No false negatives, so every real target is flagged. The flagged set contains at most
-    // Binomial(T, fpr) wrong entries (the decoys), so the real count is at least flagged - that bound.
+    // Every real target is flagged, so extra flags are false alarms. Subtracting the most false alarms
+    // plausible at this confidence gives the low bound.
     const maxFalse = binomialUpper(challenge.targets.length, this.currentFalsePositiveRate(), this.constants.confidence);
     return {
       estimate: flagged,

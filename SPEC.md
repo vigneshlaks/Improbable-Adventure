@@ -33,7 +33,7 @@ TypeScript everywhere except RL training, which is Python talking to the TypeScr
 | Web build | Vite |
 | Content files | JSON, validated with Zod schemas |
 | Hashing | MurmurHash3 x86 32-bit, implemented in-repo, seedable |
-| Multiple hashes | Enhanced double hashing (Dillinger–Manolios): h\_i = h1 + i × h2 + (i³ − i) / 6. Plain Kirsch–Mitzenmacher (h\_i = h1 + i × h2) inflated Bloom false positives by 10% to 290% at small m or large k, so it was replaced (decided 2026-10-09) |
+| Multiple hashes | Enhanced double hashing (Dillinger–Manolios): h\_i = h1 + i × h2 + (i³ − i) / 6. Plain Kirsch–Mitzenmacher (h\_i = h1 + i × h2) inflated Bloom false positives by 10% to 290% at small m or large k, so it was replaced (decided 2026-10-09). Count-Min Sketch rows are the exception: each row uses its own seeded Murmur hash, because additive double hashing leaves rows correlated (all d rows collide together with probability about 1 / w² instead of 1 / w^d), which weakens the e^-d guarantee and makes Cunning attacks too cheap (decided 2026-10-09) |
 | Random numbers | Seeded PRNG implemented in-repo (e.g. sfc32 or xoshiro128\*\*); never Math.random |
 | RL training | Python, Gymnasium, Stable-Baselines3 |
 
@@ -125,6 +125,8 @@ Formula 3, Rank (measured in rank, not raw value, so value scale never matters):
 ```latex
 \text{damage} = \text{BASE} \times \max\left(0,\ 1 - \frac{\text{rank}(s) - q}{\text{RANK\_TOL}}\right), \quad \text{rank}(s) \ge q
 ```
+
+**Frequency challenge shape (decided 2026-10-10).** The challenge names the shielded value: the enemy's most frequent live value `v` is shown to the player, and `query` asks every capable structure about `v`. The player never sees the true count `f`. The engine recomputes `v` and `f` each turn from exact live counts (deletes lower counts, Drift can change the top value); ties go to the lowest value. `strikeValue` carries only the force `s`.
 
 **Risk choices the UI must support.** Targets flagged by two structures are marked as confirmed, so the player can strike only confirmed targets. For Frequency and Rank, the UI offers the structure's estimate, its upper bound, and a free number, so the player chooses between safe and greedy strikes.
 

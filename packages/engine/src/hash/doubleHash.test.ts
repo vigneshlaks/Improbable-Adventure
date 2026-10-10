@@ -61,7 +61,7 @@ describe("double hashing", () => {
       counts[idx] = (counts[idx] ?? 0) + 1;
     }
     const expected = n / m;
-    // Chi-square with 63 degrees of freedom; 0.999 quantile is about 103.
+    // Chi-square test: the spread should look uniform at the 99.9% level.
     const chi2 = counts.reduce((acc, c) => acc + (c - expected) ** 2 / expected, 0);
     expect(chi2).toBeLessThan(103);
   });

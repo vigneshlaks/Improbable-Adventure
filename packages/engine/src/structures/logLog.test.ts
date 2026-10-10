@@ -81,7 +81,7 @@ describe("LogLog", () => {
           if (a && a.low <= n && n <= a.high) covered++;
         }
         const rms = Math.sqrt(sumSq / TRIALS);
-        // Sampling error of an RMS over 1,000 trials is about 2.2%; 10% headroom is more than four standard errors.
+        // 10% headroom over theory covers the chance variation in 1,000 trials.
         expect(rms).toBeLessThanOrEqual(theory * 1.1);
         expect(Math.abs(sum / TRIALS)).toBeLessThan(theory * 0.25); // unbiased to within a quarter of one sigma
         expect(covered / TRIALS).toBeGreaterThanOrEqual(coverageFloor(TEST_CONSTANTS.confidence, TRIALS));

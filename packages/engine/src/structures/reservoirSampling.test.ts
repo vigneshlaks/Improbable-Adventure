@@ -79,7 +79,7 @@ describe("ReservoirSampling", () => {
       }
       const expected = (TRIALS * slots) / bins;
       const chi2 = perBin.reduce((acc, c) => acc + (c - expected) ** 2 / expected, 0);
-      // 9 degrees of freedom; 0.999 quantile is about 27.9.
+      // Chi-square test: the sample should look uniform at the 99.9% level.
       expect(chi2).toBeLessThan(27.9);
     });
 
@@ -105,6 +105,37 @@ describe("ReservoirSampling", () => {
       }
       expect(Math.abs(sumEstimate / TRIALS / heavy - 1)).toBeLessThan(0.03);
       expect(covered / TRIALS).toBeGreaterThanOrEqual(coverageFloor(TEST_CONSTANTS.confidence, TRIALS));
+    });
+
+    // Shares near 0% and 100% are where the usual normal approximation breaks down.
+    for (const heavy of [1960, 1600, 20, 4]) {
+      it(`frequency bounds cover the truth when the target is ${heavy} of 2000 inserts`, () => {
+        const N = 2000;
+        let covered = 0;
+        for (let t = 0; t < TRIALS; t++) {
+          const rng = trialRng(`reservoir-extreme-${heavy}`, t);
+          const [target = 0, ...others] = distinctValues(rng, 1 + (N - heavy));
+          const stream = [...new Array<number>(heavy).fill(target), ...others];
+          for (let i = stream.length - 1; i > 0; i--) {
+            const j = rng.int(i + 1);
+            [stream[i], stream[j]] = [stream[j] ?? 0, stream[i] ?? 0];
+          }
+          const s = new ReservoirSampling({ spaceBits: space, rng: rng.split("sample") }, TEST_CONSTANTS);
+          for (const v of stream) s.ingest({ op: "insert", value: v });
+          const a = s.query({ kind: "frequency", value: target });
+          if (a && a.low <= heavy && heavy <= a.high) covered++;
+        }
+        expect(covered / TRIALS).toBeGreaterThanOrEqual(coverageFloor(TEST_CONSTANTS.confidence, TRIALS));
+      });
+    }
+
+    it("never reports a zero-width frequency bound from a finite sample", () => {
+      const s = new ReservoirSampling({ spaceBits: space, rng: Rng.fromSeed("all-hits") }, TEST_CONSTANTS);
+      for (let i = 0; i < 2000; i++) s.ingest({ op: "insert", value: 7 }); // every sampled slot holds 7
+      const a = s.query({ kind: "frequency", value: 7 });
+      expect(a?.estimate).toBe(2000);
+      expect(a?.low).toBeLessThan(2000);
+      expect(a?.high).toBe(2000);
     });
 
     it("keeps the true distinct count inside its GEE ratio bounds", () => {
