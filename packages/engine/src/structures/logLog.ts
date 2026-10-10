@@ -18,9 +18,6 @@ export const MIN_LOGLOG_REGISTERS = 16;
 /** Bias-correction constant for large register counts (Durand & Flajolet). */
 const ALPHA_INFINITY = 0.39701;
 
-/** Relative error is this divided by sqrt(register count). */
-export const LOGLOG_ERROR_COEFFICIENT = 1.3;
-
 const MAX_REGISTER = 2 ** LOGLOG_REGISTER_BITS - 1;
 
 /** The bias correction adjusted for the actual register count. */
@@ -60,7 +57,7 @@ export class LogLog implements Structure {
 
   /** Relative standard error predicted by theory. */
   get standardError(): number {
-    return LOGLOG_ERROR_COEFFICIENT / Math.sqrt(this.m);
+    return this.constants.logLogErrorCoefficient / Math.sqrt(this.m);
   }
 
   ingest(event: StreamEvent): void {

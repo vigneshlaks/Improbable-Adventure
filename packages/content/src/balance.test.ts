@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import balanceJson from "../balance.json";
+// The engine's tests use their own stand-in constants; this test keeps that stand-in in sync with balance.json.
+import { TEST_CONSTANTS } from "../../engine/src/structures/testUtils";
 import { balance, parseBalance, structureConstants } from "./balance";
 
 describe("balance.json", () => {
@@ -33,6 +35,15 @@ describe("balance.json", () => {
   });
 
   it("feeds the engine its structure constants", () => {
-    expect(structureConstants()).toEqual({ valueBits: 32, confidence: 0.95 });
+    expect(structureConstants()).toEqual({
+      valueBits: 32,
+      confidence: 0.95,
+      cmsDefaultDepth: 4,
+      logLogErrorCoefficient: 1.3,
+    });
+  });
+
+  it("matches the stand-in constants used by the engine's tests", () => {
+    expect(TEST_CONSTANTS).toEqual(structureConstants());
   });
 });

@@ -41,6 +41,10 @@ export interface StructureConstants {
   valueBits: number;
   /** Default confidence level for answer bounds. */
   confidence: number;
+  /** Count-Min rows used when the player does not choose a depth. */
+  cmsDefaultDepth: number;
+  /** LogLog relative error is this divided by sqrt(register count). */
+  logLogErrorCoefficient: number;
 }
 
 export interface Structure {

@@ -6,6 +6,8 @@ import balanceJson from "../balance.json";
 export const balanceSchema = z.object({
   VALUE_BITS: z.number().int().positive(),
   CONFIDENCE: z.number().gt(0).lt(1),
+  CMS_DEFAULT_DEPTH: z.number().int().positive(),
+  LOGLOG_ERROR_COEFFICIENT: z.number().positive(),
 
   STARTING_SPACE: z.number().int().positive(),
   STARTING_CERTAINTY: z.number().int().positive(),
@@ -39,5 +41,10 @@ export const balance: Balance = parseBalance(balanceJson);
 
 /** The slice of balance the engine's structures need, passed in because the engine imports no other package. */
 export function structureConstants(b: Balance = balance): StructureConstants {
-  return { valueBits: b.VALUE_BITS, confidence: b.CONFIDENCE };
+  return {
+    valueBits: b.VALUE_BITS,
+    confidence: b.CONFIDENCE,
+    cmsDefaultDepth: b.CMS_DEFAULT_DEPTH,
+    logLogErrorCoefficient: b.LOGLOG_ERROR_COEFFICIENT,
+  };
 }

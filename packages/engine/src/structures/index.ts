@@ -8,10 +8,10 @@ import type { Structure, StructureConstants, StructureKind, StructureOptions } f
 
 export * from "./types";
 export { BloomFilter, bloomFalsePositiveRate, bloomOptimalK, DEFAULT_BITS_PER_ITEM } from "./bloomFilter";
-export { CountMinSketch, DEFAULT_CMS_DEPTH } from "./countMinSketch";
+export { CountMinSketch } from "./countMinSketch";
 export { ExactMemory } from "./exactMemory";
 export { LinearCounting } from "./linearCounting";
-export { LogLog, LOGLOG_ERROR_COEFFICIENT, MIN_LOGLOG_REGISTERS } from "./logLog";
+export { LogLog, MIN_LOGLOG_REGISTERS } from "./logLog";
 export { ReservoirSampling } from "./reservoirSampling";
 
 export function createStructure(kind: StructureKind, options: StructureOptions, constants: StructureConstants): Structure {

@@ -2,7 +2,12 @@ import { Rng } from "../rng/rng";
 import type { StructureConstants } from "./types";
 
 /** Mirrors content/balance.json for the engine's own tests; the content package checks the two stay in sync. */
-export const TEST_CONSTANTS: StructureConstants = { valueBits: 32, confidence: 0.95 };
+export const TEST_CONSTANTS: StructureConstants = {
+  valueBits: 32,
+  confidence: 0.95,
+  cmsDefaultDepth: 4,
+  logLogErrorCoefficient: 1.3,
+};
 
 /** Every structure's statistical test runs this many seeded trials. */
 export const TRIALS = 1000;

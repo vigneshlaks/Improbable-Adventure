@@ -11,9 +11,6 @@ import {
   type StreamEvent,
 } from "./types";
 
-/** Rows used when the player does not choose a depth. */
-export const DEFAULT_CMS_DEPTH = 4;
-
 const COUNTER_MAX = 2 ** COUNTER_BITS - 1;
 
 /**
@@ -39,7 +36,7 @@ export class CountMinSketch implements Structure {
     private readonly options: StructureOptions,
     private readonly constants: StructureConstants,
   ) {
-    this.depth = Math.max(1, Math.floor(options.knob ?? DEFAULT_CMS_DEPTH));
+    this.depth = Math.max(1, Math.floor(options.knob ?? constants.cmsDefaultDepth));
     assertSpace("countMinSketch", options.spaceBits, COUNTER_BITS * this.depth);
     this.width = Math.floor(options.spaceBits / (COUNTER_BITS * this.depth));
     this.seed = options.hashSeed ?? DEFAULT_HASH_SEED;
