@@ -224,6 +224,13 @@ An enemy is a seeded generator of stream events, `{ op: "insert" | "delete", val
 
 Burst size on turn t is (Size / EXPECTED\_TURNS) × growth^t, so Growth enemies outrun what the player sized for.
 
+**Stream generator details (decided 2026-10-11).** The spec left these open:
+
+- Turn 1 is the base burst, so the growth exponent is t − 1 (turn 2 is ×1.15 at Medium).
+- Drift runs before the burst of every turn divisible by its interval (turns 4, 8, ... at Medium). It reshuffles which values hold the top `fraction` of ranks; lower ranks keep their values.
+- A delete removes one live unit chosen uniformly at random, so values are deleted in proportion to how much of them is live. When nothing is live, the event is an insert.
+- The rank-to-value mapping is a keyed permutation rebuilt from the seed and the number of drift events. The saved state stays a few hundred bytes even at 2^22 values.
+
 **Challenge generation.** Presence decoys are values never inserted, plus deleted values (ghosts). Likeness copies are generated as mutated subsets of the live set, with real copies above LIKE\_THRESHOLD and decoys placed per the Likeness trait.
 
 **Cunning, implemented literally.** Unseeded structures hash with a fixed public seed, so the enemy can attack them for real, within a search budget of CUNNING\_SEARCH (default 50,000 candidates per turn):

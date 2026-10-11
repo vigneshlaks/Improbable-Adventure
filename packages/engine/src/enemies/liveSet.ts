@@ -1,0 +1,99 @@
+import type { Rng } from "../rng/rng";
+
+/** Plain-data form of a LiveSet, safe to store as JSON. */
+export interface LiveSnapshot {
+  /** One entry per live unit: a value inserted three times and never deleted appears three times. */
+  items: number[];
+  /** Values that were inserted and have since been fully deleted. */
+  ghosts: number[];
+}
+
+function checkValue(value: unknown, where: string): asserts value is number {
+  if (typeof value !== "number" || !Number.isInteger(value) || value < 0 || value >= 2 ** 32) {
+    throw new RangeError(`Bad snapshot: "${where}" must hold uint32 values`);
+  }
+}
+
+/**
+ * The exact truth about the stream so far: which values are live, how many times each, and which are ghosts.
+ * Challenges are graded against this, never against what the player's structures report.
+ */
+export class LiveSet {
+  private items: number[] = [];
+  private counts = new Map<number, number>();
+  private ghostSet = new Set<number>();
+
+  static fromSnapshot(snapshot: LiveSnapshot): LiveSet {
+    const set = new LiveSet();
+    for (const value of snapshot.items) {
+      checkValue(value, "items");
+      set.items.push(value);
+      set.counts.set(value, (set.counts.get(value) ?? 0) + 1);
+    }
+    for (const value of snapshot.ghosts) {
+      checkValue(value, "ghosts");
+      if (set.counts.has(value)) throw new RangeError(`Bad snapshot: value ${value} is both live and a ghost`);
+      set.ghostSet.add(value);
+    }
+    return set;
+  }
+
+  snapshot(): LiveSnapshot {
+    return { items: [...this.items], ghosts: [...this.ghostSet] };
+  }
+
+  insert(value: number): void {
+    this.items.push(value);
+    this.counts.set(value, (this.counts.get(value) ?? 0) + 1);
+    this.ghostSet.delete(value);
+  }
+
+  /** Removes one live unit chosen uniformly at random, so a value is deleted in proportion to how much of it is live. */
+  deleteRandom(rng: Rng): number | null {
+    if (this.items.length === 0) return null;
+    const index = rng.int(this.items.length);
+    const value = this.items[index] as number;
+    const last = this.items.pop() as number;
+    if (index < this.items.length) this.items[index] = last;
+
+    const remaining = (this.counts.get(value) ?? 0) - 1;
+    if (remaining > 0) {
+      this.counts.set(value, remaining);
+    } else {
+      this.counts.delete(value);
+      this.ghostSet.add(value);
+    }
+    return value;
+  }
+
+  count(value: number): number {
+    return this.counts.get(value) ?? 0;
+  }
+
+  get liveTotal(): number {
+    return this.items.length;
+  }
+
+  /** Number of distinct live values. */
+  get distinct(): number {
+    return this.counts.size;
+  }
+
+  /** The heaviest live value and its count. Ties go to the lowest value. Null when nothing is live. */
+  mode(): { value: number; count: number } | null {
+    let best: { value: number; count: number } | null = null;
+    for (const [value, count] of this.counts) {
+      if (best === null || count > best.count || (count === best.count && value < best.value)) best = { value, count };
+    }
+    return best;
+  }
+
+  /** Live values in ascending order. */
+  liveValues(): number[] {
+    return [...this.counts.keys()].sort((a, b) => a - b);
+  }
+
+  ghosts(): number[] {
+    return [...this.ghostSet];
+  }
+}
