@@ -1,4 +1,5 @@
 import { murmur3U32 } from "../hash/murmur3";
+import { expectKind, optionsFromSnapshot, readCounts, readNumber, snapshotHeader } from "./snapshot";
 import {
   assertSpace,
   COUNTER_BITS,
@@ -9,6 +10,7 @@ import {
   type StructureConstants,
   type StructureOptions,
   type StreamEvent,
+  type StructureSnapshot,
 } from "./types";
 
 const COUNTER_MAX = 2 ** COUNTER_BITS - 1;
@@ -104,6 +106,21 @@ export class CountMinSketch implements Structure {
       high: est, // one-sided: never underestimates
       confidence: this.bandConfidence,
     };
+  }
+
+  snapshot(): StructureSnapshot {
+    return {
+      ...snapshotHeader(this.kind, this.options),
+      state: { counters: Array.from(this.counters), total: this.total },
+    };
+  }
+
+  static fromSnapshot(snapshot: StructureSnapshot, constants: StructureConstants): CountMinSketch {
+    expectKind(snapshot, "countMinSketch");
+    const sketch = new CountMinSketch(optionsFromSnapshot(snapshot), constants);
+    sketch.counters = Uint32Array.from(readCounts(snapshot.state, "counters", sketch.counters.length));
+    sketch.total = readNumber(snapshot.state, "total");
+    return sketch;
   }
 
   clone(): CountMinSketch {

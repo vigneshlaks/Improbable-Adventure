@@ -1,5 +1,6 @@
 import { murmur3U32 } from "../hash/murmur3";
 import { zForConfidence } from "../stats/stats";
+import { expectKind, optionsFromSnapshot, readCounts, snapshotHeader } from "./snapshot";
 import {
   assertSpace,
   DEFAULT_HASH_SEED,
@@ -10,6 +11,7 @@ import {
   type StructureConstants,
   type StructureOptions,
   type StreamEvent,
+  type StructureSnapshot,
 } from "./types";
 
 /** Fewest registers that still behave like LogLog rather than noise. */
@@ -89,6 +91,17 @@ export class LogLog implements Structure {
       high: est * Math.exp(centre + z * sigmaLn),
       confidence: this.constants.confidence,
     };
+  }
+
+  snapshot(): StructureSnapshot {
+    return { ...snapshotHeader(this.kind, this.options), state: { registers: Array.from(this.registers) } };
+  }
+
+  static fromSnapshot(snapshot: StructureSnapshot, constants: StructureConstants): LogLog {
+    expectKind(snapshot, "logLog");
+    const counter = new LogLog(optionsFromSnapshot(snapshot), constants);
+    counter.registers = Uint8Array.from(readCounts(snapshot.state, "registers", counter.registers.length));
+    return counter;
   }
 
   clone(): LogLog {

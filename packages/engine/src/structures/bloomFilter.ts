@@ -1,5 +1,6 @@
 import { doubleHashIndices } from "../hash/doubleHash";
 import { binomialUpper } from "../stats/stats";
+import { expectKind, optionsFromSnapshot, readCounts, readNumber, snapshotHeader } from "./snapshot";
 import {
   assertSpace,
   DEFAULT_HASH_SEED,
@@ -9,6 +10,7 @@ import {
   type StructureConstants,
   type StructureOptions,
   type StreamEvent,
+  type StructureSnapshot,
 } from "./types";
 
 /** Bits per item assumed when the player gives no expected item count (about 1% false positives). */
@@ -104,6 +106,22 @@ export class BloomFilter implements Structure {
       high: flagged.length,
       confidence: this.constants.confidence,
     };
+  }
+
+  snapshot(): StructureSnapshot {
+    return {
+      ...snapshotHeader(this.kind, this.options),
+      state: { bits: Array.from(this.bits), setBits: this.setBits, insertCount: this.insertCount },
+    };
+  }
+
+  static fromSnapshot(snapshot: StructureSnapshot, constants: StructureConstants): BloomFilter {
+    expectKind(snapshot, "bloomFilter");
+    const filter = new BloomFilter(optionsFromSnapshot(snapshot), constants);
+    filter.bits = Uint32Array.from(readCounts(snapshot.state, "bits", filter.bits.length));
+    filter.setBits = readNumber(snapshot.state, "setBits");
+    filter.insertCount = readNumber(snapshot.state, "insertCount");
+    return filter;
   }
 
   clone(): BloomFilter {

@@ -1,5 +1,6 @@
 import { murmur3U32 } from "../hash/murmur3";
 import { zForConfidence } from "../stats/stats";
+import { expectKind, optionsFromSnapshot, readCounts, readNumber, snapshotHeader } from "./snapshot";
 import {
   assertSpace,
   DEFAULT_HASH_SEED,
@@ -9,6 +10,7 @@ import {
   type StructureConstants,
   type StructureOptions,
   type StreamEvent,
+  type StructureSnapshot,
 } from "./types";
 
 /**
@@ -73,6 +75,21 @@ export class LinearCounting implements Structure {
     const se = Math.sqrt(this.m * (Math.exp(t) - t - 1));
     const z = zForConfidence(confidence);
     return { estimate: est, low: Math.max(0, est - z * se), high: est + z * se, confidence };
+  }
+
+  snapshot(): StructureSnapshot {
+    return {
+      ...snapshotHeader(this.kind, this.options),
+      state: { bits: Array.from(this.bits), zeros: this.zeros },
+    };
+  }
+
+  static fromSnapshot(snapshot: StructureSnapshot, constants: StructureConstants): LinearCounting {
+    expectKind(snapshot, "linearCounting");
+    const counter = new LinearCounting(optionsFromSnapshot(snapshot), constants);
+    counter.bits = Uint8Array.from(readCounts(snapshot.state, "bits", counter.bits.length));
+    counter.zeros = readNumber(snapshot.state, "zeros");
+    return counter;
   }
 
   clone(): LinearCounting {

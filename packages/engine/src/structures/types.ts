@@ -47,6 +47,21 @@ export interface StructureConstants {
   logLogErrorCoefficient: number;
 }
 
+/** Anything that survives JSON.stringify and JSON.parse unchanged. */
+export type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
+
+/**
+ * A plain-data copy of a structure: its kind, the options it was built with, and its contents.
+ * `restoreStructure` rebuilds an identical live structure from it.
+ */
+export interface StructureSnapshot {
+  kind: StructureKind;
+  spaceBits: number;
+  knob?: number;
+  hashSeed?: number;
+  state: { [key: string]: Json };
+}
+
 export interface Structure {
   readonly kind: StructureKind;
   readonly params: Readonly<Record<string, number>>;
@@ -55,6 +70,8 @@ export interface Structure {
   /** null means this structure cannot answer this kind of challenge. */
   query(challenge: Challenge): Answer | null;
   clone(): Structure;
+  /** Plain-data copy of this structure, safe to store as JSON. */
+  snapshot(): StructureSnapshot;
   merge?(other: Structure): Structure;
 }
 

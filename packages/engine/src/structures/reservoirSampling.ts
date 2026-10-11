@@ -1,5 +1,6 @@
 import { Rng } from "../rng/rng";
 import { clamp, clopperPearson } from "../stats/stats";
+import { expectKind, optionsFromSnapshot, readCounts, readNumber, readRngState, snapshotHeader } from "./snapshot";
 import {
   assertSpace,
   type Answer,
@@ -8,6 +9,7 @@ import {
   type StructureConstants,
   type StructureOptions,
   type StreamEvent,
+  type StructureSnapshot,
 } from "./types";
 
 /**
@@ -107,6 +109,26 @@ export class ReservoirSampling implements Structure {
       high: clamp(estimate * ratio, dSample, this.seen),
       confidence,
     };
+  }
+
+  snapshot(): StructureSnapshot {
+    return {
+      ...snapshotHeader(this.kind, this.options),
+      // The random generator's position is part of the state: a restored sample must keep making the
+      // same random choices as the original.
+      state: { sample: [...this.sample], seen: this.seen, rng: { ...this.rng.getState() } },
+    };
+  }
+
+  static fromSnapshot(snapshot: StructureSnapshot, constants: StructureConstants): ReservoirSampling {
+    expectKind(snapshot, "reservoirSampling");
+    const sampler = new ReservoirSampling(optionsFromSnapshot(snapshot), constants);
+    const sample = readCounts(snapshot.state, "sample");
+    if (sample.length > sampler.slots) throw new RangeError('Bad snapshot: "sample" exceeds its slots');
+    sampler.sample = sample;
+    sampler.seen = readNumber(snapshot.state, "seen");
+    sampler.rng = Rng.fromState(readRngState(snapshot.state));
+    return sampler;
   }
 
   clone(): ReservoirSampling {

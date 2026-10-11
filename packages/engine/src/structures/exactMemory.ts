@@ -1,3 +1,4 @@
+import { expectKind, optionsFromSnapshot, readCounts, readNumber, snapshotHeader } from "./snapshot";
 import {
   assertSpace,
   COUNTER_BITS,
@@ -7,6 +8,7 @@ import {
   type StructureConstants,
   type StructureOptions,
   type StreamEvent,
+  type StructureSnapshot,
 } from "./types";
 
 /**
@@ -78,6 +80,27 @@ export class ExactMemory implements Structure {
       case "count":
         return { estimate: this.counts.size, low: this.counts.size, high: this.counts.size + missed, confidence };
     }
+  }
+
+  snapshot(): StructureSnapshot {
+    // Stored as a flat list [value, count, value, count, ...] in insertion order.
+    const entries: number[] = [];
+    for (const [value, count] of this.counts) entries.push(value, count);
+    return {
+      ...snapshotHeader(this.kind, this.options),
+      state: { entries, refused: this.refusedInserts },
+    };
+  }
+
+  static fromSnapshot(snapshot: StructureSnapshot, constants: StructureConstants): ExactMemory {
+    expectKind(snapshot, "exactMemory");
+    const memory = new ExactMemory(optionsFromSnapshot(snapshot), constants);
+    const entries = readCounts(snapshot.state, "entries");
+    if (entries.length % 2 !== 0) throw new RangeError('Bad snapshot: "entries" must hold value/count pairs');
+    if (entries.length / 2 > memory.capacity) throw new RangeError('Bad snapshot: "entries" exceeds capacity');
+    for (let i = 0; i < entries.length; i += 2) memory.counts.set(entries[i] as number, entries[i + 1] as number);
+    memory.refusedInserts = readNumber(snapshot.state, "refused");
+    return memory;
   }
 
   clone(): ExactMemory {
