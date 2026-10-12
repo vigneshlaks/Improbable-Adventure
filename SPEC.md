@@ -94,6 +94,16 @@ Traits are always visible as Low, Medium, or High and generate flavor text. Cert
 5. **Strike.** The player commits one action, resolved by the damage rules.
 6. **Enemy attack.** The enemy deals its tier's Certainty damage.
 
+**Fight loop details (decided 2026-10-12).** The spec left these open:
+
+- Space assigned to a structure is charged in full when it is deployed and refunded in full when it is removed. There is no resize action: resizing is a removal followed by a deploy. Only structures the player owns can be deployed.
+- The enemy attacks at the end of every turn, including turn 1, which has no challenge.
+- A challenge that cannot be issued (a Frequency challenge with nothing live) is skipped, and the turn ends without a strike.
+- An enemy with several weak points uses them in order, one per turn, starting with its first on turn 2. A weak point is revealed when its first challenge is issued.
+- A strike that takes Certainty to 0 ends the run even if it also defeats the enemy. Otherwise HP at 0 wins before the enemy attacks.
+- The turn limit is checked after the enemy's attack: the fight is lost at the end of the turn equal to the limit, with the turn-limit penalty. If that penalty empties Certainty, the run is over.
+- `legalActions` lists a finite representative set (deploys at 25, 50, 75 and 100 percent of the free Space, removals, strikes at each structure's estimate and bounds), but the engine accepts any valid action.
+
 **Outcomes.** Integrity at 0 wins the fight. Certainty at 0 ends the run. Reaching the turn limit loses the fight and costs a large Certainty penalty.
 
 ## Challenges and damage

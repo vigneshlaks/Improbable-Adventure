@@ -1,3 +1,4 @@
+export * from "./combat";
 export * from "./enemies";
 export * from "./hash/murmur3";
 export * from "./hash/doubleHash";

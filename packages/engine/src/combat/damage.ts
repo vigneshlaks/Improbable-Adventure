@@ -47,7 +47,7 @@ export type StrikeResult = PresenceStrike | FrequencyStrike | CountStrike;
 const DECIMALS = 1e6;
 
 /** Rounds to six decimal places, so tiny floating-point differences cannot change a saved fight. */
-function settle(x: number): number {
+export function settle(x: number): number {
   return Math.round(x * DECIMALS) / DECIMALS + 0; // "+ 0" turns -0 into 0
 }
 
