@@ -4,6 +4,7 @@ import {
   burstSize,
   createStream,
   nextBurst,
+  outsideValue,
   rankToValue,
   resolveStreamParams,
   type StreamParams,
@@ -101,6 +102,21 @@ describe("values (Variety)", () => {
   it("differ between seeds", () => {
     const p = params();
     expect(rankToValue(p, "seed-a", 0, 0)).not.toBe(rankToValue(p, "seed-b", 0, 0));
+  });
+});
+
+describe("outside values", () => {
+  it("are never emitted by the enemy, and are distinct from each other", () => {
+    const p = params();
+    const universe = new Set(Array.from({ length: p.universe }, (_, rank) => rankToValue(p, "outside", 0, rank)));
+    const outside = Array.from({ length: 500 }, (_, j) => outsideValue(p, "outside", j));
+    expect(new Set(outside).size).toBe(500);
+    expect(outside.some((v) => universe.has(v))).toBe(false);
+  });
+
+  it("follow the seed", () => {
+    const p = params();
+    expect(outsideValue(p, "seed-a", 0)).not.toBe(outsideValue(p, "seed-b", 0));
   });
 });
 

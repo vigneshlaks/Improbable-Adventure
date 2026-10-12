@@ -95,6 +95,13 @@ function driftBlock(params: StreamParams): number {
   return Math.min(params.universe, Math.max(1, Math.ceil(params.drift.fraction * params.universe)));
 }
 
+/** Maps an index to a uint32 value. An odd multiplier keeps it one-to-one over the whole uint32 range. */
+function affineMap(seed: string): (index: number) => number {
+  const multiplier = murmur3String(`${seed}/multiplier`) | 1;
+  const offset = murmur3String(`${seed}/offset`);
+  return (index) => (Math.imul(multiplier, index) + offset) >>> 0;
+}
+
 /**
  * Builds the function that turns a Zipf rank (0 is the heaviest) into a concrete value.
  *
@@ -105,8 +112,7 @@ function driftBlock(params: StreamParams): number {
  */
 export function createRankMapper(params: StreamParams, seed: string, driftEpochs: number): (rank: number) => number {
   const order = makePermutation(params.universe, murmur3String(`${seed}/order`));
-  const multiplier = murmur3String(`${seed}/multiplier`) | 1;
-  const offset = murmur3String(`${seed}/offset`);
+  const toValue = affineMap(seed);
 
   const block = driftBlock(params);
   const reshuffles: Array<(x: number) => number> = [];
@@ -118,8 +124,18 @@ export function createRankMapper(params: StreamParams, seed: string, driftEpochs
     let index = rank;
     // The newest reshuffle applies first, then each older one, down to the original order.
     if (index < block) for (let i = reshuffles.length - 1; i >= 0; i--) index = (reshuffles[i] as (x: number) => number)(index);
-    return (Math.imul(multiplier, order(index)) + offset) >>> 0;
+    return toValue(order(index));
   };
+}
+
+/**
+ * A value this enemy can never emit: the image of an index beyond the universe, so it differs from every
+ * value the enemy uses. Presence challenges use these as never-inserted decoys.
+ */
+export function outsideValue(params: StreamParams, seed: string, offset: number): number {
+  const index = params.universe + offset;
+  if (!Number.isInteger(offset) || offset < 0 || index >= 2 ** 32) throw new RangeError(`Outside offset ${offset} is out of range`);
+  return affineMap(seed)(index);
 }
 
 export function rankToValue(params: StreamParams, seed: string, driftEpochs: number, rank: number): number {

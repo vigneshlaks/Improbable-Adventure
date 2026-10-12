@@ -128,6 +128,14 @@ Formula 3, Rank (measured in rank, not raw value, so value scale never matters):
 
 **Frequency challenge shape (decided 2026-10-10).** The challenge names the shielded value: the enemy's most frequent live value `v` is shown to the player, and `query` asks every capable structure about `v`. The player never sees the true count `f`. The engine recomputes `v` and `f` each turn from exact live counts (deletes lower counts, Drift can change the top value); ties go to the lowest value. `strikeValue` carries only the force `s`.
 
+**Challenge details (decided 2026-10-12).** The spec left these open:
+
+- Presence shows `T` distinct targets, of which T/2 − 1 to T/2 + 1 are real (live values) and the rest are decoys. A decoy is a ghost (a deleted value) or a value the enemy can never emit, chosen with equal chance while ghosts last. Target order is shuffled. With fewer live values than wanted, the extra targets are decoys.
+- A Presence strike names targets by position in the shown list, starting at 0, with no repeats.
+- A Frequency challenge cannot be issued when nothing is live.
+- A Count estimate exactly on the edge of the tolerance band deals no damage and costs nothing. Beyond the edge it costs MISS\_PENALTY. With nothing live, only an estimate of 0 hits.
+- Damage is rounded to six decimal places before it is applied.
+
 **Risk choices the UI must support.** Targets flagged by two structures are marked as confirmed, so the player can strike only confirmed targets. For Frequency and Rank, the UI offers the structure's estimate, its upper bound, and a free number, so the player chooses between safe and greedy strikes.
 
 Starting values: BASE 20, HIT\_DAMAGE 5, DECOY\_PENALTY 4, BLOCK\_PENALTY 3, MISS\_PENALTY 3, OVERSHOOT\_EXP 2, COUNT\_TOL 0.25, RANK\_TOL 0.1. All are placeholders until the simulator tunes them.
