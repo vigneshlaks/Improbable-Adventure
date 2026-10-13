@@ -249,6 +249,12 @@ Burst size on turn t is (Size / EXPECTED\_TURNS) × growth^t, so Growth enemies 
 - A delete removes one live unit chosen uniformly at random, so values are deleted in proportion to how much of them is live. When nothing is live, the event is an insert.
 - The rank-to-value mapping is a keyed permutation rebuilt from the seed and the number of drift events. The saved state stays a few hundred bytes even at 2^22 values.
 
+**Enemy design (decided 2026-10-13).** The spec gives trait counts per tier but not how an enemy is chosen:
+
+- An enemy picks its non-Low traits at random from the five the stream generator implements (Variety, Skew, Churn, Growth, Drift). Each is High with the tier's `highChance` and Medium otherwise. Likeness and Cunning join the pool with M9.
+- Weak points are drawn without repeats, in proportion to a base weight plus hints from the traits (`traits.json`). The hint table is a placeholder: Skew and Drift point at Frequency, Variety at Count, Churn and Growth at Presence.
+- Tier numbers (Size, HP, attack, turn limit, trait and weak point counts, High chance) are placeholders in `balance.json` for the simulator to tune. An Elite has one or two weak points and a Boss two.
+
 **Challenge generation.** Presence decoys are values never inserted, plus deleted values (ghosts). Likeness copies are generated as mutated subsets of the live set, with real copies above LIKE\_THRESHOLD and decoys placed per the Likeness trait.
 
 **Cunning, implemented literally.** Unseeded structures hash with a fixed public seed, so the enemy can attack them for real, within a search budget of CUNNING\_SEARCH (default 50,000 candidates per turn):

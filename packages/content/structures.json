@@ -1,0 +1,72 @@
+{
+  "exactMemory": {
+    "name": "Exact Memory",
+    "phase": 1,
+    "aliases": ["exact", "memory"],
+    "answers": ["presence", "frequency", "count"],
+    "knob": null,
+    "summary": "A perfect ledger of every value and how often it appeared.",
+    "help": "Stores each distinct value with a counter, so every answer is exact until the table fills. Once full it refuses new values and widens its bounds by how many it turned away. It costs 64 bits per distinct value, so it only suits small streams.",
+    "flavor": "Never forgets a face, but runs out of pages."
+  },
+  "reservoirSampling": {
+    "name": "Reservoir Sampling",
+    "phase": 1,
+    "aliases": ["reservoir", "sample"],
+    "answers": ["presence", "frequency", "count"],
+    "knob": null,
+    "summary": "A fair random sample of the stream, shown as raw values.",
+    "help": "Keeps a uniform random sample and scales it up to estimate counts, so it can answer any question roughly and shows the raw values it holds. It cannot see deletes, so deleted values linger in the sample as ghosts.",
+    "flavor": "A handful of witnesses, chosen without favorites."
+  },
+  "bloomFilter": {
+    "name": "Bloom Filter",
+    "phase": 1,
+    "aliases": ["bloom"],
+    "answers": ["presence"],
+    "knob": {
+      "name": "expected items",
+      "description": "How many distinct values you expect to insert. It sets how many bits each value uses.",
+      "min": 1,
+      "max": 1048576
+    },
+    "summary": "Answers whether a value has appeared, in very little space.",
+    "help": "A bit array where each value sets several bits. It never misses a value that was inserted, but it can flag one that was not, and the false alarms grow as it fills. It cannot delete, so deleted values stay flagged.",
+    "flavor": "Certain when it says no. Merely hopeful when it says yes."
+  },
+  "countMinSketch": {
+    "name": "Count-Min Sketch",
+    "phase": 1,
+    "aliases": ["countmin", "cms"],
+    "answers": ["frequency"],
+    "knob": {
+      "name": "depth",
+      "description": "The number of counter rows. More rows make a bad overestimate less likely.",
+      "min": 1,
+      "max": 16
+    },
+    "summary": "Estimates how often a value appeared, in a small grid of counters.",
+    "help": "A grid of counters with one row per hash. A query takes the smallest counter across the rows, so it never underestimates a value but can overshoot when counters are shared. It handles deletes.",
+    "flavor": "Counts by crowd noise, and takes the quietest reading."
+  },
+  "logLog": {
+    "name": "LogLog",
+    "phase": 1,
+    "aliases": ["loglog"],
+    "answers": ["count"],
+    "knob": null,
+    "summary": "Estimates how many distinct values appeared, using almost no space.",
+    "help": "Each register remembers the rarest hash pattern it has seen, which reveals roughly how many distinct values have passed. It is accurate on large streams, biased on small ones, and it ignores deletes.",
+    "flavor": "Judges a crowd by its rarest face."
+  },
+  "linearCounting": {
+    "name": "Linear Counting",
+    "phase": 1,
+    "aliases": ["linear", "linearcounting"],
+    "answers": ["count"],
+    "knob": null,
+    "summary": "Estimates distinct values from the share of empty bits in a bitmap.",
+    "help": "Each value sets one bit, and the fraction still empty reveals how many distinct values there were. It is precise while the bitmap has room, but once every bit is set it can only say at least this many. It ignores deletes.",
+    "flavor": "Counts the guests by the empty chairs."
+  }
+}

@@ -25,6 +25,24 @@ describe("balance.json", () => {
     });
   });
 
+  it("carries the fight settings the engine needs", () => {
+    expect(balance.EXPECTED_TURNS).toBe(5);
+    expect(balance.STARTING_LOADOUT).toEqual(["exactMemory", "reservoirSampling", "bloomFilter"]);
+    expect(Object.keys(balance.TIERS)).toEqual(["minion", "elite", "boss"]);
+  });
+
+  it("makes tiers harder as they go up", () => {
+    const { minion, elite, boss } = balance.TIERS;
+    for (const field of ["size", "hp", "attack", "highChance"] as const) {
+      expect(minion[field]).toBeLessThan(elite[field]);
+      expect(elite[field]).toBeLessThan(boss[field]);
+    }
+    expect(minion.traitCount.max).toBeLessThanOrEqual(2); // the spec's Minions have 1 or 2 non-Low traits
+    expect(elite.traitCount).toEqual({ min: 3, max: 3 });
+    expect(boss.traitCount.min).toBe(4);
+    expect(boss.weakPointCount).toEqual({ min: 2, max: 2 });
+  });
+
   it("rejects missing, unknown and out-of-range values", () => {
     const { BASE: _omitted, ...missing } = balanceJson;
     void _omitted;
@@ -32,6 +50,9 @@ describe("balance.json", () => {
     expect(() => parseBalance({ ...balanceJson, EXTRA: 1 })).toThrow();
     expect(() => parseBalance({ ...balanceJson, CONFIDENCE: 1.5 })).toThrow();
     expect(() => parseBalance({ ...balanceJson, VALUE_BITS: 0 })).toThrow();
+    expect(() => parseBalance({ ...balanceJson, STARTING_LOADOUT: ["skipList"] })).toThrow();
+    expect(() => parseBalance({ ...balanceJson, TIERS: { ...balanceJson.TIERS, minion: { ...balanceJson.TIERS.minion, hp: 0 } } })).toThrow();
+    expect(() => parseBalance({ ...balanceJson, TIERS: { ...balanceJson.TIERS, minion: { ...balanceJson.TIERS.minion, traitCount: { min: 3, max: 1 } } } })).toThrow();
   });
 
   it("feeds the engine its structure constants", () => {

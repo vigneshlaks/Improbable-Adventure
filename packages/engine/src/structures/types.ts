@@ -1,13 +1,17 @@
 import { PUBLIC_HASH_SEED } from "../hash/doubleHash";
 import type { Rng } from "../rng/rng";
 
-export type StructureKind =
-  | "exactMemory"
-  | "reservoirSampling"
-  | "bloomFilter"
-  | "countMinSketch"
-  | "logLog"
-  | "linearCounting";
+/** Every structure the engine can build. */
+export const STRUCTURE_KINDS = [
+  "exactMemory",
+  "reservoirSampling",
+  "bloomFilter",
+  "countMinSketch",
+  "logLog",
+  "linearCounting",
+] as const;
+
+export type StructureKind = (typeof STRUCTURE_KINDS)[number];
 
 export interface StreamEvent {
   op: "insert" | "delete";

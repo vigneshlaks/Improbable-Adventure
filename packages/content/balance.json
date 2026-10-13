@@ -7,6 +7,7 @@
   "STARTING_SPACE": 8192,
   "STARTING_CERTAINTY": 100,
   "STARTING_SLOTS": 3,
+  "STARTING_LOADOUT": ["exactMemory", "reservoirSampling", "bloomFilter"],
   "REST_HEAL": 30,
 
   "BASE": 20,
@@ -22,5 +23,38 @@
   "LIKENESS_COPIES": 6,
   "LIKE_THRESHOLD": 0.6,
 
-  "CUNNING_SEARCH": 50000
+  "CUNNING_SEARCH": 50000,
+
+  "EXPECTED_TURNS": 5,
+  "TURN_LIMIT_PENALTY": 20,
+
+  "TIERS": {
+    "minion": {
+      "size": 1000,
+      "hp": 40,
+      "attack": 3,
+      "turnLimit": 8,
+      "traitCount": { "min": 1, "max": 2 },
+      "weakPointCount": { "min": 1, "max": 1 },
+      "highChance": 0.25
+    },
+    "elite": {
+      "size": 4000,
+      "hp": 90,
+      "attack": 6,
+      "turnLimit": 10,
+      "traitCount": { "min": 3, "max": 3 },
+      "weakPointCount": { "min": 1, "max": 2 },
+      "highChance": 0.5
+    },
+    "boss": {
+      "size": 12000,
+      "hp": 200,
+      "attack": 9,
+      "turnLimit": 12,
+      "traitCount": { "min": 4, "max": 4 },
+      "weakPointCount": { "min": 2, "max": 2 },
+      "highChance": 0.7
+    }
+  }
 }

@@ -1,0 +1,68 @@
+import { describe, expect, it } from "vitest";
+import { createStructure, STRUCTURE_KINDS, type Challenge } from "@pda/engine";
+import structuresJson from "../structures.json";
+import { findStructure, parseStructures, structures } from "./structures";
+import { structureConstants } from "./balance";
+
+const PROBES: Challenge[] = [
+  { kind: "presence", targets: [1, 2, 3] },
+  { kind: "frequency", value: 1 },
+  { kind: "count" },
+];
+
+describe("structures.json", () => {
+  it("describes exactly the structures the engine has", () => {
+    expect(Object.keys(structures).sort()).toEqual([...STRUCTURE_KINDS].sort());
+  });
+
+  it.each(STRUCTURE_KINDS)("%s: the questions it lists are the ones the engine structure answers", (kind) => {
+    const engineStructure = createStructure(kind, { spaceBits: 8192 }, structureConstants());
+    const answered = PROBES.filter((probe) => engineStructure.query(probe) !== null).map((probe) => probe.kind);
+    expect([...structures[kind].answers].sort()).toEqual(answered.sort());
+  });
+
+  it.each(STRUCTURE_KINDS)("%s: its knob range is one the engine accepts", (kind) => {
+    const knob = structures[kind].knob;
+    if (!knob) return;
+    expect(knob.min).toBeLessThanOrEqual(knob.max);
+    for (const value of [knob.min, knob.max]) {
+      expect(() => createStructure(kind, { spaceBits: 8192, knob: value }, structureConstants())).not.toThrow();
+    }
+  });
+
+  it("gives every structure text for help and flavor", () => {
+    for (const info of Object.values(structures)) {
+      expect(info.name.length).toBeGreaterThan(0);
+      expect(info.summary.length).toBeGreaterThan(10);
+      expect(info.help.length).toBeGreaterThan(40);
+      expect(info.flavor.length).toBeGreaterThan(10);
+    }
+  });
+
+  it("has unique lowercase aliases that find their structure", () => {
+    const seen = new Map<string, string>();
+    for (const [kind, info] of Object.entries(structures)) {
+      for (const alias of info.aliases) {
+        expect(alias).toBe(alias.toLowerCase());
+        expect(seen.has(alias), `alias "${alias}" is used twice`).toBe(false);
+        seen.set(alias, kind);
+        expect(findStructure(alias)).toBe(kind);
+      }
+    }
+  });
+
+  it("finds a structure by its kind or display name, ignoring case, and returns null otherwise", () => {
+    expect(findStructure("BLOOM")).toBe("bloomFilter");
+    expect(findStructure("bloomFilter")).toBe("bloomFilter");
+    expect(findStructure("Count-Min Sketch")).toBe("countMinSketch");
+    expect(findStructure("skiplist")).toBeNull();
+  });
+
+  it("rejects a structure that is missing a field or has an unknown one", () => {
+    const { help: _help, ...withoutHelp } = structuresJson.bloomFilter;
+    void _help;
+    expect(() => parseStructures({ ...structuresJson, bloomFilter: withoutHelp })).toThrow();
+    expect(() => parseStructures({ ...structuresJson, bloomFilter: { ...structuresJson.bloomFilter, extra: 1 } })).toThrow();
+    expect(() => parseStructures({ ...structuresJson, skipList: structuresJson.bloomFilter })).toThrow();
+  });
+});

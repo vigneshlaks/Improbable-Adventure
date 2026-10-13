@@ -1,6 +1,29 @@
-import type { StructureConstants } from "@pda/engine";
+import { STRUCTURE_KINDS, type StructureConstants } from "@pda/engine";
 import { z } from "zod";
 import balanceJson from "../balance.json";
+
+/** An inclusive whole-number range such as "1 to 2 traits". */
+const rangeSchema = (largest: number) =>
+  z
+    .object({ min: z.number().int().min(1), max: z.number().int().max(largest) })
+    .strict()
+    .refine((range) => range.min <= range.max, { message: "min must not exceed max" });
+
+/** How tough an enemy tier is. All numbers are placeholders until the simulator tunes them. */
+const tierSchema = z
+  .object({
+    size: z.number().int().positive(),
+    hp: z.number().positive(),
+    attack: z.number().nonnegative(),
+    turnLimit: z.number().int().positive(),
+    /** How many of the five stream traits are above Low. */
+    traitCount: rangeSchema(5),
+    /** How many weak points the enemy has. */
+    weakPointCount: rangeSchema(3),
+    /** The chance that a trait above Low is High instead of Medium. */
+    highChance: z.number().min(0).max(1),
+  })
+  .strict();
 
 /** Every capitalized constant in the spec. All values are placeholders until the simulator tunes them. */
 export const balanceSchema = z.object({
@@ -12,6 +35,7 @@ export const balanceSchema = z.object({
   STARTING_SPACE: z.number().int().positive(),
   STARTING_CERTAINTY: z.number().int().positive(),
   STARTING_SLOTS: z.number().int().positive(),
+  STARTING_LOADOUT: z.array(z.enum(STRUCTURE_KINDS)).min(1),
   REST_HEAL: z.number().int().nonnegative(),
 
   BASE: z.number().positive(),
@@ -28,6 +52,11 @@ export const balanceSchema = z.object({
   LIKE_THRESHOLD: z.number().gt(0).lt(1),
 
   CUNNING_SEARCH: z.number().int().positive(),
+
+  EXPECTED_TURNS: z.number().int().positive(),
+  TURN_LIMIT_PENALTY: z.number().nonnegative(),
+
+  TIERS: z.object({ minion: tierSchema, elite: tierSchema, boss: tierSchema }).strict(),
 });
 
 export type Balance = z.infer<typeof balanceSchema>;

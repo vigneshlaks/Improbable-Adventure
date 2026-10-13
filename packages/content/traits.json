@@ -1,0 +1,22 @@
+{
+  "levels": {
+    "variety": { "low": 256, "medium": 16384, "high": 4194304 },
+    "skew": { "low": 0, "medium": 0.8, "high": 1.2 },
+    "churn": { "low": 0, "medium": 0.1, "high": 0.3 },
+    "growth": { "low": 1, "medium": 1.15, "high": 1.35 },
+    "drift": {
+      "low": { "fraction": 0, "everyTurns": 0 },
+      "medium": { "fraction": 0.25, "everyTurns": 4 },
+      "high": { "fraction": 0.5, "everyTurns": 3 }
+    }
+  },
+
+  "weakPointBaseWeight": 1,
+  "weakPointHints": {
+    "variety": { "medium": { "count": 1 }, "high": { "count": 3 } },
+    "skew": { "medium": { "frequency": 1 }, "high": { "frequency": 3 } },
+    "churn": { "medium": { "presence": 1 }, "high": { "presence": 3 } },
+    "growth": { "medium": { "presence": 1 }, "high": { "presence": 2 } },
+    "drift": { "medium": { "frequency": 1 }, "high": { "frequency": 2 } }
+  }
+}
