@@ -1,0 +1,93 @@
+{
+  "events": {
+    "structureDeployed": "{name} takes slot {slot} with {bits} bits.",
+    "structureRemoved": "{name} is pulled from slot {slot}. {bits} bits return to your budget.",
+    "burstIngested": "The stream surges: {events} events arrive.",
+    "burstIngestedWithDeletes": "The stream surges: {events} events arrive, {deletes} of them retractions.",
+    "challengePresence": "The enemy dangles {count} values before you. Some are really in its stream and some are decoys. Choose which to strike.",
+    "challengeFrequency": "The enemy shields itself behind the value {value}. The shield is as strong as the number of times that value has appeared. Judge that count, then strike with that much force.",
+    "challengeCount": "The enemy shields itself behind the number of distinct values in its stream. Estimate how many there are.",
+    "weakPointRevealed": "You have found its weak point: {weakPoint}.",
+    "strikeFrequencyHit": "Your strike lands for {damage} damage.",
+    "strikeFrequencyBlocked": "Your strike is too weak and the shield turns it aside. You lose {certaintyLost} Certainty.",
+    "strikeCountHit": "Your estimate is close enough to hurt it: {damage} damage.",
+    "strikeCountMiss": "Your estimate is wildly off. You lose {certaintyLost} Certainty.",
+    "strikePresence": "You strike {realHits} real and {decoyHits} decoy targets: {damage} damage, {certaintyLost} Certainty lost.",
+    "enemyAttacked": "The enemy lashes out. You lose {damage} Certainty.",
+    "turnStarted": "Turn {turn}.",
+    "fightWon": "The enemy collapses. You win on turn {turn}.",
+    "fightLostTurnLimit": "The stream overflows you. The fight is lost, and the overflow costs {certaintyLost} Certainty.",
+    "fightLostCertainty": "Your Certainty is gone. The run is over."
+  },
+
+  "enemy": {
+    "intro": {
+      "minion": "A minion approaches.",
+      "elite": "An elite approaches.",
+      "boss": "A boss looms."
+    },
+    "calm": "Its stream looks plain and steady.",
+    "traits": {
+      "variety": {
+        "low": "a small crowd of values",
+        "medium": "a wide crowd of values",
+        "high": "an ocean of distinct values"
+      },
+      "skew": {
+        "low": "spread evenly",
+        "medium": "leaning on a few favorites",
+        "high": "ruled by a handful of favorites"
+      },
+      "churn": {
+        "low": "keeps everything it sends",
+        "medium": "retracts some of what it sends",
+        "high": "constantly retracts what it sent"
+      },
+      "growth": {
+        "low": "arrives at a steady pace",
+        "medium": "swells each turn",
+        "high": "swells explosively each turn"
+      },
+      "drift": {
+        "low": "keeps the same favorites",
+        "medium": "slowly changes its favorites",
+        "high": "keeps swapping its favorites"
+      }
+    }
+  },
+
+  "commands": {
+    "deploy": {
+      "usage": "deploy <structure> <bits> [knob]",
+      "summary": "Place a structure into the next free slot, spending Space."
+    },
+    "remove": {
+      "usage": "remove <slot>",
+      "summary": "Remove a structure and get its Space back."
+    },
+    "ready": {
+      "usage": "ready",
+      "summary": "Finish deploying. The stream arrives."
+    },
+    "query": {
+      "usage": "query",
+      "summary": "Show what your structures say about the current challenge."
+    },
+    "strike": {
+      "usage": "strike <numbers> | confirmed | flagged | none | <number> | estimate | high | low",
+      "summary": "Commit your answer to the challenge."
+    },
+    "status": {
+      "usage": "status",
+      "summary": "Show your resources, the enemy and your structures."
+    },
+    "help": {
+      "usage": "help [topic]",
+      "summary": "Explain a command or a structure."
+    },
+    "quit": {
+      "usage": "quit",
+      "summary": "Leave the game."
+    }
+  }
+}

@@ -55,6 +55,7 @@ repo/
     env-server/            # Node JSON-lines server for RL
     exporter/              # toolkit generation + templates per language
     web/                   # browser text-adventure UI
+    ui-core/               # shared command parser and narrator (decided 2026-10-13)
     cli/                   # terminal playable version (fast dev loop)
   rl/                      # Python: Gymnasium wrapper, training scripts
 ```
@@ -456,6 +457,15 @@ The CLI and web UI share one command parser and one narrator; both only translat
 | help \[topic\] | help bloom | none |
 
 **Narration** is generated from engine events using templates in content, never by hand inside UI code. Enemy flavor text comes from its traits.
+
+**Command details (decided 2026-10-13).** The spec left these open:
+
+- Slots and targets are numbered from 1 for the player; the engine counts from 0.
+- `deploy` places the structure in the first free slot. A structure is named by its short alias (`bloom`, `cms`, `loglog`, `linear`, `exact`, `reservoir`) or its full name.
+- `strike high`, `low` and `estimate` use the first deployed structure that has a numeric answer. `strike high 2` names the structure by slot. The result says which structure was used.
+- `strike confirmed` strikes the targets flagged by two or more structures, `strike flagged` those flagged by any, and `strike none` strikes nothing. A bare number is a force for Frequency and an estimate for Count, and a list of numbers is a set of targets for Presence.
+- The parser never throws. A bad command returns an explanation, with a suggestion for a likely typo.
+- The status and query screens are laid out in code; the story text, enemy descriptions and command help come from `narration.json`.
 
 **Web extras:** a side panel with live visuals of each deployed structure (bit array fill, counter heatmap, register bars), an error-rate readout that updates as the stream grows, and a light/dark theme. Every visual is optional; the game must be fully playable as text.
 
