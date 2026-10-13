@@ -393,6 +393,14 @@ pnpm sim compare --bots greedy,prober,cautious --n 5000   # side by side
 
 **Report metrics:** win rate, turns per fight, Certainty lost by cause, structure deploy and win rates, and observed error rate per structure versus theory.
 
+**Report details (decided 2026-10-13).** The spec left these open:
+
+- `sim fights` and `sim compare` work on single fights. `sim runs` needs the run loop and is not available until Milestone 4.
+- Fight `i` of a batch uses the seed `seed-base + i`, and `compare` uses the same seeds for every bot, so a report is reproducible and bots face the same enemies. Options are `--n`, `--seed-base`, `--tier` (default `minion`), `--loadout` (`starting` or `full`, default `starting`) and `--json`.
+- The win rate comes with a 95 percent Wilson interval.
+- "Observed error versus theory" is measured in play: at every strike, each deployed structure's range is checked against the true answer, and the report gives how often it held the truth against the confidence the structure claimed, plus the mean relative error of its estimate. A structure deployed late is judged on a stream it only partly saw, and a structure that cannot see deletes is judged on a stream with deletes, so these figures include the game's intended weaknesses. The structures' own statistical tests cover the no-weakness case.
+- "Wrong strikes" is the share of strikes that were blocked, missed the Count band, or hit a decoy.
+
 **Balance targets** (initial, revisit after playtesting):
 
 - Greedy wins 55–70% of MVP runs; Random wins under 5%; Oracle wins over 95%.

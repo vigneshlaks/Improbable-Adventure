@@ -15,6 +15,13 @@ export default tseslint.config(
         { object: "Date", property: "now", message: "The engine must be deterministic; no Date.now." },
         { object: "performance", property: "now", message: "The engine must be deterministic." },
       ],
+      // Node's types are installed for the command-line tools, so the compiler no longer catches these in the engine.
+      "no-restricted-globals": [
+        "error",
+        ...["process", "console", "Buffer", "setTimeout", "setInterval", "setImmediate", "require", "__dirname", "__filename"].map(
+          (name) => ({ name, message: "The engine has no I/O and uses no Node globals." }),
+        ),
+      ],
       "no-restricted-syntax": [
         "error",
         { selector: "NewExpression[callee.name='Date']", message: "No wall-clock time in the engine." },

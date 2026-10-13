@@ -3,7 +3,7 @@ import type { Action, GroundTruth } from "@pda/engine";
 import { getBot } from "./bots";
 import type { Bot } from "./bots/types";
 import { playFight } from "./runner";
-import { minion } from "./testUtils";
+import { minion, minionWith } from "./testUtils";
 
 /** A bot built from a function, for testing the runner. */
 const scripted = (name: string, act: Bot["create"], usesTruth = false): Bot => ({ name, description: name, usesTruth, create: act });
@@ -75,6 +75,32 @@ describe("playFight", () => {
   it("reports an illegal action with the bot's name instead of hiding it", () => {
     const cheat = scripted("cheat", () => () => ({ type: "strikeValue", value: 5 })); // no challenge yet
     expect(() => playFight({ config: minion("cheat", "count"), seed: "cheat", bot: cheat })).toThrow(/cheat.*illegal/i);
+  });
+
+  it("checks each structure's answer against the truth at every strike", () => {
+    // Exact Memory with plenty of room is always right, so every answer holds the truth with no error.
+    const exact = scripted("exact", () => {
+      let deployed = false;
+      return (view) => {
+        if (!deployed) {
+          deployed = true;
+          return { type: "deploy", slot: 0, kind: "exactMemory", spaceBits: 8192 };
+        }
+        return view.observation.phase === "deploy" ? { type: "endDeploy" } : { type: "strikeValue", value: 1 };
+      };
+    });
+    const record = playFight({ config: minionWith("acc", "frequency", { skew: "high" }), seed: "acc", bot: exact });
+    const tally = record.accuracy.exactMemory;
+    expect(tally?.answers).toBe(record.strikes.total);
+    expect(tally?.covered).toBe(tally?.answers);
+    expect(tally?.relativeErrorSum).toBe(0);
+    expect(tally?.relativeErrorCount).toBe(tally?.answers);
+    expect(tally?.confidenceSum).toBeCloseTo((tally?.answers ?? 0) * 0.95, 10);
+    expect(Object.keys(record.accuracy)).toEqual(["exactMemory"]);
+  });
+
+  it("has no accuracy to report for a bot that uses no structures", () => {
+    expect(playFight({ config: minion("none", "count"), seed: "none", bot: getBot("oracle") }).accuracy).toEqual({});
   });
 
   it("is deterministic in its seed", () => {

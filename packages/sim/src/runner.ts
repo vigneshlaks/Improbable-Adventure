@@ -8,6 +8,7 @@ import {
   type FightConfig,
   type FightState,
   type GameEvent,
+  type Observation,
   type StructureKind,
 } from "@pda/engine";
 import type { Bot, BotView } from "./bots/types";
@@ -20,6 +21,19 @@ export function makeView(state: FightState, config: FightConfig, bot: Bot): BotV
     legalActions: () => legalActions(state),
     truth: bot.usesTruth ? groundTruth(state) : null,
   };
+}
+
+/** How one kind of structure's answers compared with the truth, summed over a fight. */
+export interface AccuracyTally {
+  /** Answers given to a challenge. */
+  answers: number;
+  /** Answers whose stated range held the truth. */
+  covered: number;
+  /** The confidence the structures claimed, summed, so it can be averaged later. */
+  confidenceSum: number;
+  /** Relative error of the estimate, summed over the answers where it is defined. */
+  relativeErrorSum: number;
+  relativeErrorCount: number;
 }
 
 export interface FightRecord {
@@ -38,7 +52,30 @@ export interface FightRecord {
   strikes: { total: number; wrong: number };
   /** Every structure the bot deployed, in order. */
   deployed: StructureKind[];
+  /** Each kind of structure's answers against the truth. This is accuracy in play, so a structure deployed late is judged on a stream it only partly saw. */
+  accuracy: Partial<Record<StructureKind, AccuracyTally>>;
   events?: GameEvent[];
+}
+
+/** Compares every structure's answer to the open challenge with the real answer, and adds it to the tallies. */
+function tallyAnswers(observation: Observation, state: FightState, accuracy: FightRecord["accuracy"]): void {
+  const truth = groundTruth(state).answer;
+  if (!truth) return;
+  // For Presence, the structures bound how many of the targets are real.
+  const actual = truth.kind === "presence" ? truth.real.filter(Boolean).length : truth.kind === "frequency" ? truth.count : truth.distinct;
+
+  for (const structure of observation.structures) {
+    const answer = structure.answer;
+    if (!answer) continue;
+    const tally = (accuracy[structure.kind] ??= { answers: 0, covered: 0, confidenceSum: 0, relativeErrorSum: 0, relativeErrorCount: 0 });
+    tally.answers++;
+    tally.confidenceSum += answer.confidence;
+    if (answer.low <= actual && actual <= answer.high) tally.covered++;
+    if (typeof answer.estimate === "number" && actual > 0) {
+      tally.relativeErrorSum += Math.abs(answer.estimate - actual) / actual;
+      tally.relativeErrorCount++;
+    }
+  }
 }
 
 export interface PlayOptions {
@@ -56,10 +93,13 @@ export function playFight({ config, seed, bot, maxSteps = 2000, keepEvents = fal
   const player = bot.create();
   const rng = Rng.fromSeed(`${seed}/bot/${bot.name}`);
   const all: GameEvent[] = [];
+  const accuracy: FightRecord["accuracy"] = {};
 
   let steps = 0;
   while (state.phase !== "won" && state.phase !== "lost" && steps < maxSteps) {
-    const action = player(makeView(state, config, bot), rng);
+    const view = makeView(state, config, bot);
+    if (state.phase === "strike") tallyAnswers(view.observation, state, accuracy);
+    const action = player(view, rng);
     try {
       const result = step(state, action);
       state = result.state;
@@ -83,6 +123,7 @@ export function playFight({ config, seed, bot, maxSteps = 2000, keepEvents = fal
     certaintyLost: { blocked: 0, decoys: 0, misses: 0, attacks: 0, turnLimit: 0 },
     strikes: { total: 0, wrong: 0 },
     deployed: [],
+    accuracy,
   };
 
   for (const event of all) {
