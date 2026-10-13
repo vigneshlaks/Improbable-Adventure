@@ -374,6 +374,15 @@ Balance is tuned by running thousands of seeded fights with scripted bots before
 | Cautious | Strikes only confirmed targets and safe bounds | Tests whether safe play is viable |
 | Oracle | Knows the true answers | Ceiling; shows the maximum achievable speed |
 
+**Bot details (decided 2026-10-13).** The spec left these open:
+
+- Bots choose from what a player sees (`observe`), so they cannot read the true answers. Only the Oracle is given them. `legalActions` is a finite representative list, so Random draws from that list.
+- **Greedy** ranks weak points by the trait hints, deploys one best-matching owned structure for each of the two likeliest, splitting the Space evenly, and strikes on the best-suited structure's estimate (for Presence, everything that structure flagged). Once the weak point is revealed it removes structures that do not help and deploys the right one. With no answer to use, it strikes minimally.
+- **Prober** spends 40 percent of the first turn's Space on Reservoir Sampling, which can answer any question, keeps it, and otherwise plays like Greedy.
+- **Cautious** deploys two structures per weak point so answers can be cross-checked, strikes only Presence targets that two or more structures flagged (nothing if none), strikes Frequency at the upper bound, and strikes Count at the estimate.
+- **Oracle** deploys nothing and strikes exactly: the true count, the true distinct count, or exactly the real Presence targets.
+- A fight a bot has not finished within a step limit is recorded as stalled.
+
 **Commands**
 
 ```

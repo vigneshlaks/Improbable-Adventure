@@ -8,7 +8,7 @@ import type {
   StructureKind,
   StructureSnapshot,
 } from "../structures/types";
-import type { WeakPoint } from "./challenges";
+import type { TrueAnswer, WeakPoint } from "./challenges";
 import type { DamageRules, StrikeResult } from "./damage";
 
 /** Everything the rules of one fight need, as plain numbers. Built from `balance.json` and the content files. */
@@ -134,6 +134,8 @@ export interface Observation {
 export interface GroundTruth {
   frequency: { value: number; count: number } | null;
   distinct: number;
+  /** The true answer to the open challenge, or null when no challenge is open. */
+  answer: TrueAnswer | null;
 }
 
 /** Thrown when an action is not allowed in the current state. */

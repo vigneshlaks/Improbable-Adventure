@@ -1,0 +1,111 @@
+import {
+  createFight,
+  groundTruth,
+  legalActions,
+  observe,
+  Rng,
+  step,
+  type FightConfig,
+  type FightState,
+  type GameEvent,
+  type StructureKind,
+} from "@pda/engine";
+import type { Bot, BotView } from "./bots/types";
+
+/** What a bot sees at this point in the fight. The true answers are included only for a bot that asks for them. */
+export function makeView(state: FightState, config: FightConfig, bot: Bot): BotView {
+  return {
+    observation: observe(state),
+    loadout: config.loadout,
+    legalActions: () => legalActions(state),
+    truth: bot.usesTruth ? groundTruth(state) : null,
+  };
+}
+
+export interface FightRecord {
+  bot: string;
+  seed: string;
+  tier: string;
+  /** "stalled" means the bot never finished within the step limit. */
+  outcome: "won" | "lost" | "stalled";
+  reason: "turnLimit" | "certainty" | null;
+  turns: number;
+  certaintyLeft: number;
+  steps: number;
+  /** Certainty lost, by what cost it. */
+  certaintyLost: { blocked: number; decoys: number; misses: number; attacks: number; turnLimit: number };
+  /** `wrong` counts strikes that were blocked, missed, or hit a decoy. */
+  strikes: { total: number; wrong: number };
+  /** Every structure the bot deployed, in order. */
+  deployed: StructureKind[];
+  events?: GameEvent[];
+}
+
+export interface PlayOptions {
+  config: FightConfig;
+  seed: string;
+  bot: Bot;
+  /** Gives up on a fight that has not ended after this many actions. */
+  maxSteps?: number;
+  keepEvents?: boolean;
+}
+
+/** Plays one whole fight with a bot and summarizes what happened. */
+export function playFight({ config, seed, bot, maxSteps = 2000, keepEvents = false }: PlayOptions): FightRecord {
+  let state = createFight(seed, config);
+  const player = bot.create();
+  const rng = Rng.fromSeed(`${seed}/bot/${bot.name}`);
+  const all: GameEvent[] = [];
+
+  let steps = 0;
+  while (state.phase !== "won" && state.phase !== "lost" && steps < maxSteps) {
+    const action = player(makeView(state, config, bot), rng);
+    try {
+      const result = step(state, action);
+      state = result.state;
+      all.push(...result.events);
+    } catch (error) {
+      const why = error instanceof Error ? error.message : String(error);
+      throw new Error(`Bot "${bot.name}" took an illegal action ${JSON.stringify(action)} on turn ${state.turn}: ${why}`, { cause: error });
+    }
+    steps++;
+  }
+
+  const record: FightRecord = {
+    bot: bot.name,
+    seed,
+    tier: config.enemy.tier,
+    outcome: state.phase === "won" ? "won" : state.phase === "lost" ? "lost" : "stalled",
+    reason: null,
+    turns: state.turn,
+    certaintyLeft: state.certainty,
+    steps,
+    certaintyLost: { blocked: 0, decoys: 0, misses: 0, attacks: 0, turnLimit: 0 },
+    strikes: { total: 0, wrong: 0 },
+    deployed: [],
+  };
+
+  for (const event of all) {
+    switch (event.type) {
+      case "structureDeployed":
+        record.deployed.push(event.kind);
+        break;
+      case "enemyAttacked":
+        record.certaintyLost.attacks += event.damage;
+        break;
+      case "strikeResolved":
+        record.strikes.total++;
+        if (event.kind === "frequency" && event.outcome === "blocked") record.certaintyLost.blocked += event.certaintyLost;
+        if (event.kind === "count" && event.outcome === "miss") record.certaintyLost.misses += event.certaintyLost;
+        if (event.kind === "presence") record.certaintyLost.decoys += event.certaintyLost;
+        if (event.certaintyLost > 0 || (event.kind === "presence" && event.decoyHits > 0)) record.strikes.wrong++;
+        break;
+      case "fightLost":
+        record.reason = event.reason;
+        if (event.reason === "turnLimit") record.certaintyLost.turnLimit += event.certaintyLost;
+        break;
+    }
+  }
+  if (keepEvents) record.events = all;
+  return record;
+}

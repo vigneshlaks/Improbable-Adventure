@@ -1,4 +1,5 @@
 import type { Answer, Challenge } from "../structures/types";
+import { trueAnswer } from "./challenges";
 import {
   liveSetOf,
   loadStructures,
@@ -43,7 +44,11 @@ export function observe(state: FightState): Observation {
 /** The real answers, for bots and tests. This is not part of what a player sees. */
 export function groundTruth(state: FightState): GroundTruth {
   const live = liveSetOf(state);
-  return { frequency: live.mode(), distinct: live.distinct };
+  return {
+    frequency: live.mode(),
+    distinct: live.distinct,
+    answer: state.phase === "strike" && state.challenge ? trueAnswer(state.challenge, live) : null,
+  };
 }
 
 /** Space shares offered when listing deploy options, as fractions of the free Space. */

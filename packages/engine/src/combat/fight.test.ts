@@ -278,6 +278,28 @@ describe("ending a fight", () => {
   });
 });
 
+describe("groundTruth", () => {
+  it("gives the real answer to the open challenge, and nothing when there is none", () => {
+    const deploying = createFight("truth", CONFIG);
+    expect(groundTruth(deploying).answer).toBeNull();
+
+    const striking = run(deploying, [deployCms, endDeploy, endDeploy]).state;
+    const truth = groundTruth(striking);
+    expect(truth.answer).toEqual({ kind: "frequency", count: truth.frequency?.count });
+  });
+
+  it("says which Presence targets are real", () => {
+    const presence: FightConfig = { ...CONFIG, enemy: { ...CONFIG.enemy, weakPoints: ["presence"] } };
+    const state = run(createFight("truth-presence", presence), [endDeploy, endDeploy]).state;
+    const answer = groundTruth(state).answer;
+    expect(answer?.kind).toBe("presence");
+    const real = answer?.kind === "presence" ? answer.real : [];
+    expect(real).toHaveLength(CONFIG.rules.presenceTargets);
+    expect(real.filter(Boolean).length).toBeGreaterThanOrEqual(5);
+    expect(real.filter(Boolean).length).toBeLessThanOrEqual(7);
+  });
+});
+
 describe("determinism and purity", () => {
   it("replays identically from the same seed", () => {
     const a = playGreedy("replay");
