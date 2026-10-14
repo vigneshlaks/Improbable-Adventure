@@ -498,6 +498,14 @@ The CLI and web UI share one command parser and one narrator; both only translat
 - The parser never throws. A bad command returns an explanation, with a suggestion for a likely typo.
 - The status and query screens are laid out in code; the story text, enemy descriptions and command help come from `narration.json`.
 
+**Terminal game (decided 2026-10-14).** `pnpm cli` plays one fight:
+
+- Options: `--seed <text>` (default: the clock, and the seed is printed so a fight can be replayed), `--tier minion|elite|boss` (default `minion`), `--loadout starting|full` (default `starting`).
+- A `Session` holds the fight and turns one typed line into lines of output with no I/O of its own, so a script of lines gives a transcript and the tests run whole fights. A thin loop feeds it lines from the terminal.
+- The prompt shows the turn, phase, Certainty, enemy HP and free Space. When a challenge arrives, the answers of the deployed structures (the `query` screen) are printed with it.
+- The welcome and goodbye lines are in `narration.json` under `game`.
+- A run is one fight for now; the run loop (rewards, rest stops, fusion) is Milestone 4.
+
 **Web extras:** a side panel with live visuals of each deployed structure (bit array fill, counter heatmap, register bars), an error-rate readout that updates as the stream grows, and a light/dark theme. Every visual is optional; the game must be fully playable as text.
 
 ## Milestones

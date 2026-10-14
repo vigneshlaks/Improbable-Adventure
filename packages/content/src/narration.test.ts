@@ -29,6 +29,11 @@ describe("narration.json", () => {
     }
   });
 
+  it("has the lines the terminal game opens and closes with", () => {
+    expect(narration.game.welcome).toMatch(/help/);
+    expect(narration.game.goodbye.length).toBeGreaterThan(0);
+  });
+
   it("rejects a template that uses an unknown variable", () => {
     const bad = { ...narrationJson, events: { ...narrationJson.events, structureDeployed: "{name} takes slot {slott}." } };
     expect(() => parseNarration(bad)).toThrow();

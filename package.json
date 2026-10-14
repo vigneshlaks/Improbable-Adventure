@@ -6,7 +6,8 @@
   "scripts": {
     "test": "vitest run",
     "lint": "eslint . && tsc --noEmit",
-    "sim": "tsx packages/sim/src/bin.ts"
+    "sim": "tsx packages/sim/src/bin.ts",
+    "cli": "tsx packages/cli/src/bin.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

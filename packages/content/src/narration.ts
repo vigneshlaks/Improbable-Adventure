@@ -77,6 +77,7 @@ export const narrationSchema = z
         quit: command,
       })
       .strict(),
+    game: z.object({ welcome: z.string().min(1), goodbye: z.string().min(1) }).strict(),
   })
   .strict();
 

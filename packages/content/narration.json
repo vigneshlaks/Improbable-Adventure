@@ -89,5 +89,9 @@
       "usage": "quit",
       "summary": "Leave the game."
     }
+  },
+  "game": {
+    "welcome": "Deploy structures, then type \"ready\" to let the stream arrive. Type \"help\" for the commands.",
+    "goodbye": "You leave the field."
   }
 }

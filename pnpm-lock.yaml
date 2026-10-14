@@ -30,6 +30,18 @@ importers:
         specifier: ^5.0.3
         version: 5.0.3(@types/node@22.20.5)(vite@8.3.2(@types/node@22.20.5)(esbuild@0.28.2)(tsx@4.23.15))
 
+  packages/cli:
+    dependencies:
+      '@pda/content':
+        specifier: workspace:*
+        version: link:../content
+      '@pda/engine':
+        specifier: workspace:*
+        version: link:../engine
+      '@pda/ui-core':
+        specifier: workspace:*
+        version: link:../ui-core
+
   packages/content:
     dependencies:
       '@pda/engine':
