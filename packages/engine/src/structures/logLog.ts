@@ -1,6 +1,7 @@
 import { murmur3U32 } from "../hash/murmur3";
 import { zForConfidence } from "../stats/stats";
-import { expectKind, optionsFromSnapshot, readCounts, snapshotHeader } from "./snapshot";
+import { liveCountRange, type CountRange } from "./ghosts";
+import { expectKind, optionsFromSnapshot, readCounts, readNumber, snapshotHeader } from "./snapshot";
 import {
   assertSpace,
   DEFAULT_HASH_SEED,
@@ -30,13 +31,16 @@ function alphaFor(m: number): number {
 /**
  * LogLog counter: m five-bit registers, where m is the largest power of two that fits in Space.
  * Each register remembers the rarest hash pattern (longest run of leading zeros) among the values routed to it.
- * Accurate on large streams, biased on small ones. Cannot delete.
+ * Accurate on large streams, biased on small ones. Cannot delete, so it counts values that were deleted since
+ * (ghosts). It counts the inserts and deletes it sees and lowers its range's low bound by the ghosts they allow.
  */
 export class LogLog implements Structure {
   readonly kind = "logLog" as const;
   readonly params: Readonly<Record<string, number>>;
 
   private registers: Uint8Array;
+  private insertCount = 0;
+  private deleteCount = 0;
   private readonly b: number;
   private readonly m: number;
   private readonly seed: number;
@@ -62,8 +66,22 @@ export class LogLog implements Structure {
     return this.constants.logLogErrorCoefficient / Math.sqrt(this.m);
   }
 
+  /** Insert events seen. */
+  get inserts(): number {
+    return this.insertCount;
+  }
+
+  /** Delete events seen and ignored. Each ghost needs at least one, so there are never more ghosts than this. */
+  get deletes(): number {
+    return this.deleteCount;
+  }
+
   ingest(event: StreamEvent): void {
-    if (event.op !== "insert") return; // LogLog cannot delete
+    if (event.op === "delete") {
+      this.deleteCount++; // it cannot undo a register, but it can count the departure
+      return;
+    }
+    this.insertCount++;
     const h = murmur3U32(event.value, this.seed);
     const idx = h >>> (32 - this.b);
     const rest = (h << this.b) >>> 0;
@@ -77,36 +95,44 @@ export class LogLog implements Structure {
     return alphaFor(this.m) * this.m * Math.pow(2, sum / this.m);
   }
 
-  query(challenge: Challenge): Answer | null {
-    if (challenge.kind !== "count") return null;
+  /** The range for the distinct values ever inserted, at a two-sided confidence. */
+  private everRange(confidence: number): CountRange {
     const est = this.estimate();
     // The error is skewed high, so a symmetric range under-covers at small register counts.
     // These bounds are lopsided (lognormal) to keep the stated confidence.
     const sigmaLn = Math.sqrt(Math.log(1 + this.standardError ** 2));
     const centre = (sigmaLn * sigmaLn) / 2;
-    const z = zForConfidence(this.constants.confidence);
-    return {
-      estimate: est,
-      low: est * Math.exp(centre - z * sigmaLn),
-      high: est * Math.exp(centre + z * sigmaLn),
-      confidence: this.constants.confidence,
-    };
+    const z = zForConfidence(confidence);
+    return { estimate: est, low: est * Math.exp(centre - z * sigmaLn), high: est * Math.exp(centre + z * sigmaLn) };
+  }
+
+  query(challenge: Challenge): Answer | null {
+    if (challenge.kind !== "count") return null;
+    const confidence = this.constants.confidence;
+    return { ...liveCountRange((c) => this.everRange(c), this.insertCount, this.deleteCount, confidence), confidence };
   }
 
   snapshot(): StructureSnapshot {
-    return { ...snapshotHeader(this.kind, this.options), state: { registers: Array.from(this.registers) } };
+    return {
+      ...snapshotHeader(this.kind, this.options),
+      state: { registers: Array.from(this.registers), inserts: this.insertCount, deletes: this.deleteCount },
+    };
   }
 
   static fromSnapshot(snapshot: StructureSnapshot, constants: StructureConstants): LogLog {
     expectKind(snapshot, "logLog");
     const counter = new LogLog(optionsFromSnapshot(snapshot), constants);
     counter.registers = Uint8Array.from(readCounts(snapshot.state, "registers", counter.registers.length));
+    counter.insertCount = readNumber(snapshot.state, "inserts");
+    counter.deleteCount = readNumber(snapshot.state, "deletes");
     return counter;
   }
 
   clone(): LogLog {
     const copy = new LogLog(this.options, this.constants);
     copy.registers = new Uint8Array(this.registers);
+    copy.insertCount = this.insertCount;
+    copy.deleteCount = this.deleteCount;
     return copy;
   }
 
@@ -118,6 +144,8 @@ export class LogLog implements Structure {
     for (let i = 0; i < merged.registers.length; i++) {
       merged.registers[i] = Math.max(merged.registers[i] ?? 0, other.registers[i] ?? 0);
     }
+    merged.insertCount = this.insertCount + other.insertCount;
+    merged.deleteCount = this.deleteCount + other.deleteCount;
     return merged;
   }
 }

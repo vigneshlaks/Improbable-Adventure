@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { LogLog } from "./logLog";
-import { coverageFloor, distinctValues, TEST_CONSTANTS, TRIALS, trialRng } from "./testUtils";
+import { LiveSet } from "../enemies/liveSet";
+import { createStream, nextBurst, type StreamParams } from "../enemies/stream";
+import { binomialUpper, zForConfidence } from "../stats/stats";
+import type { Answer } from "./types";
+import { churnStream, coverageFloor, distinctValues, TEST_CONSTANTS, TRIALS, trialRng } from "./testUtils";
 
 const make = (spaceBits: number, hashSeed?: number) => new LogLog({ spaceBits, hashSeed }, TEST_CONSTANTS);
 
@@ -54,6 +58,103 @@ describe("LogLog", () => {
     const copy = a.clone();
     copy.ingest({ op: "insert", value: 123456789 });
     expect(() => a.merge(make(640))).toThrow();
+  });
+
+  describe("deletes it cannot see", () => {
+    // 64 registers, and streams of thousands of distinct values, where the structure's own error law holds.
+    const counter = () => make(320);
+
+    it("counts the inserts and the deletes it ignores", () => {
+      const s = counter();
+      s.ingest({ op: "insert", value: 1 });
+      s.ingest({ op: "delete", value: 1 });
+      s.ingest({ op: "delete", value: 1 });
+      expect([s.inserts, s.deletes]).toEqual([1, 2]);
+    });
+
+    it("keeps the counts through clone, and adds them in a merge", () => {
+      const a = counter();
+      const b = counter();
+      a.ingest({ op: "insert", value: 1 });
+      a.ingest({ op: "delete", value: 1 });
+      b.ingest({ op: "insert", value: 2 });
+      b.ingest({ op: "insert", value: 3 });
+      b.ingest({ op: "delete", value: 2 });
+      expect([a.clone().inserts, a.clone().deletes]).toEqual([1, 1]);
+      const merged = a.merge(b);
+      expect([merged.inserts, merged.deletes]).toEqual([3, 2]);
+    });
+
+    it("lowers the low bound by the ghosts the deleted share allows, composed from its own ever range", () => {
+      const s = counter();
+      for (let value = 0; value < 4000; value++) s.ingest({ op: "insert", value });
+      for (let value = 0; value < 400; value++) s.ingest({ op: "delete", value }); // a tenth of the units: q = 0.1
+
+      // Rebuild the expected range: the ever range at 97.5 percent, then the ghosts.
+      const estimate = s.estimate();
+      const sigmaLn = Math.sqrt(Math.log(1 + s.standardError ** 2));
+      const centre = (sigmaLn * sigmaLn) / 2;
+      const z = zForConfidence(0.975);
+      const everLow = estimate * Math.exp(centre - z * sigmaLn);
+      const everHigh = estimate * Math.exp(centre + z * sigmaLn);
+      const ghosts = Math.min(400, binomialUpper(Math.ceil(everLow), 0.1, 0.975));
+
+      const answer = s.query({ kind: "count" }) as Answer;
+      expect(answer.low).toBeCloseTo(Math.max(0, everLow - ghosts), 6);
+      expect(answer.high).toBeCloseTo(everHigh, 6);
+      expect(answer.estimate).toBe(estimate);
+    });
+
+    it("is unchanged until a delete is seen", () => {
+      const s = counter();
+      for (let value = 0; value < 4000; value++) s.ingest({ op: "insert", value });
+      const answer = s.query({ kind: "count" }) as Answer;
+      const sigmaLn = Math.sqrt(Math.log(1 + s.standardError ** 2));
+      expect(answer.high).toBeCloseTo(s.estimate() * Math.exp(sigmaLn ** 2 / 2 + zForConfidence(0.95) * sigmaLn), 6);
+    });
+
+    it("keeps its range honest, and informative, when the enemy deletes values", () => {
+      let held = 0;
+      let informative = 0;
+      for (let t = 0; t < TRIALS; t++) {
+        const rng = trialRng("loglog-ghosts", t);
+        const { events, live } = churnStream(rng, distinctValues(rng, 4000), 6000, 0.25);
+        const s = counter();
+        for (const e of events) s.ingest(e);
+        const answer = s.query({ kind: "count" }) as Answer;
+        if (answer.low <= live.distinct && live.distinct <= answer.high) held++;
+        if (answer.low > 0) informative++;
+      }
+      expect(held / TRIALS).toBeGreaterThanOrEqual(coverageFloor(TEST_CONSTANTS.confidence, TRIALS));
+      expect(informative / TRIALS).toBeGreaterThan(0.95);
+    });
+
+    // The game's own streams, with bursts big enough that the stream dwarfs the 64 registers.
+    const TRIALS_PER_MIX = 120;
+    for (const churn of [0.1, 0.3]) {
+      for (const growth of [1, 1.35]) {
+        for (const drift of [{ fraction: 0, everyTurns: 0 }, { fraction: 0.5, everyTurns: 3 }]) {
+          const name = `churn ${churn}, growth ${growth}, ${drift.everyTurns ? "drifting" : "fixed"} favorites`;
+          it(`keeps its range honest on the enemy stream generator: ${name}`, () => {
+            const params: StreamParams = { universe: 16384, churn, growth, drift, skew: 0.8, baseBurst: 1000 };
+            let held = 0;
+            for (let t = 0; t < TRIALS_PER_MIX; t++) {
+              let stream = createStream(`ll-${name}-${t}`);
+              const live = new LiveSet();
+              const s = counter();
+              for (let turn = 0; turn < 4; turn++) {
+                const burst = nextBurst(params, stream, live);
+                stream = burst.state;
+                for (const e of burst.events) s.ingest(e);
+              }
+              const answer = s.query({ kind: "count" }) as Answer;
+              if (answer.low <= live.distinct && live.distinct <= answer.high) held++;
+            }
+            expect(held / TRIALS_PER_MIX).toBeGreaterThanOrEqual(coverageFloor(TEST_CONSTANTS.confidence, TRIALS_PER_MIX));
+          });
+        }
+      }
+    }
   });
 
   describe(`statistical (${TRIALS} seeded trials)`, () => {
