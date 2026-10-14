@@ -102,7 +102,8 @@ describe("LogLog", () => {
       const answer = s.query({ kind: "count" }) as Answer;
       expect(answer.low).toBeCloseTo(Math.max(0, everLow - ghosts), 6);
       expect(answer.high).toBeCloseTo(everHigh, 6);
-      expect(answer.estimate).toBe(estimate);
+      // The estimate expects fewer ghosts than the range allows: about 1 unit per value, so about a tenth are ghosts.
+      expect(answer.estimate).toBeCloseTo(estimate * (1 - 0.1 * Math.exp(-(Math.max(1, 4000 / estimate) - 1) * 0.9)), 6);
     });
 
     it("is unchanged until a delete is seen", () => {

@@ -68,7 +68,7 @@ describe("LinearCounting", () => {
       s.ingest({ op: "insert", value: 1 });
       s.ingest({ op: "delete", value: 1 });
       expect([s.inserts, s.deletes]).toEqual([2, 1]);
-      expect(s.query({ kind: "count" })?.estimate).toBeCloseTo(1, 1); // the deleted value is still counted: a ghost
+      expect(s.query({ kind: "count" })?.high).toBeGreaterThan(0.95); // the deleted value is still counted: a ghost
     });
 
     it("keeps the counts through clone", () => {
@@ -88,7 +88,9 @@ describe("LinearCounting", () => {
 
       // Bitmap error is about 0.03 at 97.5 percent, so the ever range is about 9.94 to 10.06. At most 8 of 10
       // values are ghosts at that confidence (a binomial in 1/2), and there were 20 deletes, so 8 decides.
-      expect(after?.estimate).toBeCloseTo(10, 1);
+      // The estimate expects fewer ghosts: 4 units per value, half deleted, so a value is a ghost with chance
+      // 0.5 * exp(-3 * 0.5), about a ninth. That leaves 10 * (1 - 0.112) = 8.88.
+      expect(after?.estimate).toBeCloseTo(10 * (1 - 0.5 * Math.exp(-1.5)), 1);
       expect(after?.low).toBeCloseTo(9.94 - 8, 1);
       expect(after?.high).toBeCloseTo(10.06, 1);
       expect(after?.high as number).toBeGreaterThan(before?.high as number); // the tighter confidence asked of the bitmap

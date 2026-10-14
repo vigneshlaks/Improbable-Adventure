@@ -112,7 +112,11 @@ describe("ReservoirSampling", () => {
 
     it("bounds the ghosts in a Count by the deleted share, instead of by every delete", () => {
       // 11 distinct values ever. Each is a ghost with chance at most 1/2, so at most 8 are (95 percent), leaving at least 3.
-      expect(halfDeleted().query({ kind: "count" })).toMatchObject({ estimate: 11, low: 3, high: 11 });
+      // The estimate expects fewer ghosts: 20 inserts over 11 values is 20/11 units each, so a value is a ghost with
+      // chance 0.5 * exp(-(20/11 - 1) * 0.5), about a third, leaving 11 * (1 - 0.332) = 7.35.
+      const answer = halfDeleted().query({ kind: "count" });
+      expect(answer).toMatchObject({ low: 3, high: 11 });
+      expect(answer?.estimate).toBeCloseTo(11 * (1 - 0.5 * Math.exp(-(20 / 11 - 1) * 0.5)), 9);
     });
 
     it("reports nothing live once every unit has been deleted", () => {

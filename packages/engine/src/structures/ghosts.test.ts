@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { binomialUpper, zForConfidence } from "../stats/stats";
-import { deletedShare, liveCountRange } from "./ghosts";
+import { deletedShare, expectedGhostShare, liveCountRange } from "./ghosts";
 
 const everRange = () => {
   const asked: number[] = [];
@@ -24,6 +24,33 @@ describe("deletedShare", () => {
 
   it("is 0 when nothing happened", () => {
     expect(deletedShare(0, 0)).toBe(0);
+  });
+});
+
+describe("expectedGhostShare", () => {
+  it("is 0 when no delete was seen", () => {
+    expect(expectedGhostShare(500, 0, 100)).toBe(0);
+  });
+
+  it("is the deleted share when every value has one unit, since each deleted unit then removes a value", () => {
+    expect(expectedGhostShare(100, 40, 100)).toBeCloseTo(0.4, 12);
+  });
+
+  it("shrinks as values have more units, because a value is only a ghost once all of its units are gone", () => {
+    // 1,000 inserts over 100 values: 10 units each. Half deleted: q^10-ish, so almost no ghosts.
+    expect(expectedGhostShare(1000, 500, 100)).toBeCloseTo(0.5 * Math.exp(-9 * 0.5), 12);
+    expect(expectedGhostShare(200, 100, 100)).toBeLessThan(expectedGhostShare(100, 50, 100));
+  });
+
+  it("falls back to the deleted share when there is nothing to divide by", () => {
+    expect(expectedGhostShare(0, 5, 100)).toBe(1);
+    expect(expectedGhostShare(100, 40, 0)).toBeCloseTo(0.4, 12);
+  });
+
+  it("never exceeds the deleted share, so a ghost never needs more deletes than were seen", () => {
+    for (const [inserts, deletes, ever] of [[100, 10, 100], [300, 120, 50], [50, 50, 10], [10, 500, 4]] as const) {
+      expect(expectedGhostShare(inserts, deletes, ever)).toBeLessThanOrEqual(deletedShare(inserts, deletes));
+    }
   });
 });
 
@@ -58,6 +85,21 @@ describe("liveCountRange", () => {
   it("never goes below zero", () => {
     const { ever } = everRange();
     expect(liveCountRange(ever, 10, 500, 0.95).low).toBe(0);
+  });
+
+  it("moves the estimate down by the ghosts to expect, and only the estimate and the low bound", () => {
+    const { ever } = everRange();
+    // 100 inserts and 40 deletes over about 100 values: each value has about one unit, so about 40 percent are ghosts.
+    const singles = liveCountRange(ever, 100, 40, 0.95);
+    expect(singles.estimate).toBeCloseTo(100 * (1 - 0.4), 9);
+    expect(singles.high).toBe(110);
+    // 1,000 inserts over the same 100 values: ten units each, so deleting half removes almost no value.
+    expect(liveCountRange(ever, 1000, 500, 0.95).estimate).toBeCloseTo(100 * (1 - 0.5 * Math.exp(-4.5)), 9);
+  });
+
+  it("leaves the estimate where it was when no delete was seen", () => {
+    const { ever } = everRange();
+    expect(liveCountRange(ever, 100, 0, 0.95).estimate).toBe(100);
   });
 
   it("keeps an infinite upper bound", () => {

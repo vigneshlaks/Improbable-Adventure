@@ -1,5 +1,6 @@
 import { Rng } from "../rng/rng";
 import { binomialUpper, clamp, clopperPearson } from "../stats/stats";
+import { expectedGhostShare } from "./ghosts";
 import { expectKind, optionsFromSnapshot, readCounts, readNumber, readRngState, snapshotHeader } from "./snapshot";
 import {
   assertSpace,
@@ -157,7 +158,9 @@ export class ReservoirSampling implements Structure {
     // Live values are the ever-inserted ones minus the ghosts. A value is a ghost with chance at most q (one with
     // several units is less likely to vanish), so the ghosts are at most a binomial in q. Live cannot exceed ever.
     const ghosts = binomialUpper(Math.ceil(ever.low), this.deletedShare, confidence);
-    return { estimate: ever.estimate, low: Math.max(0, ever.low - ghosts), high: ever.high, confidence };
+    const low = Math.max(0, ever.low - ghosts);
+    const expected = ever.estimate * (1 - expectedGhostShare(this.seen, this.deleteCount, ever.estimate));
+    return { estimate: clamp(expected, low, ever.high), low, high: ever.high, confidence };
   }
 
   snapshot(): StructureSnapshot {
