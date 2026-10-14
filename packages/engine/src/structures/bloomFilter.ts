@@ -28,7 +28,8 @@ export function bloomOptimalK(m: number, n: number): number {
 
 /**
  * Bloom filter: a bit array of m = Space bits. Knob: expected item count n, from which the hash count k is derived.
- * It never misses a real value but can flag a decoy. It cannot delete, so deleted values stay flagged.
+ * It never misses a real value but can flag a decoy. It cannot delete, so deleted values stay flagged as ghosts.
+ * It counts the delete events it ignores so its Presence range can allow for them.
  */
 export class BloomFilter implements Structure {
   readonly kind = "bloomFilter" as const;
@@ -37,6 +38,7 @@ export class BloomFilter implements Structure {
   private bits: Uint32Array;
   private setBits = 0;
   private insertCount = 0;
+  private deleteCount = 0;
   private readonly m: number;
   private readonly k: number;
   private readonly seed: number;
@@ -63,6 +65,11 @@ export class BloomFilter implements Structure {
     return this.setBits / this.m;
   }
 
+  /** Delete events seen and ignored. Each ghost needs at least one, so there are never more ghosts than this. */
+  get deletes(): number {
+    return this.deleteCount;
+  }
+
   /** Insert events processed (duplicates included). */
   get inserted(): number {
     return this.insertCount;
@@ -76,7 +83,10 @@ export class BloomFilter implements Structure {
   }
 
   ingest(event: StreamEvent): void {
-    if (event.op !== "insert") return; // Bloom filters cannot delete
+    if (event.op === "delete") {
+      this.deleteCount++; // it cannot remove the value, but it can count the departure
+      return;
+    }
     this.insertCount++;
     for (const idx of doubleHashIndices(event.value, this.k, this.m, this.seed)) {
       const word = idx >>> 5;
@@ -97,12 +107,14 @@ export class BloomFilter implements Structure {
   query(challenge: Challenge): Answer | null {
     if (challenge.kind !== "presence") return null;
     const flagged = challenge.targets.filter((t) => this.test(t));
-    // Every real target is flagged, so extra flags are false alarms. Subtracting the most false alarms
-    // plausible at this confidence gives the low bound.
+    // Every real target is flagged, so extra flags are false alarms of two kinds. Hash collisions: at most
+    // `maxFalse` are plausible at this confidence. Ghosts: values deleted since, of which there are at most as
+    // many as delete events, and no more than the targets flagged. Subtracting both gives the low bound.
     const maxFalse = binomialUpper(challenge.targets.length, this.currentFalsePositiveRate(), this.constants.confidence);
+    const ghosts = Math.min(this.deleteCount, flagged.length);
     return {
       estimate: flagged,
-      low: Math.max(0, flagged.length - maxFalse),
+      low: Math.max(0, flagged.length - maxFalse - ghosts),
       high: flagged.length,
       confidence: this.constants.confidence,
     };
@@ -111,7 +123,7 @@ export class BloomFilter implements Structure {
   snapshot(): StructureSnapshot {
     return {
       ...snapshotHeader(this.kind, this.options),
-      state: { bits: Array.from(this.bits), setBits: this.setBits, insertCount: this.insertCount },
+      state: { bits: Array.from(this.bits), setBits: this.setBits, insertCount: this.insertCount, deletes: this.deleteCount },
     };
   }
 
@@ -121,6 +133,7 @@ export class BloomFilter implements Structure {
     filter.bits = Uint32Array.from(readCounts(snapshot.state, "bits", filter.bits.length));
     filter.setBits = readNumber(snapshot.state, "setBits");
     filter.insertCount = readNumber(snapshot.state, "insertCount");
+    filter.deleteCount = readNumber(snapshot.state, "deletes");
     return filter;
   }
 
@@ -129,6 +142,7 @@ export class BloomFilter implements Structure {
     copy.bits = new Uint32Array(this.bits);
     copy.setBits = this.setBits;
     copy.insertCount = this.insertCount;
+    copy.deleteCount = this.deleteCount;
     return copy;
   }
 
@@ -145,6 +159,7 @@ export class BloomFilter implements Structure {
     }
     merged.setBits = count;
     merged.insertCount = this.insertCount + other.insertCount;
+    merged.deleteCount = this.deleteCount + other.deleteCount;
     return merged;
   }
 }

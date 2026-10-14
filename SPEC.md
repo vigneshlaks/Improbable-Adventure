@@ -176,9 +176,19 @@ The player chooses the Space for each structure and at most one extra knob. The 
 
 **Rules every implementation must follow**
 
-- Structures that do not support deletes ignore delete events. That is the intended weakness against Churn, not a bug.
+- Structures that do not support deletes ignore delete events. That is the intended weakness against Churn, not a bug. Bloom Filter and Reservoir Sampling also count the delete events they ignore, and use the count to keep their ranges honest (see "Delete-blind ranges" below).
 - Every query returns an estimate plus a low and high bound at a configured confidence (default 95%). For structures with one-sided error, one bound equals the estimate.
 - Each structure gets a statistical test in the engine: over many seeded trials, its observed error must fall within its theoretical bound. Where no clean bound exists (t-digest, KLL), the test records an empirical table that the query uses for its bounds.
+
+**Delete-blind ranges (decided 2026-10-14).** A range is a claim about the answer to the challenge, and a challenge asks about values that are live now. A structure that ignores deletes keeps counting or flagging deleted values (ghosts), so its range can miss the live truth. Measured in play, a Bloom Filter's Presence range held the truth 100, 51 and 29 percent of the time with no, some and many deletes, against a claimed 95.
+
+- Bloom Filter and Reservoir Sampling keep `d`, the number of delete events they ignored. Every ghost needs at least one delete, so there are never more than `d` ghosts. They do not remove anything; they only count.
+- Bloom Filter, Presence: the low bound is widened by `min(d, flagged)`, so `low = max(0, flagged - collisions - min(d, flagged))`. The high bound is unchanged.
+- Reservoir Sampling, Presence: the low bound is widened by `min(d, flagged)`. Frequency and Count: the low bound is widened by `d`, never below zero, because the sample describes what was ever inserted and the live truth is at least that minus `d`. High bounds are unchanged, since live cannot exceed ever-inserted.
+- With no deletes seen, every range is exactly what it was before.
+- The counter is not charged against Space.
+- This bound is conservative. Under real Churn, `d` is far larger than the number of targets, so the Bloom Filter's Presence low bound is 0 (its range is "0 to however many it flagged"), and Reservoir Sampling's Presence and Frequency low bounds are mostly 0. The ranges are honest because they say little. The high bound stays informative, and it is the bound a player strikes at to avoid being blocked.
+- Linear Counting and LogLog also ignore deletes and are not changed by this decision. Measured in play their ranges still miss the live truth under Churn, and LogLog's also misses on small streams.
 
 ## Enchantments, upgrades, and fusions
 

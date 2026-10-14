@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { BloomFilter, bloomFalsePositiveRate, bloomOptimalK } from "./bloomFilter";
-import { coverageFloor, distinctValues, TEST_CONSTANTS, TRIALS, trialRng } from "./testUtils";
+import type { Answer } from "./types";
+import { churnStream, coverageFloor, distinctValues, presenceTargets, TEST_CONSTANTS, TRIALS, trialRng } from "./testUtils";
 
 const make = (spaceBits: number, knob?: number, hashSeed?: number) =>
   new BloomFilter({ spaceBits, knob, hashSeed }, TEST_CONSTANTS);
@@ -79,6 +80,68 @@ describe("BloomFilter", () => {
 
   it("rejects Space of zero", () => {
     expect(() => make(0)).toThrow(RangeError);
+  });
+
+  describe("deletes it cannot see", () => {
+    // A roomy filter, so hash collisions are negligible and any shortfall is due to ghosts.
+    const roomy = () => make(4096, 100);
+    const inserted = [11, 22, 33];
+
+    it("counts the delete events it ignores", () => {
+      const b = roomy();
+      expect(b.deletes).toBe(0);
+      for (const v of inserted) b.ingest({ op: "insert", value: v });
+      b.ingest({ op: "delete", value: 11 });
+      b.ingest({ op: "delete", value: 11 });
+      expect(b.deletes).toBe(2);
+      expect(b.query({ kind: "presence", targets: [11] })?.estimate).toEqual([11]); // still flagged: a ghost
+    });
+
+    it("widens the low bound by min(deletes seen, targets flagged), and leaves the high bound alone", () => {
+      const lowAfter = (deletes: number) => {
+        const b = roomy();
+        for (const v of inserted) b.ingest({ op: "insert", value: v });
+        for (let i = 0; i < deletes; i++) b.ingest({ op: "delete", value: 11 });
+        const answer = b.query({ kind: "presence", targets: [...inserted, 777, 888] });
+        expect(answer?.high).toBe(3);
+        return answer?.low;
+      };
+      expect(lowAfter(0)).toBe(3); // unchanged without deletes: all three flagged, no collisions to allow for
+      expect(lowAfter(1)).toBe(2);
+      expect(lowAfter(2)).toBe(1);
+      expect(lowAfter(3)).toBe(0);
+      expect(lowAfter(50)).toBe(0); // never below zero
+    });
+
+    it("carries the delete count through clone and merge", () => {
+      const a = roomy();
+      const b = roomy();
+      a.ingest({ op: "delete", value: 1 });
+      b.ingest({ op: "delete", value: 2 });
+      b.ingest({ op: "delete", value: 3 });
+      expect(a.clone().deletes).toBe(1);
+      expect(a.merge(b).deletes).toBe(3);
+    });
+
+    it(`keeps its Presence range honest when the enemy deletes values (${TRIALS} seeded trials)`, () => {
+      let covered = 0;
+      let trialsWithGhostFlags = 0;
+      for (let t = 0; t < TRIALS; t++) {
+        const rng = trialRng("bloom-ghosts", t);
+        const { events, live } = churnStream(rng, distinctValues(rng, 80), 500, 0.4);
+        const b = roomy();
+        for (const e of events) b.ingest(e);
+
+        const targets = presenceTargets(live, rng);
+        const real = targets.filter((target) => live.count(target) > 0).length;
+        const answer = b.query({ kind: "presence", targets }) as Answer;
+        if (answer.low <= real && real <= answer.high) covered++;
+        const flagged = answer.estimate as number[];
+        if (flagged.some((target) => live.ghosts().includes(target))) trialsWithGhostFlags++;
+      }
+      expect(trialsWithGhostFlags / TRIALS).toBeGreaterThan(0.5); // the scenario really does flag ghosts
+      expect(covered / TRIALS).toBeGreaterThanOrEqual(coverageFloor(TEST_CONSTANTS.confidence, TRIALS));
+    });
   });
 
   describe(`statistical (${TRIALS} seeded trials)`, () => {

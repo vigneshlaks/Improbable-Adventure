@@ -15,7 +15,9 @@ import {
 /**
  * Reservoir sampling: a uniform random sample of the insert stream, one slot per VALUE_BITS of Space.
  * Counts are estimated by scaling up from the sample. It cannot see deletes, so deleted values stay in
- * the sample as ghosts. Its raw values are shown to the player.
+ * the sample as ghosts. It counts the delete events it ignores, and widens the low bound of its ranges by
+ * that many, because the sample describes what was ever inserted and the truth is what is still live.
+ * Its raw values are shown to the player.
  */
 export class ReservoirSampling implements Structure {
   readonly kind = "reservoirSampling" as const;
@@ -23,6 +25,7 @@ export class ReservoirSampling implements Structure {
 
   private sample: number[] = [];
   private seen = 0;
+  private deleteCount = 0;
   private rng: Rng;
   private readonly slots: number;
 
@@ -49,8 +52,21 @@ export class ReservoirSampling implements Structure {
     return this.seen;
   }
 
+  /** Delete events seen and ignored. Each ghost needs at least one, so there are never more ghosts than this. */
+  get deletes(): number {
+    return this.deleteCount;
+  }
+
+  /** Lowers a low bound by the deletes seen: live is at least ever-inserted minus the deletes. Never below zero. */
+  private widen(low: number): number {
+    return Math.max(0, low - this.deleteCount);
+  }
+
   ingest(event: StreamEvent): void {
-    if (event.op !== "insert") return; // deletes are invisible to a sample
+    if (event.op === "delete") {
+      this.deleteCount++; // a sample cannot tell which value left, but it can count the departures
+      return;
+    }
     this.seen++;
     if (this.sample.length < this.slots) {
       this.sample.push(event.value);
@@ -66,9 +82,14 @@ export class ReservoirSampling implements Structure {
       case "presence": {
         const inSample = new Set(this.sample);
         const flagged = challenge.targets.filter((t) => inSample.has(t));
-        // A sampled value was inserted at some point (possibly deleted since).
-        // Unsampled targets may still be present.
-        return { estimate: flagged, low: flagged.length, high: challenge.targets.length, confidence };
+        // A sampled value was inserted at some point, possibly deleted since, and at most as many sampled
+        // values are ghosts as there were deletes. Unsampled targets may still be present.
+        return {
+          estimate: flagged,
+          low: flagged.length - Math.min(this.deleteCount, flagged.length),
+          high: challenge.targets.length,
+          confidence,
+        };
       }
       case "frequency":
         return this.frequency(challenge.value, confidence);
@@ -81,7 +102,7 @@ export class ReservoirSampling implements Structure {
     const n = this.sample.length;
     let c = 0;
     for (const v of this.sample) if (v === value) c++;
-    if (this.seen <= this.slots) return { estimate: c, low: c, high: c, confidence };
+    if (this.seen <= this.slots) return { estimate: c, low: this.widen(c), high: c, confidence };
 
     const N = this.seen;
     const scale = N / n;
@@ -89,7 +110,7 @@ export class ReservoirSampling implements Structure {
     // Exact range on the sample's share, scaled to the stream. The usual normal approximation
     // breaks down when almost none or almost all of the sample matches.
     const { low, high } = clopperPearson(c, n, confidence);
-    return { estimate, low: Math.max(c, N * low), high: Math.min(N, N * high), confidence };
+    return { estimate, low: this.widen(Math.max(c, N * low)), high: Math.min(N, N * high), confidence };
   }
 
   private distinct(confidence: number): Answer {
@@ -97,7 +118,7 @@ export class ReservoirSampling implements Structure {
     const freq = new Map<number, number>();
     for (const v of this.sample) freq.set(v, (freq.get(v) ?? 0) + 1);
     const dSample = freq.size;
-    if (this.seen <= this.slots) return { estimate: dSample, low: dSample, high: dSample, confidence };
+    if (this.seen <= this.slots) return { estimate: dSample, low: this.widen(dSample), high: dSample, confidence };
 
     let singletons = 0;
     for (const f of freq.values()) if (f === 1) singletons++;
@@ -105,7 +126,7 @@ export class ReservoirSampling implements Structure {
     const estimate = ratio * singletons + (dSample - singletons);
     return {
       estimate,
-      low: clamp(estimate / ratio, dSample, this.seen),
+      low: this.widen(clamp(estimate / ratio, dSample, this.seen)),
       high: clamp(estimate * ratio, dSample, this.seen),
       confidence,
     };
@@ -116,7 +137,7 @@ export class ReservoirSampling implements Structure {
       ...snapshotHeader(this.kind, this.options),
       // The random generator's position is part of the state: a restored sample must keep making the
       // same random choices as the original.
-      state: { sample: [...this.sample], seen: this.seen, rng: { ...this.rng.getState() } },
+      state: { sample: [...this.sample], seen: this.seen, deletes: this.deleteCount, rng: { ...this.rng.getState() } },
     };
   }
 
@@ -127,6 +148,7 @@ export class ReservoirSampling implements Structure {
     if (sample.length > sampler.slots) throw new RangeError('Bad snapshot: "sample" exceeds its slots');
     sampler.sample = sample;
     sampler.seen = readNumber(snapshot.state, "seen");
+    sampler.deleteCount = readNumber(snapshot.state, "deletes");
     sampler.rng = Rng.fromState(readRngState(snapshot.state));
     return sampler;
   }
@@ -135,6 +157,7 @@ export class ReservoirSampling implements Structure {
     const copy = new ReservoirSampling(this.options, this.constants);
     copy.sample = [...this.sample];
     copy.seen = this.seen;
+    copy.deleteCount = this.deleteCount;
     copy.rng = this.rng.clone();
     return copy;
   }
