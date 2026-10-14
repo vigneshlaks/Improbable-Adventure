@@ -1,5 +1,5 @@
 import { Rng } from "../rng/rng";
-import { clamp, clopperPearson } from "../stats/stats";
+import { binomialUpper, clamp, clopperPearson } from "../stats/stats";
 import { expectKind, optionsFromSnapshot, readCounts, readNumber, readRngState, snapshotHeader } from "./snapshot";
 import {
   assertSpace,
@@ -18,6 +18,11 @@ import {
  * the sample as ghosts. It counts the delete events it ignores, and widens the low bound of its ranges by
  * that many, because the sample describes what was ever inserted and the truth is what is still live.
  * Its raw values are shown to the player.
+ *
+ * The number of deletes against the number of inserts gives the share of units deleted, q. Treating each unit as
+ * deleted independently with chance q, a Frequency answer is the ever-inserted count thinned by q, and a Count
+ * answer loses at most the ghosts a binomial in q allows. A Presence answer cannot be bounded this way, because
+ * which targets are ghosts depends on how the challenge chose them, so it keeps the worst-case widening.
  */
 export class ReservoirSampling implements Structure {
   readonly kind = "reservoirSampling" as const;
@@ -57,9 +62,9 @@ export class ReservoirSampling implements Structure {
     return this.deleteCount;
   }
 
-  /** Lowers a low bound by the deletes seen: live is at least ever-inserted minus the deletes. Never below zero. */
-  private widen(low: number): number {
-    return Math.max(0, low - this.deleteCount);
+  /** The share of inserted units that have since been deleted. The structure can count both, so this is known. */
+  private get deletedShare(): number {
+    return this.seen === 0 ? 1 : Math.min(1, this.deleteCount / this.seen);
   }
 
   ingest(event: StreamEvent): void {
@@ -102,15 +107,36 @@ export class ReservoirSampling implements Structure {
     const n = this.sample.length;
     let c = 0;
     for (const v of this.sample) if (v === value) c++;
-    if (this.seen <= this.slots) return { estimate: c, low: this.widen(c), high: c, confidence };
+    const exact = this.seen <= this.slots;
 
-    const N = this.seen;
-    const scale = N / n;
-    const estimate = c * scale;
-    // Exact range on the sample's share, scaled to the stream. The usual normal approximation
-    // breaks down when almost none or almost all of the sample matches.
-    const { low, high } = clopperPearson(c, n, confidence);
-    return { estimate, low: this.widen(Math.max(c, N * low)), high: Math.min(N, N * high), confidence };
+    if (this.deleteCount === 0) {
+      if (exact) return { estimate: c, low: c, high: c, confidence };
+      const N = this.seen;
+      // Exact range on the sample's share, scaled to the stream. The usual normal approximation
+      // breaks down when almost none or almost all of the sample matches.
+      const { low, high } = clopperPearson(c, n, confidence);
+      return { estimate: (c * N) / n, low: Math.max(c, N * low), high: Math.min(N, N * high), confidence };
+    }
+
+    // The error budget is shared by the sources of error. Each side of the range may miss with chance `tail`
+    // from each source: the sampling (when there is any) and the deletions.
+    const tail = (1 - confidence) / (exact ? 2 : 4);
+    let ever = { estimate: c, low: c, high: c };
+    if (!exact) {
+      const N = this.seen;
+      const { low, high } = clopperPearson(c, n, 1 - 2 * tail);
+      ever = { estimate: (c * N) / n, low: Math.max(c, N * low), high: Math.min(N, N * high) };
+    }
+    return this.thinned(ever, tail, confidence);
+  }
+
+  /** Turns a range for the ever-inserted count into one for the live count, by thinning it with the deleted share. */
+  private thinned(ever: { estimate: number; low: number; high: number }, tail: number, confidence: number): Answer {
+    const q = this.deletedShare;
+    // Fewest survivors: the most deletions plausible among the fewest units. Most survivors: the reverse.
+    const low = Math.max(0, ever.low - binomialUpper(Math.ceil(ever.low), q, 1 - tail));
+    const high = Math.max(low, ever.high - binomialUpper(Math.floor(ever.high), q, tail));
+    return { estimate: clamp(ever.estimate * (1 - q), low, high), low, high, confidence };
   }
 
   private distinct(confidence: number): Answer {
@@ -118,18 +144,20 @@ export class ReservoirSampling implements Structure {
     const freq = new Map<number, number>();
     for (const v of this.sample) freq.set(v, (freq.get(v) ?? 0) + 1);
     const dSample = freq.size;
-    if (this.seen <= this.slots) return { estimate: dSample, low: this.widen(dSample), high: dSample, confidence };
+    let ever = { estimate: dSample, low: dSample, high: dSample };
+    if (this.seen > this.slots) {
+      let singletons = 0;
+      for (const f of freq.values()) if (f === 1) singletons++;
+      const ratio = Math.sqrt(this.seen / n);
+      const estimate = ratio * singletons + (dSample - singletons);
+      ever = { estimate, low: clamp(estimate / ratio, dSample, this.seen), high: clamp(estimate * ratio, dSample, this.seen) };
+    }
+    if (this.deleteCount === 0) return { ...ever, confidence };
 
-    let singletons = 0;
-    for (const f of freq.values()) if (f === 1) singletons++;
-    const ratio = Math.sqrt(this.seen / n);
-    const estimate = ratio * singletons + (dSample - singletons);
-    return {
-      estimate,
-      low: this.widen(clamp(estimate / ratio, dSample, this.seen)),
-      high: clamp(estimate * ratio, dSample, this.seen),
-      confidence,
-    };
+    // Live values are the ever-inserted ones minus the ghosts. A value is a ghost with chance at most q (one with
+    // several units is less likely to vanish), so the ghosts are at most a binomial in q. Live cannot exceed ever.
+    const ghosts = binomialUpper(Math.ceil(ever.low), this.deletedShare, confidence);
+    return { estimate: ever.estimate, low: Math.max(0, ever.low - ghosts), high: ever.high, confidence };
   }
 
   snapshot(): StructureSnapshot {

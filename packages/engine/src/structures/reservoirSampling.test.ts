@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { LiveSet } from "../enemies/liveSet";
+import { createStream, nextBurst, type StreamParams } from "../enemies/stream";
 import { Rng } from "../rng/rng";
 import { ReservoirSampling } from "./reservoirSampling";
 import type { Answer } from "./types";
@@ -83,20 +85,48 @@ describe("ReservoirSampling", () => {
       expect([0, 1, 2, 3, 40].map(lowAfter)).toEqual([3, 2, 1, 0, 0]);
     });
 
-    it("widens the Frequency and Count low bounds by the deletes seen, never below zero", () => {
-      const s = sampler(10); // everything fits, so the answers are exact before widening
-      for (const v of [7, 7, 7, 7, 8, 9]) s.ingest({ op: "insert", value: v });
-      expect(s.query({ kind: "frequency", value: 7 })).toMatchObject({ estimate: 4, low: 4, high: 4 });
-      expect(s.query({ kind: "count" })).toMatchObject({ estimate: 3, low: 3, high: 3 });
+    // Value 7 is inserted 10 times among 20 inserts, then half of all units are deleted (5 of the 7s among them).
+    // Everything fits in the sample, so before deletes the answers are exact: 10 sevens and 11 distinct values.
+    const halfDeleted = () => {
+      const s = sampler(50);
+      for (let i = 0; i < 10; i++) s.ingest({ op: "insert", value: 7 });
+      for (let v = 100; v < 110; v++) s.ingest({ op: "insert", value: v });
+      for (let i = 0; i < 5; i++) s.ingest({ op: "delete", value: 7 });
+      for (let v = 100; v < 105; v++) s.ingest({ op: "delete", value: v });
+      return s;
+    };
 
-      s.ingest({ op: "delete", value: 7 });
-      s.ingest({ op: "delete", value: 7 });
-      expect(s.query({ kind: "frequency", value: 7 })).toMatchObject({ estimate: 4, low: 2, high: 4 });
-      expect(s.query({ kind: "count" })).toMatchObject({ estimate: 3, low: 1, high: 3 });
+    it("is exact before any delete", () => {
+      const s = sampler(50);
+      for (let i = 0; i < 10; i++) s.ingest({ op: "insert", value: 7 });
+      for (let v = 100; v < 110; v++) s.ingest({ op: "insert", value: v });
+      expect(s.query({ kind: "frequency", value: 7 })).toMatchObject({ estimate: 10, low: 10, high: 10 });
+      expect(s.query({ kind: "count" })).toMatchObject({ estimate: 11, low: 11, high: 11 });
+    });
 
-      for (let i = 0; i < 10; i++) s.ingest({ op: "delete", value: 9 });
-      expect(s.query({ kind: "frequency", value: 7 })?.low).toBe(0);
-      expect(s.query({ kind: "count" })?.low).toBe(0);
+    it("scales a Frequency estimate to the live share, with a range that allows for the units deleted", () => {
+      // Half the units are gone, so the estimate halves. Each of the 10 sevens was deleted with chance 1/2, so the
+      // survivors are Binomial(10, 1/2): between 2 and 8 with 95 percent confidence.
+      expect(halfDeleted().query({ kind: "frequency", value: 7 })).toMatchObject({ estimate: 5, low: 2, high: 8 });
+    });
+
+    it("bounds the ghosts in a Count by the deleted share, instead of by every delete", () => {
+      // 11 distinct values ever. Each is a ghost with chance at most 1/2, so at most 8 are (95 percent), leaving at least 3.
+      expect(halfDeleted().query({ kind: "count" })).toMatchObject({ estimate: 11, low: 3, high: 11 });
+    });
+
+    it("reports nothing live once every unit has been deleted", () => {
+      const s = sampler(10);
+      for (let i = 0; i < 3; i++) s.ingest({ op: "insert", value: 4 });
+      for (let i = 0; i < 3; i++) s.ingest({ op: "delete", value: 4 });
+      expect(s.query({ kind: "frequency", value: 4 })).toMatchObject({ estimate: 0, low: 0, high: 0 });
+    });
+
+    it("keeps the estimate inside its range", () => {
+      for (const answer of [halfDeleted().query({ kind: "frequency", value: 7 }), halfDeleted().query({ kind: "count" })]) {
+        expect(answer?.estimate as number).toBeGreaterThanOrEqual(answer?.low as number);
+        expect(answer?.estimate as number).toBeLessThanOrEqual(answer?.high as number);
+      }
     });
 
     it("carries the delete count through clone", () => {
@@ -106,15 +136,23 @@ describe("ReservoirSampling", () => {
     });
 
     // A big sample of a small stream, so most of the stream is in the sample, ghosts included.
-    const coverage = (label: string, build: (rng: Rng) => { contained: boolean; ghostsInvolved: boolean }) => {
+    interface Trial {
+      contained: boolean;
+      ghostsInvolved: boolean;
+      /** True when the low bound says something, that is, it is above zero. */
+      informative?: boolean;
+    }
+    const coverage = (label: string, build: (rng: Rng) => Trial, trials = TRIALS) => {
       let held = 0;
       let involved = 0;
-      for (let t = 0; t < TRIALS; t++) {
+      let informative = 0;
+      for (let t = 0; t < trials; t++) {
         const result = build(trialRng(label, t));
         if (result.contained) held++;
         if (result.ghostsInvolved) involved++;
+        if (result.informative) informative++;
       }
-      return { held: held / TRIALS, involved: involved / TRIALS };
+      return { held: held / trials, involved: involved / trials, informative: informative / trials };
     };
     const within = (answer: Answer | null, actual: number) => !!answer && answer.low <= actual && actual <= answer.high;
     const bigSampler = (rng: Rng) => new ReservoirSampling({ spaceBits: 32 * 200, rng: rng.split("sample") }, TEST_CONSTANTS);
@@ -133,29 +171,75 @@ describe("ReservoirSampling", () => {
       expect(held).toBeGreaterThanOrEqual(coverageFloor(TEST_CONSTANTS.confidence, TRIALS));
     });
 
-    it("keeps its Frequency range honest when the enemy deletes values", () => {
-      const { held, involved } = coverage("res-ghost-frequency", (rng) => {
+    it("keeps its Frequency range honest, and still informative, when the enemy deletes values", () => {
+      const { held, involved, informative } = coverage("res-ghost-frequency", (rng) => {
         const { events, live } = churnStream(rng, distinctValues(rng, 30), 600, 0.4, { skewed: true });
         const s = bigSampler(rng);
         for (const e of events) s.ingest(e);
         const heaviest = live.mode() as { value: number; count: number };
-        return {
-          contained: within(s.query({ kind: "frequency", value: heaviest.value }), heaviest.count),
-          ghostsInvolved: events.some((e) => e.op === "delete"),
-        };
+        const answer = s.query({ kind: "frequency", value: heaviest.value });
+        return { contained: within(answer, heaviest.count), ghostsInvolved: events.some((e) => e.op === "delete"), informative: (answer?.low ?? 0) > 0 };
       });
       expect(involved).toBeGreaterThan(0.5);
       expect(held).toBeGreaterThanOrEqual(coverageFloor(TEST_CONSTANTS.confidence, TRIALS));
+      expect(informative).toBeGreaterThan(0.8); // a low bound of zero would say nothing
     });
 
-    it("keeps its Count range honest when the enemy deletes values", () => {
-      const { held } = coverage("res-ghost-count", (rng) => {
+    it("keeps its Count range honest, and still informative, when the enemy deletes values", () => {
+      const { held, informative } = coverage("res-ghost-count", (rng) => {
         const { events, live } = churnStream(rng, distinctValues(rng, 60), 400, 0.4);
         const s = bigSampler(rng);
         for (const e of events) s.ingest(e);
-        return { contained: within(s.query({ kind: "count" }), live.distinct), ghostsInvolved: live.ghosts().length > 0 };
+        const answer = s.query({ kind: "count" });
+        return { contained: within(answer, live.distinct), ghostsInvolved: live.ghosts().length > 0, informative: (answer?.low ?? 0) > 0 };
       });
       expect(held).toBeGreaterThanOrEqual(coverageFloor(TEST_CONSTANTS.confidence, TRIALS));
+      expect(informative).toBeGreaterThan(0.8);
+    });
+
+    // The game's own streams, under the trait mixes that hurt most: deletes, growing bursts, and heavy values that change.
+    describe("on the enemy stream generator", () => {
+      const TRIALS_PER_MIX = 120;
+      const mixes = [];
+      for (const universe of [256, 16384]) {
+        for (const churn of [0.1, 0.3]) {
+          for (const growth of [1, 1.35]) {
+            for (const drift of [{ fraction: 0, everyTurns: 0 }, { fraction: 0.5, everyTurns: 3 }]) {
+              mixes.push({ universe, churn, growth, drift });
+            }
+          }
+        }
+      }
+
+      for (const mix of mixes) {
+        const name = `${mix.universe} values, churn ${mix.churn}, growth ${mix.growth}, ${mix.drift.everyTurns ? "drifting" : "fixed"} favorites`;
+        it(`keeps Frequency and Count ranges honest: ${name}`, () => {
+          const params: StreamParams = { ...mix, skew: 0.8, baseBurst: 200 };
+          const run = (kind: "frequency" | "count") =>
+            coverage(
+              `res-stream-${kind}-${name}`,
+              (rng) => {
+                const seed = `s-${rng.next()}`;
+                let stream = createStream(seed);
+                const live = new LiveSet();
+                const s = new ReservoirSampling({ spaceBits: 32 * 128, rng: rng.split("sample") }, TEST_CONSTANTS);
+                for (let turn = 0; turn < 4; turn++) {
+                  const burst = nextBurst(params, stream, live);
+                  stream = burst.state;
+                  for (const e of burst.events) s.ingest(e);
+                }
+                const heaviest = live.mode() as { value: number; count: number };
+                const answer = s.query(kind === "frequency" ? { kind: "frequency", value: heaviest.value } : { kind: "count" });
+                const actual = kind === "frequency" ? heaviest.count : live.distinct;
+                return { contained: within(answer, actual), ghostsInvolved: live.ghosts().length > 0 };
+              },
+              TRIALS_PER_MIX,
+            ).held;
+          const floor = coverageFloor(TEST_CONSTANTS.confidence, TRIALS_PER_MIX);
+          expect(run("frequency")).toBeGreaterThanOrEqual(floor);
+          expect(run("count")).toBeGreaterThanOrEqual(floor);
+        });
+      }
     });
   });
 
