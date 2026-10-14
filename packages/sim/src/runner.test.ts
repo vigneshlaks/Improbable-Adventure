@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Action, GroundTruth } from "@pda/engine";
+import { burstSize, resolveStreamParams, type Action, type GroundTruth } from "@pda/engine";
 import { getBot } from "./bots";
 import type { Bot } from "./bots/types";
 import { playFight } from "./runner";
@@ -101,6 +101,50 @@ describe("playFight", () => {
 
   it("has no accuracy to report for a bot that uses no structures", () => {
     expect(playFight({ config: minion("none", "count"), seed: "none", bot: getBot("oracle") }).accuracy).toEqual({});
+  });
+
+  describe("Count duel: LogLog against Linear Counting at equal Space", () => {
+    const futile = scripted("futile", () => (view) => (view.observation.phase === "deploy" ? { type: "endDeploy" } : { type: "strikeValue", value: 1 }));
+
+    it("compares the two at every Count challenge and records the most distinct values seen", () => {
+      // 4 million possible values, no skew, no deletes: nearly every insert is a new value.
+      const config = minionWith("duel", "count", { variety: "high", growth: "high" });
+      const record = playFight({ config, seed: "duel", bot: futile });
+      expect(record.outcome).toBe("lost");
+
+      let inserts = 0;
+      const params = resolveStreamParams(config.enemy.size, config.enemy.traits, config.traitTables, config.rules.expectedTurns);
+      for (let turn = 1; turn <= config.enemy.turnLimit; turn++) inserts += burstSize(params, turn);
+      expect(record.countDuel.challenges).toBe(7); // turns 2 to 8
+      expect(record.countDuel.largestDistinct).toBeLessThanOrEqual(inserts);
+      expect(record.countDuel.largestDistinct).toBeGreaterThan(inserts * 0.99);
+      expect(record.countDuel.logLogCloser).toBeGreaterThanOrEqual(0);
+      expect(record.countDuel.logLogCloser).toBeLessThan(record.countDuel.challenges / 2); // Linear Counting wins at these sizes
+    });
+
+    it("sees fewer values when more of the enemy's events are deletes", () => {
+      const churned = playFight({ config: minionWith("ghosts", "count", { variety: "high", churn: "high" }), seed: "ghosts", bot: futile });
+      const steady = playFight({ config: minionWith("ghosts", "count", { variety: "high" }), seed: "ghosts", bot: futile });
+      expect(churned.countDuel.largestDistinct).toBeGreaterThan(0);
+      expect(churned.countDuel.largestDistinct).toBeLessThan(steady.countDuel.largestDistinct);
+    });
+
+    it("counts the values the counters saw, ghosts included, not only the ones still live", () => {
+      // 256 possible values with heavy deletes: many values are inserted, deleted, and no longer live.
+      const livePeaks: number[] = [];
+      const watcher = scripted("watcher", () => (view) => {
+        if (view.truth?.answer?.kind === "count") livePeaks.push(view.truth.answer.distinct);
+        return view.observation.phase === "deploy" ? { type: "endDeploy" } : { type: "strikeValue", value: 1 };
+      }, true);
+      const record = playFight({ config: minionWith("seen", "count", { churn: "high" }), seed: "seen", bot: watcher });
+      expect(livePeaks.length).toBe(record.countDuel.challenges);
+      expect(record.countDuel.largestDistinct).toBeGreaterThan(Math.max(...livePeaks));
+    });
+
+    it("stays at zero in a fight with no Count challenge", () => {
+      const record = playFight({ config: minion("nocount", "frequency"), seed: "nocount", bot: futile });
+      expect(record.countDuel).toEqual({ challenges: 0, logLogCloser: 0, largestDistinct: 0 });
+    });
   });
 
   it("is deterministic in its seed", () => {

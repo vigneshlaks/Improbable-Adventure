@@ -12,6 +12,7 @@ import {
   type StructureKind,
 } from "@pda/engine";
 import type { Bot, BotView } from "./bots/types";
+import { counterErrors, everSeen } from "./countDuel";
 
 /** What a bot sees at this point in the fight. The true answers are included only for a bot that asks for them. */
 export function makeView(state: FightState, config: FightConfig, bot: Bot): BotView {
@@ -36,6 +37,16 @@ export interface AccuracyTally {
   relativeErrorCount: number;
 }
 
+/** How LogLog and Linear Counting, given the same Space, compared at a fight's Count challenges. */
+export interface CountDuelTally {
+  /** Count challenges struck at. */
+  challenges: number;
+  /** Challenges where LogLog's estimate was strictly closer to the truth. */
+  logLogCloser: number;
+  /** The most distinct values the counters had seen at any one challenge (deleted values included). */
+  largestDistinct: number;
+}
+
 export interface FightRecord {
   bot: string;
   seed: string;
@@ -54,6 +65,8 @@ export interface FightRecord {
   deployed: StructureKind[];
   /** Each kind of structure's answers against the truth. This is accuracy in play, so a structure deployed late is judged on a stream it only partly saw. */
   accuracy: Partial<Record<StructureKind, AccuracyTally>>;
+  /** A side comparison, whatever the bot deployed: every Count structure the player could have used, at the starting Space. */
+  countDuel: CountDuelTally;
   events?: GameEvent[];
 }
 
@@ -78,6 +91,17 @@ function tallyAnswers(observation: Observation, state: FightState, accuracy: Fig
   }
 }
 
+/** At a Count challenge, has a LogLog and a Linear Counting that each held all the starting Space judge the stream, and tallies who was closer. */
+function tallyCountDuel(state: FightState, duel: CountDuelTally): void {
+  const truth = groundTruth(state).answer;
+  if (truth?.kind !== "count" || truth.distinct <= 0) return;
+  const seen = everSeen(state.live);
+  const errors = counterErrors(seen, truth.distinct, state.config.rules.startingSpace, state.config.constants);
+  duel.challenges++;
+  if (errors.logLog < errors.linearCounting) duel.logLogCloser++;
+  duel.largestDistinct = Math.max(duel.largestDistinct, seen.length);
+}
+
 export interface PlayOptions {
   config: FightConfig;
   seed: string;
@@ -94,11 +118,15 @@ export function playFight({ config, seed, bot, maxSteps = 2000, keepEvents = fal
   const rng = Rng.fromSeed(`${seed}/bot/${bot.name}`);
   const all: GameEvent[] = [];
   const accuracy: FightRecord["accuracy"] = {};
+  const countDuel: CountDuelTally = { challenges: 0, logLogCloser: 0, largestDistinct: 0 };
 
   let steps = 0;
   while (state.phase !== "won" && state.phase !== "lost" && steps < maxSteps) {
     const view = makeView(state, config, bot);
-    if (state.phase === "strike") tallyAnswers(view.observation, state, accuracy);
+    if (state.phase === "strike") {
+      tallyAnswers(view.observation, state, accuracy);
+      tallyCountDuel(state, countDuel);
+    }
     const action = player(view, rng);
     try {
       const result = step(state, action);
@@ -124,6 +152,7 @@ export function playFight({ config, seed, bot, maxSteps = 2000, keepEvents = fal
     strikes: { total: 0, wrong: 0 },
     deployed: [],
     accuracy,
+    countDuel,
   };
 
   for (const event of all) {

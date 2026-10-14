@@ -14,6 +14,7 @@ const fight = (overrides: Partial<FightRecord>): FightRecord => ({
   strikes: { total: 0, wrong: 0 },
   deployed: [],
   accuracy: {},
+  countDuel: { challenges: 0, logLogCloser: 0, largestDistinct: 0 },
   ...overrides,
 });
 
@@ -26,6 +27,7 @@ export const RECORDS: FightRecord[] = [
     strikes: { total: 3, wrong: 1 },
     deployed: ["countMinSketch", "bloomFilter"],
     accuracy: { countMinSketch: { answers: 2, covered: 2, confidenceSum: 1.96, relativeErrorSum: 0.2, relativeErrorCount: 2 } },
+    countDuel: { challenges: 3, logLogCloser: 1, largestDistinct: 900 },
   }),
   fight({
     seed: "B",
@@ -46,6 +48,7 @@ export const RECORDS: FightRecord[] = [
     strikes: { total: 2, wrong: 0 },
     deployed: ["countMinSketch"],
     accuracy: { countMinSketch: { answers: 1, covered: 0, confidenceSum: 0.98, relativeErrorSum: 0.4, relativeErrorCount: 1 } },
+    countDuel: { challenges: 1, logLogCloser: 1, largestDistinct: 60000 },
   }),
   fight({
     seed: "D",

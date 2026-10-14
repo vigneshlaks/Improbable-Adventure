@@ -44,6 +44,15 @@ describe("summarize", () => {
     expect(report.accuracy.exactMemory).toBeUndefined();
   });
 
+  it("reports how often LogLog beat Linear Counting at Count challenges, and the most distinct values seen", () => {
+    expect(report.countDuel).toEqual({ fights: 2, challenges: 4, logLogCloserShare: 0.5, largestDistinct: 60000 });
+  });
+
+  it("has no share to report when no Count challenge came up", () => {
+    const none = summarize([RECORDS[1]!, RECORDS[3]!], META);
+    expect(none.countDuel).toEqual({ fights: 0, challenges: 0, logLogCloserShare: null, largestDistinct: 0 });
+  });
+
   it("handles fights that never struck or deployed anything", () => {
     const quiet = summarize([{ ...RECORDS[0]!, strikes: { total: 0, wrong: 0 }, deployed: [], accuracy: {} }], META);
     expect(quiet.strikes).toEqual({ meanPerFight: 0, wrongShare: 0 });

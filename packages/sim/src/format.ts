@@ -11,6 +11,15 @@ const heading = (label: string, ...columns: string[]) => `${label.padEnd(NAME_WI
 const kindsIn = (record: Partial<Record<StructureKind, unknown>>) => (Object.keys(record) as StructureKind[]);
 const nameOf = (kind: StructureKind) => structures[kind].name;
 
+function countDuelLines(duel: FightReport["countDuel"]): string[] {
+  if (duel.logLogCloserShare === null) return ["  no Count challenge came up"];
+  return [
+    row("Fights with a Count challenge", String(duel.fights)),
+    row("LogLog closer than Linear Counting", percent(duel.logLogCloserShare)) + `   (of ${duel.challenges} challenges)`,
+    row("Most distinct values seen", String(duel.largestDistinct)),
+  ];
+}
+
 /** The full report for one bot, as text. */
 export function formatReport(report: FightReport): string {
   const { outcomes, meanCertaintyLost: lost } = report;
@@ -58,6 +67,9 @@ export function formatReport(report: FightReport): string {
       );
     }),
     ...(kindsIn(report.accuracy).length === 0 ? ["  no structure answered"] : []),
+    "",
+    "Count structures at equal Space (each holding all the starting Space)",
+    ...countDuelLines(report.countDuel),
   ];
   return lines.join("\n");
 }

@@ -26,6 +26,11 @@ export interface FightReport {
   structures: Partial<Record<StructureKind, { deployedShare: number; winRateWhenDeployed: number }>>;
   /** For each structure that ever answered: how often its range held the truth, against what it claimed. */
   accuracy: Partial<Record<StructureKind, { answers: number; withinRange: number; statedConfidence: number; meanRelativeError: number | null }>>;
+  /**
+   * LogLog against Linear Counting at Count challenges, whatever the bot deployed: each judges the same stream
+   * holding all the starting Space. `largestDistinct` is the most values the counters had seen at one challenge.
+   */
+  countDuel: { fights: number; challenges: number; logLogCloserShare: number | null; largestDistinct: number };
 }
 
 export interface ReportMeta {
@@ -77,6 +82,14 @@ export function summarize(records: FightRecord[], meta: ReportMeta): FightReport
     };
   }
 
+  const duelChallenges = sum(records, (record) => record.countDuel.challenges);
+  const countDuel: FightReport["countDuel"] = {
+    fights: records.filter((record) => record.countDuel.challenges > 0).length,
+    challenges: duelChallenges,
+    logLogCloserShare: duelChallenges === 0 ? null : sum(records, (record) => record.countDuel.logLogCloser) / duelChallenges,
+    largestDistinct: Math.max(0, ...records.map((record) => record.countDuel.largestDistinct)),
+  };
+
   return {
     ...meta,
     fights: n,
@@ -104,6 +117,7 @@ export function summarize(records: FightRecord[], meta: ReportMeta): FightReport
     },
     structures,
     accuracy,
+    countDuel,
   };
 }
 

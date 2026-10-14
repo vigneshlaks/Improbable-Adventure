@@ -53,6 +53,20 @@ describe("formatReport", () => {
   });
 });
 
+describe("formatReport, Count structures", () => {
+  it("shows how often LogLog was closer and the most distinct values seen", () => {
+    const text = formatReport(report);
+    expect(text).toMatch(/Fights with a Count challenge +2/);
+    expect(text).toMatch(/LogLog closer than Linear Counting +50\.0%/);
+    expect(text).toMatch(/of 4 challenges/);
+    expect(text).toMatch(/Most distinct values seen +60000/);
+  });
+
+  it("says so when there was no Count challenge", () => {
+    expect(formatReport(summarize([RECORDS[1]!], META))).toMatch(/no Count challenge/);
+  });
+});
+
 describe("formatComparison", () => {
   it("puts each bot on its own row with the headline numbers", () => {
     const text = formatComparison([report, { ...report, bot: "oracle", winRate: 1, winRateInterval: [0.9, 1] }]);
