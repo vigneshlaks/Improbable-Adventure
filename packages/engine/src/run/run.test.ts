@@ -213,3 +213,70 @@ describe("a whole run", () => {
     expect(play(revived, { type: "chooseReward", index: 1 }).state).toEqual(next);
   });
 });
+
+describe("fusions at the rest stop", () => {
+  /** A run that offers LogLog at its first reward, takes it, and arrives at the rest stop (before encounter 2). */
+  function restWith(logLog: boolean, overrides = {}) {
+    const rewards = [
+      { id: "structure:logLog", kind: "structure" as const, structure: "logLog" as const, weight: 1 },
+      { id: "upgrade:power", kind: "upgrade" as const, upgrade: "power", weight: 1 },
+    ];
+    let run = createRun("fuse", runConfig({ rewards, ...overrides }));
+    for (let reward = 0; reward < 2; reward++) {
+      run = until(run, "reward");
+      const options = observeRun(run).offers ?? [];
+      const wanted = logLog && reward === 0 ? "structure:logLog" : "upgrade:power";
+      run = play(run, { type: "chooseReward", index: Math.max(0, options.findIndex((o) => o.id === wanted)) }).state;
+    }
+    return run;
+  }
+
+  it("offers a fusion whose inputs are all owned, next to leaving", () => {
+    const rest = restWith(true);
+    expect(rest.phase).toBe("rest");
+    expect(legalActions(rest)).toEqual([{ type: "fuse", recipeId: "hyperLogLog" }, { type: "leaveRest" }]);
+    expect(observeRun(rest).fusions).toEqual([{ id: "hyperLogLog", inputs: ["logLog", "linearCounting"], result: "hyperLogLog" }]);
+    expect(legalActions(restWith(false))).toEqual([{ type: "leaveRest" }]); // LogLog was never taken
+  });
+
+  it("consumes the inputs and gives the result, which the next fight can deploy", () => {
+    const { state, events } = play(restWith(true), { type: "fuse", recipeId: "hyperLogLog" });
+    expect(state.phase).toBe("rest"); // fusing does not end the rest stop
+    expect(state.owned).toEqual(["exactMemory", "reservoirSampling", "bloomFilter", "hyperLogLog"]);
+    expect(events).toContainEqual({ type: "fused", recipeId: "hyperLogLog", inputs: ["logLog", "linearCounting"], result: "hyperLogLog" });
+    expect(legalActions(state)).toEqual([{ type: "leaveRest" }]); // the inputs are gone
+    const fight = play(state, { type: "leaveRest" }).state;
+    expect(fight.fight?.config.loadout).toContain("hyperLogLog");
+    expect(fight.fight?.config.loadout).not.toContain("logLog");
+    expect(legalActions(fight).some((a) => a.type === "deploy" && a.kind === "hyperLogLog")).toBe(true);
+  });
+
+  it("refuses a fusion out of turn, with an unknown recipe, or without the inputs", () => {
+    expect(() => step(start(), { type: "fuse", recipeId: "hyperLogLog" })).toThrow(IllegalActionError); // in a fight
+    expect(() => step(restWith(true), { type: "fuse", recipeId: "mystery" })).toThrow(IllegalActionError);
+    expect(() => step(restWith(false), { type: "fuse", recipeId: "hyperLogLog" })).toThrow(IllegalActionError);
+    const fused = play(restWith(true), { type: "fuse", recipeId: "hyperLogLog" }).state;
+    expect(() => step(fused, { type: "fuse", recipeId: "hyperLogLog" })).toThrow(IllegalActionError); // already used up
+  });
+
+  it("does not offer a consumed structure as a reward again", () => {
+    const fused = play(restWith(true), { type: "fuse", recipeId: "hyperLogLog" }, { type: "leaveRest" }).state;
+    expect(fused.consumed).toEqual(["logLog", "linearCounting"]);
+    const offers = observeRun(until(fused, "reward")).offers ?? [];
+    expect(offers.some((o) => o.kind === "structure" && o.structure === "logLog")).toBe(false);
+  });
+
+  it("does not offer a fusion whose result is already owned", () => {
+    const owned = until(createRun("dup", runConfig({ loadout: ["exactMemory", "logLog", "linearCounting", "hyperLogLog"] })), "rest");
+    expect(owned.phase).toBe("rest");
+    expect(legalActions(owned)).toEqual([{ type: "leaveRest" }]);
+  });
+
+  it("rejects a recipe that cannot work", () => {
+    expect(() => start("x", { fusions: [{ id: "a", inputs: ["logLog", "logLog"], result: "hyperLogLog" }] })).toThrow(RangeError);
+    expect(() => start("x", { fusions: [{ id: "a", inputs: ["logLog", "linearCounting"], result: "logLog" }] })).toThrow(RangeError);
+    expect(() => start("x", { fusions: [{ id: "a", inputs: ["logLog"], result: "hyperLogLog" }] })).toThrow(RangeError);
+    const twice = { id: "a", inputs: ["logLog", "linearCounting"] as const, result: "hyperLogLog" as const };
+    expect(() => start("x", { fusions: [twice, twice] })).toThrow(RangeError);
+  });
+});

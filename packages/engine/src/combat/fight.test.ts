@@ -10,11 +10,12 @@ import {
   type FightState,
   type GameEvent,
 } from "./index";
+import { TEST_CONSTANTS } from "../structures/testUtils";
 
 // A small, fast enemy: few distinct values and a steep skew, so one value clearly dominates after a
 // single burst. With 1,000 events over 5 expected turns, each burst is about 200 events.
 const CONFIG: FightConfig = {
-  constants: { valueBits: 32, confidence: 0.95, cmsDefaultDepth: 4, logLogErrorCoefficient: 1.3 },
+  constants: TEST_CONSTANTS,
   rules: {
     startingSpace: 8192,
     startingCertainty: 100,

@@ -76,6 +76,8 @@ describe("balance.json", () => {
       confidence: 0.95,
       cmsDefaultDepth: 4,
       logLogErrorCoefficient: 1.3,
+      hyperLogLogErrorCoefficient: 1.04,
+      hyperLogLogSmallRange: 2.8,
     });
   });
 

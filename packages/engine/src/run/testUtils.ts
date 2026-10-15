@@ -1,3 +1,4 @@
+import { TEST_CONSTANTS } from "../structures/testUtils";
 import { groundTruth } from "../combat/view";
 import type { EnemyConfig } from "../combat/types";
 import { step } from "./run";
@@ -28,7 +29,7 @@ export const REWARDS: RewardDef[] = [
 
 export function runConfig(overrides: Partial<RunConfig> = {}): RunConfig {
   return {
-    constants: { valueBits: 32, confidence: 0.95, cmsDefaultDepth: 4, logLogErrorCoefficient: 1.3 },
+    constants: TEST_CONSTANTS,
     rules: {
       startingSpace: 8192,
       startingCertainty: 100,
@@ -61,6 +62,7 @@ export function runConfig(overrides: Partial<RunConfig> = {}): RunConfig {
     restHeal: 30,
     rewardChoices: 3,
     rewards: REWARDS,
+    fusions: [{ id: "hyperLogLog", inputs: ["logLog", "linearCounting"], result: "hyperLogLog" }],
     upgrades: {
       capacity: { space: 1024 },
       slots: { slots: 1 },

@@ -21,6 +21,7 @@ const CASES: Array<{ kind: StructureKind; options: StructureOptions }> = [
   { kind: "countMinSketch", options: { spaceBits: 4096, knob: 4, hashSeed: 12345 } },
   { kind: "logLog", options: { spaceBits: 640, hashSeed: 12345 } },
   { kind: "linearCounting", options: { spaceBits: 1024, hashSeed: 12345 } },
+  { kind: "hyperLogLog", options: { spaceBits: 640, hashSeed: 12345 } },
 ];
 
 const UNIVERSE = distinctValues(trialRng("snapshot-universe", 0), 300);
@@ -57,7 +58,7 @@ const answers = (s: Structure) => PROBES.map((probe) => s.query(probe));
 const viaJson = (snapshot: StructureSnapshot): StructureSnapshot => JSON.parse(JSON.stringify(snapshot));
 
 describe("snapshots, for every structure", () => {
-  /** Runs a check on each of the six structures, reporting every one that fails. */
+  /** Runs a check on each structure, reporting every one that fails. */
   const forEvery = (check: (c: { kind: StructureKind; options: StructureOptions; build: () => Structure }) => void) =>
     eachCase(CASES.map((c) => [c.kind, c] as const), ({ kind, options }) =>
       check({ kind, options, build: () => createStructure(kind, options, TEST_CONSTANTS) }),

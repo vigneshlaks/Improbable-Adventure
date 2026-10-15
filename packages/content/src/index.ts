@@ -1,6 +1,7 @@
 export * from "./balance";
 export * from "./enemies";
 export * from "./fight";
+export * from "./fusions";
 export * from "./narration";
 export * from "./run";
 export * from "./structures";

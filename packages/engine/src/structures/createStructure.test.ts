@@ -10,6 +10,7 @@ const KINDS: StructureKind[] = [
   "countMinSketch",
   "logLog",
   "linearCounting",
+  "hyperLogLog",
 ];
 
 describe("createStructure", () => {

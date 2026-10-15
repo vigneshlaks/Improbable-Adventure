@@ -31,6 +31,8 @@ export const balanceSchema = z.object({
   CONFIDENCE: z.number().gt(0).lt(1),
   CMS_DEFAULT_DEPTH: z.number().int().positive(),
   LOGLOG_ERROR_COEFFICIENT: z.number().positive(),
+  HLL_ERROR_COEFFICIENT: z.number().positive(),
+  HLL_SMALL_RANGE: z.number().positive(),
 
   STARTING_SPACE: z.number().int().positive(),
   STARTING_CERTAINTY: z.number().int().positive(),
@@ -83,5 +85,7 @@ export function structureConstants(b: Balance = balance): StructureConstants {
     confidence: b.CONFIDENCE,
     cmsDefaultDepth: b.CMS_DEFAULT_DEPTH,
     logLogErrorCoefficient: b.LOGLOG_ERROR_COEFFICIENT,
+    hyperLogLogErrorCoefficient: b.HLL_ERROR_COEFFICIENT,
+    hyperLogLogSmallRange: b.HLL_SMALL_RANGE,
   };
 }

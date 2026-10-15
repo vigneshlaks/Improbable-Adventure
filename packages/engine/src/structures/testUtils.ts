@@ -9,6 +9,8 @@ export const TEST_CONSTANTS: StructureConstants = {
   confidence: 0.95,
   cmsDefaultDepth: 4,
   logLogErrorCoefficient: 1.3,
+  hyperLogLogErrorCoefficient: 1.04,
+  hyperLogLogSmallRange: 2.8,
 };
 
 /** Every structure's statistical test runs this many seeded trials. */

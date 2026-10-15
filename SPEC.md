@@ -167,6 +167,7 @@ The player chooses the Space for each structure and at most one extra knob. The 
 | Count-Min Sketch | MVP | Frequency | Space, depth d | 32 × w × d | Never underestimates; overestimate at most (e/w) × N with probability 1 − e^(−d) | Yes, if counts stay non-negative |
 | LogLog | MVP | Count | Space | 5 × m registers | Standard error about 1.30 / √m | No |
 | Linear Counting | MVP | Count | Space | m | Estimate −m ln(V), V = fraction of zero bits; fails as V approaches 0 | No |
+| HyperLogLog (fusion) | MVP | Count | Space | 5 × m registers | Standard error about 1.04 / √m; counts empty registers (as Linear Counting) while that count is below 2.8 m | No |
 | Cuckoo Filter | 2 | Presence | Space, fingerprint bits f | buckets × 4 × f | False positives about 8 / 2^f; inserts fail above about 95% load, after which false negatives appear | Yes |
 | Count Sketch | 2 | Frequency | Space, depth d | 32 × w × d | Unbiased, error scales with the stream's L2 norm over √w | Yes |
 | K-Minimum Values | 2 | Count, set math | Space | 32 × k | Relative error about 1 / √(k − 2) | No |
@@ -300,6 +301,12 @@ The MVP run is one act: five fights, one rest stop, one Elite, then a Boss. The 
 - **The rest stop** restores `REST_HEAL` Certainty up to the maximum. Its only action for now is `leaveRest`; fusions and enchantments come in later steps.
 - **Seeds:** fight `i` uses `<run seed>/fight/<i>` and encounter `i` is designed from `<run seed>/encounter/<i>`, so the encounters do not copy each other and adding rewards never shifts a stream.
 - A scripted run that strikes the true answer every time wins the whole act on the real content (test), so Certainty carry-over alone does not make the act unwinnable. Whether the bots win it at the spec's balance targets is step 4.
+
+**HyperLogLog and fusions (decided 2026-10-15).**
+
+- **The structure.** HyperLogLog has m = the largest power of two that fits in Space / 5 registers (at least 16). The estimate is the harmonic mean `alpha_m m^2 / sum(2^-M_j)`; but while the count of empty registers, `m ln(m / V)`, is at most `HLL_SMALL_RANGE` (2.8) times m, it uses that count instead, as Linear Counting does. The range is the estimate plus or minus z times the error: Linear Counting's own error law while it counts empty registers, otherwise `HLL_ERROR_COEFFICIENT` (1.04) / √m. It ignores deletes and handles them as LogLog and Linear Counting do (the ghosts range and the live-share estimate above). Registers merge by maximum.
+- **Measured** (1,024 registers, 1,000 seeded trials per size, RMS relative error against the spec's 1.04 / √m = 3.25%): between 2.3% and 3.3% at every stream size from 500 to 100,000 values except around the switch, where both estimators are about equally noisy and the worst case is 3.57% (1.10 times the theory). The switch is decided on the empty-register count, which is less noisy than the harmonic mean, and 2.8 m was the threshold with the smallest worst case (2.5 m gave 3.86%). The test allows 1.10 times the theory away from the switch and 1.15 times around it, and requires the range to cover the truth at the stated confidence at every size.
+- **Recipes** are in `fusions.json` (id, inputs, result, summary, phase) and passed to the engine as `RunConfig.fusions`. At a rest stop the player may `fuse` any recipe whose inputs are all owned and whose result is not; the inputs are consumed, the result is added to the owned structures, and it takes one slot when deployed. Fusing does not end the rest stop. A fusion result is never found as a reward, and a consumed structure is not offered again. The HyperLogLog recipe is LogLog + Linear Counting; its in-game summary says it is a teaching shortcut.
 
 ## Engine API and data
 

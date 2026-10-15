@@ -18,9 +18,10 @@ export function preferredKinds(weakPoint: WeakPoint, traits: StreamTraits): Stru
       return ["countMinSketch", "exactMemory", "reservoirSampling"];
     case "count":
       // LogLog suits huge streams. Linear Counting is more precise while its bitmap has room.
+      // HyperLogLog (made by fusing the two) is the best of both.
       return traits.variety === "high"
-        ? ["logLog", "linearCounting", "exactMemory", "reservoirSampling"]
-        : ["linearCounting", "logLog", "exactMemory", "reservoirSampling"];
+        ? ["hyperLogLog", "logLog", "linearCounting", "exactMemory", "reservoirSampling"]
+        : ["hyperLogLog", "linearCounting", "logLog", "exactMemory", "reservoirSampling"];
   }
 }
 

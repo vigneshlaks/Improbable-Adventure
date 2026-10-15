@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { preferredKinds } from "./bots/common";
 import { eachCase } from "../../engine/src/testCases";
 import { buildFightConfig, type TierName } from "@pda/content";
 import {
@@ -90,6 +91,14 @@ describe("the bots", () => {
   });
 });
 
+describe("choosing structures", () => {
+  it("prefers HyperLogLog for Count when it is owned, whatever the stream's variety", () => {
+    const traits = { variety: "low", skew: "low", churn: "low", growth: "low", drift: "low" } as const;
+    expect(preferredKinds("count", traits)[0]).toBe("hyperLogLog");
+    expect(preferredKinds("count", { ...traits, variety: "high" })[0]).toBe("hyperLogLog");
+  });
+});
+
 describe("Oracle", () => {
   it("wins a Minion fight on turn 3 without losing Certainty to its own strikes", () => {
     for (const weakPoint of WEAK_POINTS) {
@@ -122,11 +131,17 @@ describe("Greedy", () => {
     const skewed = fightWith({ skew: "high" });
     expect(firstAction(getBot("greedy"), skewed.state, skewed.config)).toMatchObject({ type: "deploy", kind: "countMinSketch" });
 
+    // With every structure owned, HyperLogLog is the best Count tool at any variety. Without it (below) the choice follows the stream.
     const varied = fightWith({ variety: "high" });
-    expect(firstAction(getBot("greedy"), varied.state, varied.config)).toMatchObject({ type: "deploy", kind: "logLog" });
+    expect(firstAction(getBot("greedy"), varied.state, varied.config)).toMatchObject({ type: "deploy", kind: "hyperLogLog" });
 
-    const small = fightWith({ variety: "medium" });
-    expect(firstAction(getBot("greedy"), small.state, small.config)).toMatchObject({ type: "deploy", kind: "linearCounting" });
+    const withoutIt = (variety: "high" | "medium") => {
+      const base = fightWith({ variety });
+      const config = { ...base.config, loadout: base.config.loadout.filter((kind) => kind !== "hyperLogLog") };
+      return firstAction(getBot("greedy"), base.state, config);
+    };
+    expect(withoutIt("high")).toMatchObject({ type: "deploy", kind: "logLog" });
+    expect(withoutIt("medium")).toMatchObject({ type: "deploy", kind: "linearCounting" });
 
     const churning = fightWith({ churn: "high" });
     expect(firstAction(getBot("greedy"), churning.state, churning.config)).toMatchObject({ type: "deploy", kind: "bloomFilter" });
@@ -154,7 +169,7 @@ describe("Greedy", () => {
     for (let i = 0; i < 6; i++) {
       const { config } = fightWith({ skew: "high" }, "count");
       const { record } = observed(getBot("greedy"), config, `adapt-${i}`);
-      if (record.deployed.some((kind) => kind === "logLog" || kind === "linearCounting")) adapted++;
+      if (record.deployed.some((kind) => kind === "hyperLogLog" || kind === "logLog" || kind === "linearCounting")) adapted++;
     }
     expect(adapted).toBe(6);
   });

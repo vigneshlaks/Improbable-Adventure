@@ -3,7 +3,7 @@ import { createFight, step as stepFight } from "../combat/fight";
 import { legalActions as fightActions, observe as observeFight } from "../combat/view";
 import { Rng } from "../rng/rng";
 import type { StructureKind } from "../structures/types";
-import type { RewardDef, RewardView, RunAction, RunConfig, RunEvent, RunObservation, RunState, RunStepResult, UpgradeEffect } from "./types";
+import type { FusionDef, RewardDef, RewardView, RunAction, RunConfig, RunEvent, RunObservation, RunState, RunStepResult, UpgradeEffect } from "./types";
 
 /** The numbers upgrades add up to. */
 interface RunStats {
@@ -37,6 +37,14 @@ function validate(config: RunConfig): void {
   need(config.restHeal >= 0, "restHeal cannot be negative");
   for (const index of config.restBefore) {
     need(Number.isInteger(index) && index >= 1 && index < config.encounters.length, `a rest stop cannot come before encounter ${index}`);
+  }
+  const recipes = new Set<string>();
+  for (const fusion of config.fusions) {
+    need(!recipes.has(fusion.id), `fusion id ${fusion.id} is used twice`);
+    recipes.add(fusion.id);
+    need(fusion.inputs.length >= 2, `fusion ${fusion.id} needs at least two inputs`);
+    need(new Set(fusion.inputs).size === fusion.inputs.length, `fusion ${fusion.id} lists an input twice`);
+    need(!fusion.inputs.includes(fusion.result), `fusion ${fusion.id} would produce one of its own inputs`);
   }
   const ids = new Set<string>();
   for (const reward of config.rewards) {
@@ -82,6 +90,7 @@ export function createRun(seed: string, config: RunConfig): RunState {
     certainty: config.rules.startingCertainty,
     maxCertainty: config.rules.startingCertainty,
     owned: [...config.loadout],
+    consumed: [],
     upgrades: {},
     offers: null,
     rewardRng: Rng.fromSeed(`${seed}/rewards`).getState(),
@@ -94,7 +103,8 @@ export function createRun(seed: string, config: RunConfig): RunState {
 function drawOffers(state: RunState): { offers: string[]; rng: RunState["rewardRng"] } {
   const rng = Rng.fromState(state.rewardRng);
   const eligible = state.config.rewards.filter(
-    (reward) => reward.weight > 0 && !(reward.kind === "structure" && state.owned.includes(reward.structure)),
+    (reward) =>
+      reward.weight > 0 && !(reward.kind === "structure" && (state.owned.includes(reward.structure) || state.consumed.includes(reward.structure))),
   );
   const offers: string[] = [];
   while (offers.length < state.config.rewardChoices && eligible.length > 0) {
@@ -167,6 +177,24 @@ function chooseReward(state: RunState, index: number, events: Array<GameEvent | 
   return moved.state;
 }
 
+/** The fusions whose inputs are all owned, and whose result is not already owned. */
+function availableFusions(state: RunState): FusionDef[] {
+  return state.config.fusions.filter(
+    (fusion) => fusion.inputs.every((input) => state.owned.includes(input)) && !state.owned.includes(fusion.result),
+  );
+}
+
+function fuse(state: RunState, recipeId: string, events: Array<GameEvent | RunEvent>): RunState {
+  const recipe = availableFusions(state).find((fusion) => fusion.id === recipeId);
+  if (!recipe) throw new IllegalActionError(`The fusion "${recipeId}" is not available`);
+  events.push({ type: "fused", recipeId, inputs: [...recipe.inputs], result: recipe.result });
+  return {
+    ...state,
+    owned: [...state.owned.filter((kind) => !recipe.inputs.includes(kind)), recipe.result],
+    consumed: [...state.consumed, ...recipe.inputs],
+  };
+}
+
 /** Applies one action and returns the new state plus what happened. The input state is not modified. */
 export function step(state: RunState, action: RunAction): RunStepResult {
   const events: Array<GameEvent | RunEvent> = [];
@@ -179,7 +207,7 @@ export function step(state: RunState, action: RunAction): RunStepResult {
       throw new IllegalActionError("The run is over");
 
     case "fight": {
-      if (action.type === "chooseReward" || action.type === "leaveRest") throw new IllegalActionError(`${action.type} is not allowed during a fight`);
+      if (action.type === "chooseReward" || action.type === "leaveRest" || action.type === "fuse") throw new IllegalActionError(`${action.type} is not allowed during a fight`);
       const result = stepFight(state.fight as NonNullable<RunState["fight"]>, action);
       events.push(...result.events);
       reward = result.reward;
@@ -198,6 +226,10 @@ export function step(state: RunState, action: RunAction): RunStepResult {
       break;
 
     case "rest": {
+      if (action.type === "fuse") {
+        next = fuse(state, action.recipeId, events);
+        break;
+      }
       if (action.type !== "leaveRest") throw new IllegalActionError("The rest stop ends with leaveRest");
       const started = startFight({ ...state }, state.encounter);
       events.push(...started.events);
@@ -219,7 +251,7 @@ export function legalActions(state: RunState): RunAction[] {
     case "reward":
       return (state.offers ?? []).map((_, index) => ({ type: "chooseReward", index }));
     case "rest":
-      return [{ type: "leaveRest" }];
+      return [...availableFusions(state).map((fusion): RunAction => ({ type: "fuse", recipeId: fusion.id })), { type: "leaveRest" }];
   }
 }
 
@@ -243,6 +275,7 @@ export function observeRun(state: RunState): RunObservation {
     offers: state.offers
       ? state.offers.map((id) => viewOf(state.config.rewards.find((reward) => reward.id === id) as RewardDef))
       : null,
+    fusions: state.phase === "rest" ? availableFusions(state) : null,
   };
 }
 

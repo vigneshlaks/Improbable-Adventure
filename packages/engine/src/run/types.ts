@@ -22,6 +22,13 @@ export type RewardDef =
   | { id: string; kind: "structure"; structure: StructureKind; weight: number }
   | { id: string; kind: "upgrade"; upgrade: string; weight: number };
 
+/** A recipe: owning every input lets the player fuse them, at a rest stop, into the result. The inputs are consumed. */
+export interface FusionDef {
+  id: string;
+  inputs: StructureKind[];
+  result: StructureKind;
+}
+
 /** Everything a run needs, as plain data. The content package builds it from the content files and the run seed. */
 export interface RunConfig {
   constants: StructureConstants;
@@ -39,6 +46,7 @@ export interface RunConfig {
   /** How many rewards are offered after a fight. */
   rewardChoices: number;
   rewards: RewardDef[];
+  fusions: FusionDef[];
   upgrades: Record<string, UpgradeEffect>;
 }
 
@@ -56,6 +64,8 @@ export interface RunState {
   certainty: number;
   maxCertainty: number;
   owned: StructureKind[];
+  /** Structures used up by a fusion. They are never offered as rewards again. */
+  consumed: StructureKind[];
   /** How many times each upgrade has been taken. */
   upgrades: Record<string, number>;
   /** Ids of the rewards on offer during the reward phase, otherwise null. */
@@ -65,13 +75,14 @@ export interface RunState {
   turnsDone: number;
 }
 
-export type RunAction = Action | { type: "chooseReward"; index: number } | { type: "leaveRest" };
+export type RunAction = Action | { type: "chooseReward"; index: number } | { type: "fuse"; recipeId: string } | { type: "leaveRest" };
 
 export type RunEvent =
   | { type: "fightStarted"; encounter: number; tier: EnemyConfig["tier"] }
   | { type: "rewardOffered"; options: string[] }
   | { type: "rewardChosen"; id: string }
   | { type: "restStarted"; healed: number }
+  | { type: "fused"; recipeId: string; inputs: StructureKind[]; result: StructureKind }
   | { type: "runWon"; turns: number; certaintyLeft: number }
   | { type: "runLost"; encounter: number };
 
@@ -100,4 +111,6 @@ export interface RunObservation {
   fight: Observation | null;
   /** The rewards on offer, during the reward phase. */
   offers: RewardView[] | null;
+  /** The fusions the player can do right now, during a rest stop. */
+  fusions: FusionDef[] | null;
 }

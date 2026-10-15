@@ -2,8 +2,15 @@
   "exactMemory": {
     "name": "Exact Memory",
     "phase": 1,
-    "aliases": ["exact", "memory"],
-    "answers": ["presence", "frequency", "count"],
+    "aliases": [
+      "exact",
+      "memory"
+    ],
+    "answers": [
+      "presence",
+      "frequency",
+      "count"
+    ],
     "knob": null,
     "summary": "A perfect ledger of every value and how often it appeared.",
     "help": "Stores each distinct value with a counter, so every answer is exact until the table fills. Once full it refuses new values and widens its bounds by how many it turned away. It costs 64 bits per distinct value, so it only suits small streams.",
@@ -12,8 +19,15 @@
   "reservoirSampling": {
     "name": "Reservoir Sampling",
     "phase": 1,
-    "aliases": ["reservoir", "sample"],
-    "answers": ["presence", "frequency", "count"],
+    "aliases": [
+      "reservoir",
+      "sample"
+    ],
+    "answers": [
+      "presence",
+      "frequency",
+      "count"
+    ],
     "knob": null,
     "summary": "A fair random sample of the stream, shown as raw values.",
     "help": "Keeps a uniform random sample and scales it up to estimate counts, so it can answer any question roughly and shows the raw values it holds. It cannot see deletes, so deleted values linger in the sample as ghosts.",
@@ -22,8 +36,12 @@
   "bloomFilter": {
     "name": "Bloom Filter",
     "phase": 1,
-    "aliases": ["bloom"],
-    "answers": ["presence"],
+    "aliases": [
+      "bloom"
+    ],
+    "answers": [
+      "presence"
+    ],
     "knob": {
       "name": "expected items",
       "description": "How many distinct values you expect to insert. It sets how many bits each value uses.",
@@ -37,8 +55,13 @@
   "countMinSketch": {
     "name": "Count-Min Sketch",
     "phase": 1,
-    "aliases": ["countmin", "cms"],
-    "answers": ["frequency"],
+    "aliases": [
+      "countmin",
+      "cms"
+    ],
+    "answers": [
+      "frequency"
+    ],
     "knob": {
       "name": "depth",
       "description": "The number of counter rows. More rows make a bad overestimate less likely.",
@@ -52,8 +75,12 @@
   "logLog": {
     "name": "LogLog",
     "phase": 1,
-    "aliases": ["loglog"],
-    "answers": ["count"],
+    "aliases": [
+      "loglog"
+    ],
+    "answers": [
+      "count"
+    ],
     "knob": null,
     "summary": "Estimates how many distinct values appeared, using almost no space.",
     "help": "Each register remembers the rarest hash pattern it has seen, which reveals roughly how many distinct values have passed. It is accurate on large streams, biased on small ones, and it ignores deletes.",
@@ -62,11 +89,31 @@
   "linearCounting": {
     "name": "Linear Counting",
     "phase": 1,
-    "aliases": ["linear", "linearcounting"],
-    "answers": ["count"],
+    "aliases": [
+      "linear",
+      "linearcounting"
+    ],
+    "answers": [
+      "count"
+    ],
     "knob": null,
     "summary": "Estimates distinct values from the share of empty bits in a bitmap.",
     "help": "Each value sets one bit, and the fraction still empty reveals how many distinct values there were. It is precise while the bitmap has room, but once every bit is set it can only say at least this many. It ignores deletes.",
     "flavor": "Counts the guests by the empty chairs."
+  },
+  "hyperLogLog": {
+    "name": "HyperLogLog",
+    "phase": 1,
+    "aliases": [
+      "hll",
+      "hyperloglog"
+    ],
+    "answers": [
+      "count"
+    ],
+    "knob": null,
+    "summary": "Estimates how many distinct values appeared, accurately from tiny streams to huge ones.",
+    "help": "Like LogLog, each register remembers the rarest hash pattern it has seen, but it averages them harmonically, which tames the odd register that got lucky. While many registers are still empty it counts those instead, as Linear Counting does. Its error is about 1.04 divided by the square root of the register count. It is made by fusing LogLog with Linear Counting at a rest stop; in real life that is a teaching shortcut, since HyperLogLog's main change from LogLog is the harmonic mean. It ignores deletes.",
+    "flavor": "Counts the crowd by its rarest faces, and by the empty seats."
   }
 }

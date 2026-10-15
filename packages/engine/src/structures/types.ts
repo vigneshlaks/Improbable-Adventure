@@ -9,6 +9,7 @@ export const STRUCTURE_KINDS = [
   "countMinSketch",
   "logLog",
   "linearCounting",
+  "hyperLogLog",
 ] as const;
 
 export type StructureKind = (typeof STRUCTURE_KINDS)[number];
@@ -49,6 +50,10 @@ export interface StructureConstants {
   cmsDefaultDepth: number;
   /** LogLog relative error is this divided by sqrt(register count). */
   logLogErrorCoefficient: number;
+  /** HyperLogLog relative error is this divided by sqrt(register count). */
+  hyperLogLogErrorCoefficient: number;
+  /** HyperLogLog counts empty registers instead while that count is below this multiple of the register count. */
+  hyperLogLogSmallRange: number;
 }
 
 /** Anything that survives JSON.stringify and JSON.parse unchanged. */

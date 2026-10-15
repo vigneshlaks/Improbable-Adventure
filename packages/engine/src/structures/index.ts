@@ -1,6 +1,7 @@
 import { BloomFilter } from "./bloomFilter";
 import { CountMinSketch } from "./countMinSketch";
 import { ExactMemory } from "./exactMemory";
+import { HyperLogLog } from "./hyperLogLog";
 import { LinearCounting } from "./linearCounting";
 import { LogLog } from "./logLog";
 import { ReservoirSampling } from "./reservoirSampling";
@@ -10,6 +11,7 @@ export * from "./types";
 export { BloomFilter, bloomFalsePositiveRate, bloomOptimalK, DEFAULT_BITS_PER_ITEM } from "./bloomFilter";
 export { CountMinSketch } from "./countMinSketch";
 export { ExactMemory } from "./exactMemory";
+export { HyperLogLog, MIN_HLL_REGISTERS } from "./hyperLogLog";
 export { LinearCounting } from "./linearCounting";
 export { LogLog, MIN_LOGLOG_REGISTERS } from "./logLog";
 export { ReservoirSampling } from "./reservoirSampling";
@@ -29,6 +31,8 @@ export function restoreStructure(snapshot: StructureSnapshot, constants: Structu
       return LogLog.fromSnapshot(snapshot, constants);
     case "linearCounting":
       return LinearCounting.fromSnapshot(snapshot, constants);
+    case "hyperLogLog":
+      return HyperLogLog.fromSnapshot(snapshot, constants);
     default:
       throw new RangeError(`Cannot restore unknown structure kind: ${String((snapshot as { kind: unknown }).kind)}`);
   }
@@ -48,5 +52,7 @@ export function createStructure(kind: StructureKind, options: StructureOptions, 
       return new LogLog(options, constants);
     case "linearCounting":
       return new LinearCounting(options, constants);
+    case "hyperLogLog":
+      return new HyperLogLog(options, constants);
   }
 }
