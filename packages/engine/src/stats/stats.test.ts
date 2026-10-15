@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { eachCase } from "../testCases";
 import { binomialUpper, clamp, clopperPearson, zForConfidence } from "./stats";
 
 describe("zForConfidence", () => {
@@ -45,15 +46,18 @@ describe("binomialUpper at large sizes", () => {
 
 describe("clopperPearson", () => {
   // Published exact 95% intervals (e.g. from standard binomial CI tables).
-  it.each([
-    [0, 10, 0, 0.3085],
-    [1, 10, 0.0025, 0.445],
-    [5, 10, 0.1871, 0.8129],
-    [10, 10, 0.6915, 1],
-  ])("%i hits in %i trials gives [%f, %f]", (hits, n, low, high) => {
-    const ci = clopperPearson(hits, n, 0.95);
-    expect(ci.low).toBeCloseTo(low, 3);
-    expect(ci.high).toBeCloseTo(high, 3);
+  it("matches the published intervals", () => {
+    const published: Array<[number, number, number, number]> = [
+      [0, 10, 0, 0.3085],
+      [1, 10, 0.0025, 0.445],
+      [5, 10, 0.1871, 0.8129],
+      [10, 10, 0.6915, 1],
+    ];
+    eachCase(published.map((c) => [`${c[0]} hits in ${c[1]} trials`, c] as const), ([hits, n, low, high]) => {
+      const ci = clopperPearson(hits, n, 0.95);
+      expect(ci.low).toBeCloseTo(low, 3);
+      expect(ci.high).toBeCloseTo(high, 3);
+    });
   });
 
   it("does not underflow for large n", () => {

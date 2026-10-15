@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { eachCase } from "../testCases";
 import { LogLog } from "./logLog";
 import { LiveSet } from "../enemies/liveSet";
 import { createStream, nextBurst, type StreamParams } from "../enemies/stream";
@@ -132,11 +133,12 @@ describe("LogLog", () => {
 
     // The game's own streams, with bursts big enough that the stream dwarfs the 64 registers.
     const TRIALS_PER_MIX = 120;
+    const cases: Array<readonly [string, () => void]> = [];
     for (const churn of [0.1, 0.3]) {
       for (const growth of [1, 1.35]) {
         for (const drift of [{ fraction: 0, everyTurns: 0 }, { fraction: 0.5, everyTurns: 3 }]) {
           const name = `churn ${churn}, growth ${growth}, ${drift.everyTurns ? "drifting" : "fixed"} favorites`;
-          it(`keeps its range honest on the enemy stream generator: ${name}`, () => {
+          cases.push([`keeps its range honest on the enemy stream generator: ${name}`, () => {
             const params: StreamParams = { universe: 16384, churn, growth, drift, skew: 0.8, baseBurst: 1000 };
             let held = 0;
             for (let t = 0; t < TRIALS_PER_MIX; t++) {
@@ -152,10 +154,11 @@ describe("LogLog", () => {
               if (answer.low <= live.distinct && live.distinct <= answer.high) held++;
             }
             expect(held / TRIALS_PER_MIX).toBeGreaterThanOrEqual(coverageFloor(TEST_CONSTANTS.confidence, TRIALS_PER_MIX));
-          });
+          }]);
         }
       }
     }
+    it("keeps its range honest on the enemy stream generator, under every trait mix", () => eachCase(cases, (run) => run()));
   });
 
   describe(`statistical (${TRIALS} seeded trials)`, () => {
@@ -165,8 +168,9 @@ describe("LogLog", () => {
       { space: 320, n: 8000 }, // m = 64, theory 16.3%
     ];
 
+    const cases: Array<readonly [string, () => void]> = [];
     for (const { space, n } of configs) {
-      it(`m = ${2 ** Math.floor(Math.log2(space / 5))}, n = ${n}: relative error stays within 1.30 / sqrt(m)`, () => {
+      cases.push([`m = ${2 ** Math.floor(Math.log2(space / 5))}, n = ${n}: relative error stays within 1.30 / sqrt(m)`, () => {
         let sumSq = 0;
         let sum = 0;
         let covered = 0;
@@ -187,7 +191,8 @@ describe("LogLog", () => {
         expect(rms).toBeLessThanOrEqual(theory * 1.1);
         expect(Math.abs(sum / TRIALS)).toBeLessThan(theory * 0.25); // unbiased to within a quarter of one sigma
         expect(covered / TRIALS).toBeGreaterThanOrEqual(coverageFloor(TEST_CONSTANTS.confidence, TRIALS));
-      });
+      }]);
     }
+    it("keeps its relative error within 1.30 / sqrt(m) at every register count", () => eachCase(cases, (run) => run()));
   });
 });

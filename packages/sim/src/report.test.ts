@@ -113,3 +113,18 @@ describe("the starting loadout", () => {
     expect(won / fights).toBeGreaterThan(0.8);
   });
 });
+
+describe("Frequency with a Count-Min Sketch", () => {
+  it("is not a trap: a bot that deploys the sketch wins most Frequency Minions, as it does by gambling on Exact Memory", () => {
+    // With squared falloff the sketch's overshoot (about 3x on these streams) cut its damage to a ninth and it won 32 percent,
+    // against 75 percent for the Exact Memory gamble. Linear falloff makes the two routes comparable.
+    const kit = [...buildFightConfig({ seed: "kit", tier: "minion" }).loadout, "countMinSketch" as const];
+    let won = 0;
+    const fights = 60;
+    for (let i = 0; i < fights; i++) {
+      const seed = `freq-cms-${i}`;
+      if (playFight({ config: minion(seed, "frequency", kit), seed, bot: getBot("greedy") }).outcome === "won") won++;
+    }
+    expect(won / fights).toBeGreaterThan(0.55);
+  });
+});

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Rng } from "../rng/rng";
+import { eachCase } from "../testCases";
 import {
   createStructure,
   restoreStructure,
@@ -55,69 +56,87 @@ const answers = (s: Structure) => PROBES.map((probe) => s.query(probe));
 
 const viaJson = (snapshot: StructureSnapshot): StructureSnapshot => JSON.parse(JSON.stringify(snapshot));
 
-describe.each(CASES)("$kind snapshot", ({ kind, options }) => {
-  const build = () => createStructure(kind, options, TEST_CONSTANTS);
+describe("snapshots, for every structure", () => {
+  /** Runs a check on each of the six structures, reporting every one that fails. */
+  const forEvery = (check: (c: { kind: StructureKind; options: StructureOptions; build: () => Structure }) => void) =>
+    eachCase(CASES.map((c) => [c.kind, c] as const), ({ kind, options }) =>
+      check({ kind, options, build: () => createStructure(kind, options, TEST_CONSTANTS) }),
+    );
 
   it("is plain data that survives JSON unchanged", () => {
-    const s = build();
-    ingestAll([s], makeEvents(trialRng("snap-json", 0), new Map(), 600));
-    const snapshot = s.snapshot();
-    expect(snapshot.kind).toBe(kind);
-    expect(viaJson(snapshot)).toStrictEqual(snapshot);
+    forEvery(({ kind, build }) => {
+      const s = build();
+      ingestAll([s], makeEvents(trialRng("snap-json", 0), new Map(), 600));
+      const snapshot = s.snapshot();
+      expect(snapshot.kind).toBe(kind);
+      expect(viaJson(snapshot)).toStrictEqual(snapshot);
+    });
   });
 
   it("restores to a structure that looks and answers the same", () => {
-    const original = build();
-    ingestAll([original], makeEvents(trialRng("snap-restore", 0), new Map(), 600));
-    const restored = restoreStructure(viaJson(original.snapshot()), TEST_CONSTANTS);
+    forEvery(({ kind, build }) => {
+      const original = build();
+      ingestAll([original], makeEvents(trialRng("snap-restore", 0), new Map(), 600));
+      const restored = restoreStructure(viaJson(original.snapshot()), TEST_CONSTANTS);
 
-    expect(restored.kind).toBe(kind);
-    expect(restored.params).toEqual(original.params);
-    expect(restored.spaceBits()).toBe(original.spaceBits());
-    expect(restored.snapshot()).toStrictEqual(original.snapshot());
-    expect(answers(restored)).toEqual(answers(original));
+      expect(restored.kind).toBe(kind);
+      expect(restored.params).toEqual(original.params);
+      expect(restored.spaceBits()).toBe(original.spaceBits());
+      expect(restored.snapshot()).toStrictEqual(original.snapshot());
+      expect(answers(restored)).toEqual(answers(original));
+    });
   });
 
   it("keeps behaving identically as more events arrive", () => {
-    const rng = trialRng("snap-continue", 0);
-    const live = new Map<number, number>();
-    const original = build();
-    ingestAll([original], makeEvents(rng, live, 400));
-    const restored = restoreStructure(viaJson(original.snapshot()), TEST_CONSTANTS);
+    forEvery(({ build }) => {
+      const rng = trialRng("snap-continue", 0);
+      const live = new Map<number, number>();
+      const original = build();
+      ingestAll([original], makeEvents(rng, live, 400));
+      const restored = restoreStructure(viaJson(original.snapshot()), TEST_CONSTANTS);
 
-    // Including sampling: a restored Reservoir must continue its random choices from the same point.
-    ingestAll([original, restored], makeEvents(rng, live, 600));
-    expect(restored.snapshot()).toStrictEqual(original.snapshot());
-    expect(answers(restored)).toEqual(answers(original));
+      // Including sampling: a restored Reservoir must continue its random choices from the same point.
+      ingestAll([original, restored], makeEvents(rng, live, 600));
+      expect(restored.snapshot()).toStrictEqual(original.snapshot());
+      expect(answers(restored)).toEqual(answers(original));
+    });
   });
 
   it("can restore an empty structure", () => {
-    const empty = build();
-    const restored = restoreStructure(viaJson(empty.snapshot()), TEST_CONSTANTS);
-    expect(restored.snapshot()).toStrictEqual(empty.snapshot());
+    forEvery(({ build }) => {
+      const empty = build();
+      const restored = restoreStructure(viaJson(empty.snapshot()), TEST_CONSTANTS);
+      expect(restored.snapshot()).toStrictEqual(empty.snapshot());
+    });
   });
 
   it("is a copy, not a view of the live structure", () => {
-    const s = build();
-    ingestAll([s], makeEvents(trialRng("snap-copy", 0), new Map(), 300));
-    const snapshot = s.snapshot();
-    const frozen = JSON.stringify(snapshot);
-    ingestAll([s], makeEvents(trialRng("snap-copy", 1), new Map(), 300));
-    expect(JSON.stringify(snapshot)).toBe(frozen);
-    expect(JSON.stringify(s.snapshot())).not.toBe(frozen);
+    forEvery(({ build }) => {
+      const s = build();
+      ingestAll([s], makeEvents(trialRng("snap-copy", 0), new Map(), 300));
+      const snapshot = s.snapshot();
+      const frozen = JSON.stringify(snapshot);
+      ingestAll([s], makeEvents(trialRng("snap-copy", 1), new Map(), 300));
+      expect(JSON.stringify(snapshot)).toBe(frozen);
+      expect(JSON.stringify(s.snapshot())).not.toBe(frozen);
+    });
   });
 
   it("rejects a snapshot with missing or malformed state", () => {
-    const snapshot = build().snapshot();
-    expect(() => restoreStructure({ ...snapshot, state: {} }, TEST_CONSTANTS)).toThrow(RangeError);
-    const firstKey = Object.keys(snapshot.state)[0] as string;
-    expect(() => restoreStructure({ ...snapshot, state: { ...snapshot.state, [firstKey]: "oops" } }, TEST_CONSTANTS)).toThrow(RangeError);
+    forEvery(({ build }) => {
+      const snapshot = build().snapshot();
+      expect(() => restoreStructure({ ...snapshot, state: {} }, TEST_CONSTANTS)).toThrow(RangeError);
+      const firstKey = Object.keys(snapshot.state)[0] as string;
+      expect(() => restoreStructure({ ...snapshot, state: { ...snapshot.state, [firstKey]: "oops" } }, TEST_CONSTANTS)).toThrow(RangeError);
+    });
   });
 
   it("rejects a snapshot whose kind does not match its state", () => {
-    const other = CASES.find((c) => c.kind !== kind) as (typeof CASES)[number];
-    const foreign = createStructure(other.kind, other.options, TEST_CONSTANTS).snapshot();
-    expect(() => restoreStructure({ ...build().snapshot(), state: foreign.state }, TEST_CONSTANTS)).toThrow(RangeError);
+    forEvery(({ kind, build }) => {
+      const other = CASES.find((c) => c.kind !== kind) as (typeof CASES)[number];
+      const foreign = createStructure(other.kind, other.options, TEST_CONSTANTS).snapshot();
+      expect(() => restoreStructure({ ...build().snapshot(), state: foreign.state }, TEST_CONSTANTS)).toThrow(RangeError);
+    });
   });
 });
 

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { eachCase } from "../testCases";
 import { murmur3Bytes, murmur3String, murmur3U32, utf8Bytes } from "./murmur3";
 
 // Published MurmurHash3_x86_32 reference vectors (SMHasher / Wikipedia / widely mirrored test suites).
@@ -19,8 +20,10 @@ const KNOWN_ANSWERS: Array<[string, number, number]> = [
 ];
 
 describe("murmur3 known answers", () => {
-  it.each(KNOWN_ANSWERS)("hash(%j, seed %i) = %i", (text, seed, expected) => {
-    expect(murmur3String(text, seed)).toBe(expected);
+  it("matches the published known answers", () => {
+    eachCase(KNOWN_ANSWERS.map((c) => [`hash(${JSON.stringify(c[0])}, seed ${c[1]})`, c] as const), ([text, seed, expected]) => {
+      expect(murmur3String(text, seed)).toBe(expected);
+    });
   });
 
   it("covers every tail length (0-3 trailing bytes) in the vectors above", () => {

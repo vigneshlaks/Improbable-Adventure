@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { eachCase } from "../../engine/src/testCases";
 import { buildFightConfig, type TierName } from "@pda/content";
 import {
   createFight,
@@ -66,22 +67,26 @@ describe("the bots", () => {
     expect(() => getBot("clever")).toThrow(/random, greedy, prober, cautious, oracle/);
   });
 
-  it.each(Object.keys(BOTS))("%s only ever takes actions the engine accepts, in every tier and for every weak point", (name) => {
-    for (const tier of ["minion", "elite", "boss"] as const) {
-      for (let i = 0; i < 6; i++) {
-        const seed = `legal-${name}-${tier}-${i}`;
-        const config = buildFightConfig({ seed, tier, loadout: [...STRUCTURE_KINDS] });
-        const forced: FightConfig = { ...config, enemy: { ...config.enemy, weakPoints: [WEAK_POINTS[i % 3] as WeakPoint] } };
-        // playFight throws if the bot ever returns an illegal action.
-        const record = playFight({ config: forced, seed, bot: getBot(name), maxSteps: 3000 });
-        expect(["won", "lost", "stalled"]).toContain(record.outcome);
+  it("never takes an action the engine refuses, for any bot, in every tier and for every weak point", () => {
+    eachCase(Object.keys(BOTS).map((name) => [name, name] as const), (name) => {
+      for (const tier of ["minion", "elite", "boss"] as const) {
+        for (let i = 0; i < 6; i++) {
+          const seed = `legal-${name}-${tier}-${i}`;
+          const config = buildFightConfig({ seed, tier, loadout: [...STRUCTURE_KINDS] });
+          const forced: FightConfig = { ...config, enemy: { ...config.enemy, weakPoints: [WEAK_POINTS[i % 3] as WeakPoint] } };
+          // playFight throws if the bot ever returns an illegal action.
+          const record = playFight({ config: forced, seed, bot: getBot(name), maxSteps: 3000 });
+          expect(["won", "lost", "stalled"]).toContain(record.outcome);
+        }
       }
-    }
+    });
   });
 
-  it.each(Object.keys(BOTS))("%s plays the same fight the same way twice", (name) => {
-    const config = minion("same", "presence");
-    expect(playFight({ config, seed: "same", bot: getBot(name) })).toEqual(playFight({ config, seed: "same", bot: getBot(name) }));
+  it("has every bot play the same fight the same way twice", () => {
+    eachCase(Object.keys(BOTS).map((name) => [name, name] as const), (name) => {
+      const config = minion("same", "presence");
+      expect(playFight({ config, seed: "same", bot: getBot(name) })).toEqual(playFight({ config, seed: "same", bot: getBot(name) }));
+    });
   });
 });
 
@@ -97,8 +102,10 @@ describe("Oracle", () => {
     }
   });
 
-  it.each(["minion", "elite", "boss"] as const)("wins at least 95 percent of %s fights", (tier) => {
-    expect(winRate(play("oracle", tier, 40))).toBeGreaterThanOrEqual(0.95);
+  it("wins at least 95 percent of fights in every tier", () => {
+    eachCase((["minion", "elite", "boss"] as const).map((tier) => [tier, tier] as const), (tier) => {
+      expect(winRate(play("oracle", tier, 40))).toBeGreaterThanOrEqual(0.95);
+    });
   });
 });
 

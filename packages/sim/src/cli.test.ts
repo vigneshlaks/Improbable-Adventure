@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { eachCase } from "../../engine/src/testCases";
 import { main, parseArgs } from "./cli";
 
 describe("parseArgs", () => {
@@ -63,21 +64,24 @@ describe("main", () => {
     expect(output).toMatch(/sim fights/);
   });
 
-  it.each([
-    [["fights"], /--bot/],
-    [["fights", "--bot", "clever"], /Unknown bot "clever"/],
-    [["fights", "--bot", "oracle", "--n", "0"], /--n must be a whole number/],
-    [["fights", "--bot", "oracle", "--n", "2.5"], /--n must be a whole number/],
-    [["fights", "--bot", "oracle", "--seed-base", "-4"], /--seed-base must be a whole number/],
-    [["fights", "--bot", "oracle", "--tier", "king"], /--tier must be one of minion, elite, boss/],
-    [["fights", "--bot", "oracle", "--loadout", "big"], /--loadout must be one of starting, full/],
-    [["fights", "--bot", "oracle", "--bott", "x"], /Unknown option --bott/],
-    [["compare"], /--bots/],
-    [["compare", "--bots", "oracle,clever"], /Unknown bot "clever"/],
-    [["dance"], /Unknown command "dance"/],
-  ])("rejects bad input %j", (argv, message) => {
-    const { code, output } = main(argv);
-    expect(code).toBe(1);
-    expect(output).toMatch(message);
+  it("rejects bad input with an explanation", () => {
+    const bad: Array<[string[], RegExp]> = [
+      [["fights"], /--bot/],
+      [["fights", "--bot", "clever"], /Unknown bot "clever"/],
+      [["fights", "--bot", "oracle", "--n", "0"], /--n must be a whole number/],
+      [["fights", "--bot", "oracle", "--n", "2.5"], /--n must be a whole number/],
+      [["fights", "--bot", "oracle", "--seed-base", "-4"], /--seed-base must be a whole number/],
+      [["fights", "--bot", "oracle", "--tier", "king"], /--tier must be one of minion, elite, boss/],
+      [["fights", "--bot", "oracle", "--loadout", "big"], /--loadout must be one of starting, full/],
+      [["fights", "--bot", "oracle", "--bott", "x"], /Unknown option --bott/],
+      [["compare"], /--bots/],
+      [["compare", "--bots", "oracle,clever"], /Unknown bot "clever"/],
+      [["dance"], /Unknown command "dance"/],
+    ];
+    eachCase(bad.map((pair) => [JSON.stringify(pair[0]), pair] as const), ([argv, message]) => {
+      const { code, output } = main(argv);
+      expect(code).toBe(1);
+      expect(output).toMatch(message);
+    });
   });
 });

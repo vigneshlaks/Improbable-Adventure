@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { eachCase } from "../../engine/src/testCases";
 import { balance } from "./balance";
 import { generateEnemy, type TierName } from "./enemies";
 
@@ -6,27 +7,31 @@ const TIERS: TierName[] = ["minion", "elite", "boss"];
 const nonLow = (traits: object) => Object.values(traits).filter((level) => level !== "low").length;
 
 describe("generateEnemy", () => {
-  it.each(TIERS)("%s: copies its numbers from the tier table", (tier) => {
-    const enemy = generateEnemy("seed", tier);
-    const spec = balance.TIERS[tier];
-    expect(enemy).toMatchObject({ tier, size: spec.size, hp: spec.hp, attack: spec.attack, turnLimit: spec.turnLimit });
+  it("copies every tier's numbers from the tier table", () => {
+    eachCase(TIERS.map((tier) => [tier, tier] as const), (tier) => {
+      const enemy = generateEnemy("seed", tier);
+      const spec = balance.TIERS[tier];
+      expect(enemy).toMatchObject({ tier, size: spec.size, hp: spec.hp, attack: spec.attack, turnLimit: spec.turnLimit });
+    });
   });
 
-  it.each(TIERS)("%s: has the right number of non-Low traits and weak points", (tier) => {
-    const spec = balance.TIERS[tier];
-    const counts = new Set<number>();
-    for (let i = 0; i < 300; i++) {
-      const enemy = generateEnemy(`count-${i}`, tier);
-      const n = nonLow(enemy.traits);
-      expect(n).toBeGreaterThanOrEqual(spec.traitCount.min);
-      expect(n).toBeLessThanOrEqual(spec.traitCount.max);
-      expect(enemy.weakPoints.length).toBeGreaterThanOrEqual(spec.weakPointCount.min);
-      expect(enemy.weakPoints.length).toBeLessThanOrEqual(spec.weakPointCount.max);
-      expect(new Set(enemy.weakPoints).size).toBe(enemy.weakPoints.length); // no repeats
-      counts.add(n);
-    }
-    // Tiers with a range of trait counts use all of it.
-    expect(counts.size).toBe(spec.traitCount.max - spec.traitCount.min + 1);
+  it("gives every tier the right number of non-Low traits and weak points", () => {
+    eachCase(TIERS.map((tier) => [tier, tier] as const), (tier) => {
+      const spec = balance.TIERS[tier];
+      const counts = new Set<number>();
+      for (let i = 0; i < 300; i++) {
+        const enemy = generateEnemy(`count-${i}`, tier);
+        const n = nonLow(enemy.traits);
+        expect(n).toBeGreaterThanOrEqual(spec.traitCount.min);
+        expect(n).toBeLessThanOrEqual(spec.traitCount.max);
+        expect(enemy.weakPoints.length).toBeGreaterThanOrEqual(spec.weakPointCount.min);
+        expect(enemy.weakPoints.length).toBeLessThanOrEqual(spec.weakPointCount.max);
+        expect(new Set(enemy.weakPoints).size).toBe(enemy.weakPoints.length); // no repeats
+        counts.add(n);
+      }
+      // Tiers with a range of trait counts use all of it.
+      expect(counts.size).toBe(spec.traitCount.max - spec.traitCount.min + 1);
+    });
   });
 
   it("is deterministic in its seed and varies across seeds", () => {

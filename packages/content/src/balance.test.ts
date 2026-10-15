@@ -25,7 +25,7 @@ describe("balance.json", () => {
       DECOY_PENALTY: 4,
       BLOCK_PENALTY: 3,
       MISS_PENALTY: 3,
-      OVERSHOOT_EXP: 2,
+      OVERSHOOT_EXP: 1,
       COUNT_TOL: 0.25,
       RANK_TOL: 0.1,
       STARTING_SPACE: 8192,

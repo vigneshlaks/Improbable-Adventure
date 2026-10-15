@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { eachCase } from "../../engine/src/testCases";
 import { createStructure, STRUCTURE_KINDS, type Challenge } from "@pda/engine";
 import structuresJson from "../structures.json";
 import { findStructure, parseStructures, structures } from "./structures";
@@ -15,19 +16,23 @@ describe("structures.json", () => {
     expect(Object.keys(structures).sort()).toEqual([...STRUCTURE_KINDS].sort());
   });
 
-  it.each(STRUCTURE_KINDS)("%s: the questions it lists are the ones the engine structure answers", (kind) => {
-    const engineStructure = createStructure(kind, { spaceBits: 8192 }, structureConstants());
-    const answered = PROBES.filter((probe) => engineStructure.query(probe) !== null).map((probe) => probe.kind);
-    expect([...structures[kind].answers].sort()).toEqual(answered.sort());
+  it("lists, for every structure, the questions the engine structure answers", () => {
+    eachCase(STRUCTURE_KINDS.map((kind) => [kind, kind] as const), (kind) => {
+      const engineStructure = createStructure(kind, { spaceBits: 8192 }, structureConstants());
+      const answered = PROBES.filter((probe) => engineStructure.query(probe) !== null).map((probe) => probe.kind);
+      expect([...structures[kind].answers].sort()).toEqual(answered.sort());
+    });
   });
 
-  it.each(STRUCTURE_KINDS)("%s: its knob range is one the engine accepts", (kind) => {
-    const knob = structures[kind].knob;
-    if (!knob) return;
-    expect(knob.min).toBeLessThanOrEqual(knob.max);
-    for (const value of [knob.min, knob.max]) {
-      expect(() => createStructure(kind, { spaceBits: 8192, knob: value }, structureConstants())).not.toThrow();
-    }
+  it("gives every structure a knob range the engine accepts", () => {
+    eachCase(STRUCTURE_KINDS.map((kind) => [kind, kind] as const), (kind) => {
+      const knob = structures[kind].knob;
+      if (!knob) return;
+      expect(knob.min).toBeLessThanOrEqual(knob.max);
+      for (const value of [knob.min, knob.max]) {
+        expect(() => createStructure(kind, { spaceBits: 8192, knob: value }, structureConstants())).not.toThrow();
+      }
+    });
   });
 
   it("gives every structure text for help and flavor", () => {

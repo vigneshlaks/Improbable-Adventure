@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { eachCase } from "../testCases";
 import { createZipfSampler } from "./zipf";
 import { CHI2_999, chiSquare, rngFor } from "./testUtils";
 
@@ -10,24 +11,27 @@ function pmf(n: number, s: number): number[] {
 }
 
 describe("createZipfSampler", () => {
-  it.each([
-    [0, 20, 19],
-    [0.8, 50, 49],
-    [1, 50, 49],
-    [1.2, 50, 49],
-  ])("matches the Zipf distribution for s = %f over %i ranks", (s, n, df) => {
-    const sample = createZipfSampler(n, s);
-    const rng = rngFor(`zipf-${s}`);
-    const draws = 200000;
-    const observed = new Array<number>(n).fill(0);
-    for (let i = 0; i < draws; i++) {
-      const rank = sample(rng);
-      expect(rank).toBeGreaterThanOrEqual(1);
-      expect(rank).toBeLessThanOrEqual(n);
-      observed[rank - 1] = (observed[rank - 1] ?? 0) + 1;
-    }
-    const expected = pmf(n, s).map((p) => p * draws);
-    expect(chiSquare(observed, expected)).toBeLessThan(CHI2_999[df] as number);
+  it("matches the Zipf distribution for s = 0, 0.8, 1 and 1.2", () => {
+    const cases: Array<[number, number, number]> = [
+      [0, 20, 19],
+      [0.8, 50, 49],
+      [1, 50, 49],
+      [1.2, 50, 49],
+    ];
+    eachCase(cases.map((c) => [`s = ${c[0]} over ${c[1]} ranks`, c] as const), ([s, n, df]) => {
+      const sample = createZipfSampler(n, s);
+      const rng = rngFor(`zipf-${s}`);
+      const draws = 200000;
+      const observed = new Array<number>(n).fill(0);
+      for (let i = 0; i < draws; i++) {
+        const rank = sample(rng);
+        expect(rank).toBeGreaterThanOrEqual(1);
+        expect(rank).toBeLessThanOrEqual(n);
+        observed[rank - 1] = (observed[rank - 1] ?? 0) + 1;
+      }
+      const expected = pmf(n, s).map((p) => p * draws);
+      expect(chiSquare(observed, expected)).toBeLessThan(CHI2_999[df] as number);
+    });
   });
 
   it("handles a single rank", () => {

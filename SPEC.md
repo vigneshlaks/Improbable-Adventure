@@ -149,7 +149,9 @@ Formula 3, Rank (measured in rank, not raw value, so value scale never matters):
 
 **Risk choices the UI must support.** Targets flagged by two structures are marked as confirmed, so the player can strike only confirmed targets. For Frequency and Rank, the UI offers the structure's estimate, its upper bound, and a free number, so the player chooses between safe and greedy strikes.
 
-Starting values: BASE 20, HIT\_DAMAGE 5, DECOY\_PENALTY 4, BLOCK\_PENALTY 3, MISS\_PENALTY 3, OVERSHOOT\_EXP 2, COUNT\_TOL 0.25, RANK\_TOL 0.1. All are placeholders until the simulator tunes them.
+Starting values: BASE 20, HIT\_DAMAGE 5, DECOY\_PENALTY 4, BLOCK\_PENALTY 3, MISS\_PENALTY 3, OVERSHOOT\_EXP 1, COUNT\_TOL 0.25, RANK\_TOL 0.1. All are placeholders until the simulator tunes them.
+
+**Frequency falloff (changed 2026-10-15).** OVERSHOOT\_EXP was 2 and is now 1, so damage falls in proportion to the overshoot instead of its square. Measured with Minion Frequency fights (120 seeds, Greedy / Prober / Cautious / Random, win percent): with the starting loadout the exponent hardly mattered (75 / 63 / 3 to 28 / 4 to 8 at every value from 0.5 to 2), because Greedy strikes Exact Memory's figure, which is exact when the value is in its table and blocked when it is not. With a Count-Min Sketch owned, exponent 2 made the sketch a trap: it overshoots about three times on these streams, so damage fell to a ninth and Greedy won 32 percent against 75 for the Exact Memory gamble. At exponent 1 it is 78 / 38 / 47 / 6, so the sketch route is as good as the gamble for a careful player and still rewards skill. Exponents of 0.75 and below made Frequency nearly trivial with the sketch (Prober and Cautious about 78 percent, Random up to 10 and 16 percent).
 
 ## Structures
 

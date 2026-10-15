@@ -1,18 +1,22 @@
 import { describe, expect, it } from "vitest";
+import { eachCase } from "../testCases";
 import { makePermutation } from "./permutation";
 
 describe("makePermutation", () => {
-  it.each([1, 2, 3, 5, 100, 255, 256, 1000, 4096, 65537])("is a bijection on 0..%i-1", (n) => {
-    const p = makePermutation(n, 12345);
-    const seen = new Set<number>();
-    for (let x = 0; x < n; x++) {
-      const y = p(x);
-      expect(Number.isInteger(y)).toBe(true);
-      expect(y).toBeGreaterThanOrEqual(0);
-      expect(y).toBeLessThan(n);
-      seen.add(y);
-    }
-    expect(seen.size).toBe(n);
+  it("is a bijection on 0..n-1 for sizes from 1 to 65537", () => {
+    const sizes = [1, 2, 3, 5, 100, 255, 256, 1000, 4096, 65537];
+    eachCase(sizes.map((n) => [`n = ${n}`, n] as const), (n) => {
+      const p = makePermutation(n, 12345);
+      const seen = new Set<number>();
+      for (let x = 0; x < n; x++) {
+        const y = p(x);
+        expect(Number.isInteger(y)).toBe(true);
+        expect(y).toBeGreaterThanOrEqual(0);
+        expect(y).toBeLessThan(n);
+        seen.add(y);
+      }
+      expect(seen.size).toBe(n);
+    });
   });
 
   it("is deterministic and depends on the key", () => {

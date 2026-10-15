@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { eachCase } from "../testCases";
 import { BloomFilter, bloomFalsePositiveRate, bloomOptimalK } from "./bloomFilter";
 import type { Answer } from "./types";
 import { churnStream, coverageFloor, distinctValues, presenceTargets, TEST_CONSTANTS, TRIALS, trialRng } from "./testUtils";
@@ -156,9 +157,10 @@ describe("BloomFilter", () => {
       { m: 8192, n: 400, queries: 10000 }, // k = 14, power of two
     ];
 
+    const cases: Array<readonly [string, () => void]> = [];
     for (const { m, n, queries } of configs) {
       const k = bloomOptimalK(m, n);
-      it(`m = ${m}, n = ${n}, k = ${k}: no false negatives and a false-positive rate that follows (1 - e^(-kn/m))^k`, () => {
+      cases.push([`m = ${m}, n = ${n}, k = ${k}: no false negatives and a false-positive rate that follows (1 - e^(-kn/m))^k`, () => {
         const theory = bloomFalsePositiveRate(m, n, k);
         let falseNegatives = 0;
         let falsePositives = 0;
@@ -180,8 +182,9 @@ describe("BloomFilter", () => {
         // Plain double hashing missed this by 10% to 290% on the small-m and k = 14 configs (see notes/dev).
         const sigma = Math.sqrt(theory * total) / total;
         expect(Math.abs(observed - theory)).toBeLessThanOrEqual(4 * sigma + 0.03 * theory);
-      });
+      }]);
     }
+    it("has no false negatives and a false-positive rate that follows (1 - e^(-kn/m))^k, at every configuration", () => eachCase(cases, (run) => run()));
 
     it("reports bounds on the real-target count that hold at the stated confidence", () => {
       const m = 8192;

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { eachCase } from "../../engine/src/testCases";
 import { createFight, legalActions, Rng, step, STRUCTURE_KINDS, type FightState } from "@pda/engine";
 import { balance } from "./balance";
 import { buildFightConfig } from "./fight";
@@ -65,17 +66,19 @@ describe("fights from generated enemies", () => {
     return { state, steps, config };
   }
 
-  it.each(["minion", "elite", "boss"] as const)("%s fights never break the engine under random play", (tier) => {
-    let finished = 0;
-    for (let i = 0; i < 12; i++) {
-      const { state, config } = playRandomly(`fuzz-${tier}-${i}`, tier);
-      expect(state.certainty).toBeGreaterThanOrEqual(0);
-      expect(state.certainty).toBeLessThanOrEqual(balance.STARTING_CERTAINTY);
-      expect(state.enemyHp).toBeGreaterThanOrEqual(0);
-      expect(state.enemyHp).toBeLessThanOrEqual(config.enemy.hp);
-      if (state.phase === "won" || state.phase === "lost") finished++;
-    }
-    expect(finished).toBeGreaterThan(0);
+  it("never breaks the engine under random play, in any tier", () => {
+    eachCase((["minion", "elite", "boss"] as const).map((tier) => [tier, tier] as const), (tier) => {
+      let finished = 0;
+      for (let i = 0; i < 12; i++) {
+        const { state, config } = playRandomly(`fuzz-${tier}-${i}`, tier);
+        expect(state.certainty).toBeGreaterThanOrEqual(0);
+        expect(state.certainty).toBeLessThanOrEqual(balance.STARTING_CERTAINTY);
+        expect(state.enemyHp).toBeGreaterThanOrEqual(0);
+        expect(state.enemyHp).toBeLessThanOrEqual(config.enemy.hp);
+        if (state.phase === "won" || state.phase === "lost") finished++;
+      }
+      expect(finished).toBeGreaterThan(0);
+    });
   });
 
   it("every generated fight can be saved as JSON mid-way and resumed", () => {

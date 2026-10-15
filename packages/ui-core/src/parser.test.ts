@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { eachCase } from "../../engine/src/testCases";
 import type { Observation, StructureKind } from "@pda/engine";
 import { parseCommand, type ParseResult } from "./parser";
 import { answer, observation, view } from "./testUtils";
@@ -36,16 +37,19 @@ describe("deploy", () => {
     expect(result.kind === "action" && "knob" in result.action).toBe(false);
   });
 
-  it.each([
-    ["exact", "exactMemory"],
-    ["reservoir", "reservoirSampling"],
-    ["bloom", "bloomFilter"],
-    ["cms", "countMinSketch"],
-    ["countmin", "countMinSketch"],
-    ["loglog", "logLog"],
-    ["linear", "linearCounting"],
-  ])("accepts the alias %s", (alias, kind) => {
-    expect(parse(`deploy ${alias} 1024`)).toMatchObject({ kind: "action", action: { type: "deploy", kind } });
+  it("accepts every structure alias", () => {
+    const aliases: Array<[string, string]> = [
+      ["exact", "exactMemory"],
+      ["reservoir", "reservoirSampling"],
+      ["bloom", "bloomFilter"],
+      ["cms", "countMinSketch"],
+      ["countmin", "countMinSketch"],
+      ["loglog", "logLog"],
+      ["linear", "linearCounting"],
+    ];
+    eachCase(aliases.map((pair) => [pair[0], pair] as const), ([alias, kind]) => {
+      expect(parse(`deploy ${alias} 1024`)).toMatchObject({ kind: "action", action: { type: "deploy", kind } });
+    });
   });
 
   it("accepts a structure's full name", () => {

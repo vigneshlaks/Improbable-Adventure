@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { eachCase } from "../testCases";
 import { LinearCounting } from "./linearCounting";
 import { LiveSet } from "../enemies/liveSet";
 import { createStream, nextBurst, type StreamParams } from "../enemies/stream";
@@ -129,12 +130,13 @@ describe("LinearCounting", () => {
 
     // The game's own streams, under the trait mixes that hurt most.
     const TRIALS_PER_MIX = 120;
+    const cases: Array<readonly [string, () => void]> = [];
     for (const universe of [256, 16384]) {
       for (const churn of [0.1, 0.3]) {
         for (const growth of [1, 1.35]) {
           for (const drift of [{ fraction: 0, everyTurns: 0 }, { fraction: 0.5, everyTurns: 3 }]) {
             const name = `${universe} values, churn ${churn}, growth ${growth}, ${drift.everyTurns ? "drifting" : "fixed"} favorites`;
-            it(`keeps its range honest on the enemy stream generator: ${name}`, () => {
+            cases.push([`keeps its range honest on the enemy stream generator: ${name}`, () => {
               const params: StreamParams = { universe, churn, growth, drift, skew: 0.8, baseBurst: 200 };
               let held = 0;
               for (let t = 0; t < TRIALS_PER_MIX; t++) {
@@ -150,18 +152,20 @@ describe("LinearCounting", () => {
                 if (answer.low <= live.distinct && live.distinct <= answer.high) held++;
               }
               expect(held / TRIALS_PER_MIX).toBeGreaterThanOrEqual(coverageFloor(TEST_CONSTANTS.confidence, TRIALS_PER_MIX));
-            });
+            }]);
           }
         }
       }
     }
+    it("keeps its range honest on the enemy stream generator, under every trait mix", () => eachCase(cases, (run) => run()));
   });
 
   describe(`statistical (${TRIALS} seeded trials)`, () => {
     const m = 4096;
     // Load factors t = n / m of about 0.24, 0.98 and 1.95.
+    const cases: Array<readonly [string, () => void]> = [];
     for (const n of [1000, 4000, 8000]) {
-      it(`n = ${n} (load ${(n / m).toFixed(2)}): error follows sqrt(m (e^t - t - 1)) / n`, () => {
+      cases.push([`n = ${n} (load ${(n / m).toFixed(2)}): error follows sqrt(m (e^t - t - 1)) / n`, () => {
         const t = n / m;
         const theory = Math.sqrt(m * (Math.exp(t) - t - 1)) / n;
         let sumSq = 0;
@@ -177,7 +181,8 @@ describe("LinearCounting", () => {
         }
         expect(Math.sqrt(sumSq / TRIALS)).toBeLessThanOrEqual(theory * 1.1);
         expect(covered / TRIALS).toBeGreaterThanOrEqual(coverageFloor(TEST_CONSTANTS.confidence, TRIALS));
-      });
+      }]);
     }
+    it("follows the bitmap error law at loads of about 0.24, 0.98 and 1.95", () => eachCase(cases, (run) => run()));
   });
 });

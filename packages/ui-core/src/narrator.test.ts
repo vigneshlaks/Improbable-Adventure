@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { eachCase } from "../../engine/src/testCases";
 import { buildFightConfig, narration } from "@pda/content";
 import { createFight, observe, step, STRUCTURE_KINDS, type Action, type FightConfig, type FightState, type GameEvent } from "@pda/engine";
 import { describeEnemy, formatNumber, narrateEvent, narrateEvents, renderTemplate } from "./narrator";
@@ -271,14 +272,16 @@ describe("a whole fight from typed commands", () => {
     return { state, log, events, typed };
   }
 
-  it.each(["presence", "frequency", "count"] as const)("plays a %s fight through the parser, engine and narrator", (weakPoint) => {
-    const { state, log, events } = playFromText(`typed-${weakPoint}`, weakPoint);
-    expect(state.phase === "won" || state.phase === "lost").toBe(true);
-    expect(unresolved(log)).toBe(false);
-    expect(log.every((line) => typeof line === "string")).toBe(true);
-    expect(events.some((e) => e.type === "challengeIssued")).toBe(true);
-    expect(log.join("\n")).toMatch(/Turn 2\./);
-    expect(log.join("\n")).toMatch(/weak point/);
+  it("plays a fight of each kind through the parser, engine and narrator", () => {
+    eachCase((["presence", "frequency", "count"] as const).map((weakPoint) => [weakPoint, weakPoint] as const), (weakPoint) => {
+      const { state, log, events } = playFromText(`typed-${weakPoint}`, weakPoint);
+      expect(state.phase === "won" || state.phase === "lost").toBe(true);
+      expect(unresolved(log)).toBe(false);
+      expect(log.every((line) => typeof line === "string")).toBe(true);
+      expect(events.some((e) => e.type === "challengeIssued")).toBe(true);
+      expect(log.join("\n")).toMatch(/Turn 2\./);
+      expect(log.join("\n")).toMatch(/weak point/);
+    });
   });
 
   it("narrates every kind of event it produces", () => {

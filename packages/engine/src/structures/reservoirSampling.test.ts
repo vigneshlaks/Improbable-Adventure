@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { eachCase } from "../testCases";
 import { LiveSet } from "../enemies/liveSet";
 import { createStream, nextBurst, type StreamParams } from "../enemies/stream";
 import { Rng } from "../rng/rng";
@@ -215,9 +216,10 @@ describe("ReservoirSampling", () => {
         }
       }
 
+      const cases: Array<readonly [string, () => void]> = [];
       for (const mix of mixes) {
         const name = `${mix.universe} values, churn ${mix.churn}, growth ${mix.growth}, ${mix.drift.everyTurns ? "drifting" : "fixed"} favorites`;
-        it(`keeps Frequency and Count ranges honest: ${name}`, () => {
+        cases.push([`keeps Frequency and Count ranges honest: ${name}`, () => {
           const params: StreamParams = { ...mix, skew: 0.8, baseBurst: 200 };
           const run = (kind: "frequency" | "count") =>
             coverage(
@@ -242,8 +244,9 @@ describe("ReservoirSampling", () => {
           const floor = coverageFloor(TEST_CONSTANTS.confidence, TRIALS_PER_MIX);
           expect(run("frequency")).toBeGreaterThanOrEqual(floor);
           expect(run("count")).toBeGreaterThanOrEqual(floor);
-        });
+        }]);
       }
+      it("keeps Frequency and Count ranges honest, under every trait mix", () => eachCase(cases, (run) => run()));
     });
   });
 
@@ -297,8 +300,9 @@ describe("ReservoirSampling", () => {
     });
 
     // Shares near 0% and 100% are where the usual normal approximation breaks down.
+    const cases: Array<readonly [string, () => void]> = [];
     for (const heavy of [1960, 1600, 20, 4]) {
-      it(`frequency bounds cover the truth when the target is ${heavy} of 2000 inserts`, () => {
+      cases.push([`frequency bounds cover the truth when the target is ${heavy} of 2000 inserts`, () => {
         const N = 2000;
         let covered = 0;
         for (let t = 0; t < TRIALS; t++) {
@@ -315,8 +319,9 @@ describe("ReservoirSampling", () => {
           if (a && a.low <= heavy && heavy <= a.high) covered++;
         }
         expect(covered / TRIALS).toBeGreaterThanOrEqual(coverageFloor(TEST_CONSTANTS.confidence, TRIALS));
-      });
+      }]);
     }
+    it("keeps Frequency bounds honest when the target is nearly all or almost none of the inserts", () => eachCase(cases, (run) => run()));
 
     it("never reports a zero-width frequency bound from a finite sample", () => {
       const s = new ReservoirSampling({ spaceBits: space, rng: Rng.fromSeed("all-hits") }, TEST_CONSTANTS);
