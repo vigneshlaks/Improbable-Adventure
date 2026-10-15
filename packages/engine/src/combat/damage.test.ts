@@ -13,12 +13,12 @@ const RULES: DamageRules = {
 
 describe("frequencyStrike", () => {
   it("blocks a force below the true count and charges the block penalty", () => {
-    expect(frequencyStrike(RULES, 88, 87)).toEqual({ kind: "frequency", outcome: "blocked", damage: 0, certaintyLost: 3 });
+    expect(frequencyStrike(RULES, 88, 87)).toEqual({ kind: "frequency", outcome: "blocked", damage: 0, certaintyLost: 3, force: 87, trueCount: 88 });
     expect(frequencyStrike(RULES, 88, 0)).toMatchObject({ outcome: "blocked" });
   });
 
   it("deals full BASE at exactly the true count", () => {
-    expect(frequencyStrike(RULES, 88, 88)).toEqual({ kind: "frequency", outcome: "hit", damage: 20, certaintyLost: 0 });
+    expect(frequencyStrike(RULES, 88, 88)).toEqual({ kind: "frequency", outcome: "hit", damage: 20, certaintyLost: 0, force: 88, trueCount: 88 });
   });
 
   it("wastes force when overshooting: BASE x (f / s)^OVERSHOOT_EXP", () => {
@@ -57,6 +57,8 @@ describe("countStrike", () => {
   // The tolerance band is COUNT_TOL x D = 0.25 x 200 = 50.
   it("deals full BASE for an exact estimate", () => {
     expect(countStrike(RULES, 200, 200)).toMatchObject({ outcome: "hit", damage: 20, certaintyLost: 0, accuracy: 1 });
+    expect(countStrike(RULES, 200, 175)).toMatchObject({ estimate: 175, trueDistinct: 200 }); // the player is shown what was true
+    expect(countStrike(RULES, 200, 400)).toMatchObject({ outcome: "miss", estimate: 400, trueDistinct: 200 });
   });
 
   it("falls off linearly across the tolerance band, in both directions", () => {
@@ -90,8 +92,8 @@ describe("presenceStrike", () => {
   const real = [true, false, true, true, false, false]; // targets 0, 2, 3 are real
 
   it("pays HIT_DAMAGE per real target and charges DECOY_PENALTY per decoy", () => {
-    expect(presenceStrike(RULES, real, [0, 2, 3])).toEqual({ kind: "presence", realHits: 3, decoyHits: 0, damage: 15, certaintyLost: 0 });
-    expect(presenceStrike(RULES, real, [0, 1])).toEqual({ kind: "presence", realHits: 1, decoyHits: 1, damage: 5, certaintyLost: 4 });
+    expect(presenceStrike(RULES, real, [0, 2, 3])).toEqual({ kind: "presence", realHits: 3, decoyHits: 0, damage: 15, certaintyLost: 0, realTotal: 3 });
+    expect(presenceStrike(RULES, real, [0, 1])).toEqual({ kind: "presence", realHits: 1, decoyHits: 1, damage: 5, certaintyLost: 4, realTotal: 3 }); // 2 real targets were left
     expect(presenceStrike(RULES, real, [1, 4, 5])).toMatchObject({ realHits: 0, decoyHits: 3, damage: 0, certaintyLost: 12 });
   });
 

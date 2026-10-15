@@ -505,6 +505,8 @@ The CLI and web UI share one command parser and one narrator; both only translat
 - The prompt shows the turn, phase, Certainty, enemy HP and free Space. When a challenge arrives, the answers of the deployed structures (the `query` screen) are printed with it.
 - The welcome and goodbye lines are in `narration.json` under `game`.
 - A run is one fight for now; the run loop (rewards, rest stops, fusion) is Milestone 4.
+- **Strike feedback (decided 2026-10-14).** After a strike the game says what was true, so the player can learn how far off a range was: a Frequency strike reports the true count and the force used, a Count strike the true number of distinct values and the estimate used, a Presence strike how many of the targets were real. The truth is part of the `strikeResolved` event (`trueCount` and `force`, `trueDistinct` and `estimate`, `realTotal`); it appears only after the strike, never in an Observation. The first playtest found that without it a player cannot tell a good range from a bad one.
+- `help` lists only the structures in the loadout; asking about another one still explains it and says it is not owned. On a Presence challenge turn the targets are printed once, in the query screen with the structures' flags.
 
 **Web extras:** a side panel with live visuals of each deployed structure (bit array fill, counter heatmap, register bars), an error-rate readout that updates as the stream grows, and a light/dark theme. Every visual is optional; the game must be fully playable as text.
 

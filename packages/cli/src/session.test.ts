@@ -66,6 +66,40 @@ describe("handle", () => {
     expect(text(counting!.handle("strike estimate").lines)).toMatch(/Using the Linear Counting in slot 1/);
   });
 
+  it("lists only the structures the loadout owns in help", () => {
+    const owned = text(start().handle("help").lines);
+    expect(owned).toMatch(/exact:/);
+    expect(owned).toMatch(/linear:/);
+    expect(owned).not.toMatch(/countmin:|loglog:/);
+    expect(text(start({ loadout: "full" }).handle("help").lines)).toMatch(/countmin:/);
+    expect(text(start().handle("help loglog").lines)).toMatch(/do not own/i);
+  });
+
+  it("prints the Presence targets once when a challenge arrives", () => {
+    const found = Array.from({ length: 80 }, (_, i) => start({ seed: `presence-${i}` })).map((session) => {
+      session.handle("deploy bloom 4096");
+      session.handle("ready");
+      return text(session.handle("ready").lines);
+    });
+    const presence = found.find((out) => /dangles 12 values/.test(out));
+    expect(presence).toBeDefined();
+    expect(presence!.match(/^ *1\) \d+/gm)).toHaveLength(1);
+  });
+
+  it("tells the player the true answer after a strike", () => {
+    const outcomes = Array.from({ length: 60 }, (_, i) => {
+      const session = start({ seed: `truth-${i}`, loadout: "full" });
+      session.handle("deploy linear 4096");
+      session.handle("ready");
+      const challenge = text(session.handle("ready").lines);
+      if (/distinct values are in the stream/i.test(challenge)) return text(session.handle("strike estimate").lines);
+      if (/how many times has it appeared/i.test(challenge)) return text(session.handle("strike 5").lines);
+      return "";
+    });
+    expect(outcomes.some((out) => /There were \d+ distinct values; you said \d+/.test(out))).toBe(true);
+    expect(outcomes.some((out) => /The value had appeared \d+ times; you struck with 5/.test(out))).toBe(true);
+  });
+
   it("answers help and query without touching the fight", () => {
     const session = start();
     expect(text(session.handle("help").lines)).toMatch(/Commands:/);

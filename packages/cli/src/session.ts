@@ -59,14 +59,15 @@ export function createSession({ seed, tier, loadout }: SessionOptions): Session 
           return { lines: [narration.game.goodbye], done: true };
         case "info": {
           const o = observe(state);
-          const lines = parsed.info === "status" ? renderStatus(o) : parsed.info === "query" ? renderQuery(o) : renderHelp(parsed.topic);
+          const lines = parsed.info === "status" ? renderStatus(o) : parsed.info === "query" ? renderQuery(o) : renderHelp(parsed.topic, config.loadout);
           return { lines, done: false };
         }
         case "action": {
           try {
             const result = step(state, parsed.action);
             state = result.state;
-            const lines = [...(parsed.note ? [parsed.note] : []), ...narrateEvents(result.events)];
+            // On a challenge turn the query screen lists the Presence targets with the structures' flags, so the story does not.
+            const lines = [...(parsed.note ? [parsed.note] : []), ...narrateEvents(result.events, { listTargets: state.phase !== "strike" })];
             if (state.phase === "strike") lines.push("", ...renderQuery(observe(state)));
             return { lines, done: over() };
           } catch (error) {

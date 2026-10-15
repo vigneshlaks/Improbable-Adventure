@@ -62,15 +62,30 @@ describe("narrateEvent", () => {
     expect(lines.slice(-3)).toEqual(["  1) 11", "  2) 22", "  3) 33"]);
   });
 
-  it("describes each strike outcome", () => {
+  it("describes each strike outcome, and tells the player what was true", () => {
     const base = { type: "strikeResolved", turn: 2 } as const;
-    expect(narrateEvent({ ...base, kind: "frequency", outcome: "hit", damage: 17.8421, certaintyLost: 0 })).toEqual(["Your strike lands for 17.84 damage."]);
-    expect(narrateEvent({ ...base, kind: "frequency", outcome: "blocked", damage: 0, certaintyLost: 3 }).join(" ")).toMatch(/turns it aside.*lose 3 Certainty/);
-    expect(narrateEvent({ ...base, kind: "count", outcome: "hit", accuracy: 0.5, damage: 10, certaintyLost: 0 })).toEqual(["Your estimate is close enough to hurt it: 10 damage."]);
-    expect(narrateEvent({ ...base, kind: "count", outcome: "miss", accuracy: -1, damage: 0, certaintyLost: 3 }).join(" ")).toMatch(/wildly off.*lose 3 Certainty/);
-    expect(narrateEvent({ ...base, kind: "presence", realHits: 3, decoyHits: 1, damage: 15, certaintyLost: 4 })).toEqual([
-      "You strike 3 real and 1 decoy targets: 15 damage, 4 Certainty lost.",
+    expect(narrateEvent({ ...base, kind: "frequency", outcome: "hit", damage: 17.8421, certaintyLost: 0, force: 15, trueCount: 13 })).toEqual([
+      "Your strike lands for 17.84 damage. The value had appeared 13 times; you struck with 15.",
     ]);
+    expect(narrateEvent({ ...base, kind: "frequency", outcome: "blocked", damage: 0, certaintyLost: 3, force: 9, trueCount: 12 }).join(" ")).toMatch(
+      /turns it aside.*lose 3 Certainty.*appeared 12 times; you struck with 9/,
+    );
+    expect(narrateEvent({ ...base, kind: "count", outcome: "hit", accuracy: 0.5, damage: 10, certaintyLost: 0, estimate: 190, trueDistinct: 200 })).toEqual([
+      "Your estimate is close enough to hurt it: 10 damage. There were 200 distinct values; you said 190.",
+    ]);
+    expect(narrateEvent({ ...base, kind: "count", outcome: "miss", accuracy: -1, damage: 0, certaintyLost: 3, estimate: 50, trueDistinct: 200 }).join(" ")).toMatch(
+      /wildly off.*lose 3 Certainty.*200 distinct values; you said 50/,
+    );
+    expect(narrateEvent({ ...base, kind: "presence", realHits: 3, decoyHits: 1, damage: 15, certaintyLost: 4, realTotal: 5 })).toEqual([
+      "You strike 3 real and 1 decoy targets: 15 damage, 4 Certainty lost. 5 of the targets were real.",
+    ]);
+  });
+
+  it("can leave the Presence target list out, for a screen that prints it with the answers", () => {
+    const event: GameEvent = { type: "challengeIssued", turn: 2, weakPoint: "presence", challenge: { kind: "presence", targets: [11, 22] }, firstReveal: false };
+    expect(narrateEvents([event], { listTargets: false }).join("\n")).not.toMatch(/1\) 11/);
+    expect(narrateEvents([event], { listTargets: false }).join("\n")).toMatch(/dangles 2 values/);
+    expect(narrateEvents([event]).join("\n")).toMatch(/1\) 11/);
   });
 
   it("narrates the enemy's attack, the turn and the ending", () => {
@@ -188,6 +203,21 @@ describe("renderHelp", () => {
     const text = renderHelp("strike").join("\n");
     expect(text).toContain(narration.commands.strike.usage);
     expect(text).toContain(narration.commands.strike.summary);
+  });
+
+  it("lists only the structures the player owns when given a loadout", () => {
+    const text = renderHelp(undefined, ["bloomFilter", "linearCounting"]).join("\n");
+    expect(text).toMatch(/bloom: Bloom Filter/);
+    expect(text).toMatch(/linear: Linear Counting/);
+    expect(text).not.toMatch(/loglog|countmin|reservoir: |exact: /);
+    expect(renderHelp().join("\n")).toMatch(/loglog/); // with no loadout, everything is listed
+  });
+
+  it("still explains a structure the player does not own, and says so", () => {
+    const text = renderHelp("loglog", ["bloomFilter"]).join("\n");
+    expect(text).toMatch(/LogLog/);
+    expect(text).toMatch(/do not own/i);
+    expect(renderHelp("bloom", ["bloomFilter"]).join("\n")).not.toMatch(/do not own/i);
   });
 
   it("explains a structure, including its knob, by alias or full name", () => {

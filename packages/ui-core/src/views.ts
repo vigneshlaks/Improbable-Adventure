@@ -1,5 +1,5 @@
 import { findStructure, narration, structures } from "@pda/content";
-import { STRUCTURE_KINDS, type Answer, type Observation, type StructureView } from "@pda/engine";
+import { STRUCTURE_KINDS, type Answer, type Observation, type StructureKind, type StructureView } from "@pda/engine";
 import { formatNumber, TRAIT_NAMES, title } from "./narrator";
 
 // The layouts of the status, query and help screens. Story text lives in content; these are the displays.
@@ -94,14 +94,17 @@ function structureHelp(kind: keyof typeof structures): string[] {
   ];
 }
 
-/** Explains the commands and structures. With a topic, explains just that one. */
-export function renderHelp(topic?: string): string[] {
+/**
+ * Explains the commands and structures. With a topic, explains just that one. With a loadout, the overview lists only
+ * the structures the player owns; asking about another one still explains it and says it is not owned.
+ */
+export function renderHelp(topic?: string, loadout?: readonly StructureKind[]): string[] {
   if (topic === undefined) {
     return [
       "Commands:",
       ...Object.values(narration.commands).map((command) => `  ${command.usage}: ${command.summary}`),
       "Structures:",
-      ...STRUCTURE_KINDS.map((kind) => `  ${structures[kind].aliases[0]}: ${structures[kind].name}. ${structures[kind].summary}`),
+      ...STRUCTURE_KINDS.filter((kind) => !loadout || loadout.includes(kind)).map((kind) => `  ${structures[kind].aliases[0]}: ${structures[kind].name}. ${structures[kind].summary}`),
       'Type "help <command or structure>" for more.',
     ];
   }
@@ -111,6 +114,6 @@ export function renderHelp(topic?: string): string[] {
   if (command) return [command.usage, command.summary];
 
   const kind = findStructure(wanted);
-  if (kind) return structureHelp(kind);
+  if (kind) return [...structureHelp(kind), ...(loadout && !loadout.includes(kind) ? ["You do not own this structure yet."] : [])];
   return [`No help for "${topic}". Type "help" to see everything.`];
 }

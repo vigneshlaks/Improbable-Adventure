@@ -20,12 +20,17 @@ export function renderTemplate(template: string, variables: Record<string, strin
 const say = (key: EventTemplateKey, variables: Record<string, string | number> = {}) =>
   renderTemplate(narration.events[key], variables);
 
-function challengeLines(challenge: Challenge): string[] {
+export interface NarrateOptions {
+  /** Whether a Presence challenge lists its targets. A screen that prints them with the structures' answers turns this off. */
+  listTargets?: boolean;
+}
+
+function challengeLines(challenge: Challenge, { listTargets = true }: NarrateOptions): string[] {
   switch (challenge.kind) {
     case "presence":
       return [
         say("challengePresence", { count: challenge.targets.length }),
-        ...challenge.targets.map((target, position) => `  ${position + 1}) ${target}`),
+        ...(listTargets ? challenge.targets.map((target, position) => `  ${position + 1}) ${target}`) : []),
       ];
     case "frequency":
       return [say("challengeFrequency", { value: challenge.value })];
@@ -35,7 +40,7 @@ function challengeLines(challenge: Challenge): string[] {
 }
 
 /** The text for one event, as lines. Slots are shown from 1, as the player types them. */
-export function narrateEvent(event: GameEvent): string[] {
+export function narrateEvent(event: GameEvent, options: NarrateOptions = {}): string[] {
   switch (event.type) {
     case "structureDeployed":
       return [say("structureDeployed", { name: structures[event.kind].name, slot: event.slot + 1, bits: event.spaceBits })];
@@ -46,18 +51,26 @@ export function narrateEvent(event: GameEvent): string[] {
     case "challengeIssued":
       return [
         ...(event.firstReveal ? [say("weakPointRevealed", { weakPoint: event.weakPoint })] : []),
-        ...challengeLines(event.challenge),
+        ...challengeLines(event.challenge, options),
       ];
     case "strikeResolved": {
       const damage = formatNumber(event.damage);
       const certaintyLost = formatNumber(event.certaintyLost);
       switch (event.kind) {
         case "frequency":
-          return [event.outcome === "hit" ? say("strikeFrequencyHit", { damage }) : say("strikeFrequencyBlocked", { certaintyLost })];
+          return [
+            event.outcome === "hit"
+              ? say("strikeFrequencyHit", { damage, trueCount: event.trueCount, force: formatNumber(event.force) })
+              : say("strikeFrequencyBlocked", { certaintyLost, trueCount: event.trueCount, force: formatNumber(event.force) }),
+          ];
         case "count":
-          return [event.outcome === "hit" ? say("strikeCountHit", { damage }) : say("strikeCountMiss", { certaintyLost })];
+          return [
+            event.outcome === "hit"
+              ? say("strikeCountHit", { damage, trueDistinct: event.trueDistinct, estimate: formatNumber(event.estimate) })
+              : say("strikeCountMiss", { certaintyLost, trueDistinct: event.trueDistinct, estimate: formatNumber(event.estimate) }),
+          ];
         case "presence":
-          return [say("strikePresence", { realHits: event.realHits, decoyHits: event.decoyHits, damage, certaintyLost })];
+          return [say("strikePresence", { realHits: event.realHits, decoyHits: event.decoyHits, damage, certaintyLost, realTotal: event.realTotal })];
       }
       return [];
     }
@@ -76,8 +89,8 @@ export function narrateEvent(event: GameEvent): string[] {
   }
 }
 
-export function narrateEvents(events: readonly GameEvent[]): string[] {
-  return events.flatMap(narrateEvent);
+export function narrateEvents(events: readonly GameEvent[], options: NarrateOptions = {}): string[] {
+  return events.flatMap((event) => narrateEvent(event, options));
 }
 
 const TRAIT_NAMES = ["variety", "skew", "churn", "growth", "drift"] as const;

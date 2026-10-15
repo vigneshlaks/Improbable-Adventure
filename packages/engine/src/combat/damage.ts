@@ -24,6 +24,8 @@ export interface PresenceStrike {
   decoyHits: number;
   damage: number;
   certaintyLost: number;
+  /** How many of the presented targets were real, so the player can see what was missed. */
+  realTotal: number;
 }
 
 export interface FrequencyStrike {
@@ -31,6 +33,9 @@ export interface FrequencyStrike {
   outcome: "hit" | "blocked";
   damage: number;
   certaintyLost: number;
+  /** The force the player struck with, and the true count it is judged against. */
+  force: number;
+  trueCount: number;
 }
 
 export interface CountStrike {
@@ -40,6 +45,9 @@ export interface CountStrike {
   accuracy: number;
   damage: number;
   certaintyLost: number;
+  /** The estimate the player struck with, and the true number of distinct values it is judged against. */
+  estimate: number;
+  trueDistinct: number;
 }
 
 export type StrikeResult = PresenceStrike | FrequencyStrike | CountStrike;
@@ -69,10 +77,10 @@ function assertAmount(value: number, name: string): void {
 export function frequencyStrike(rules: DamageRules, trueCount: number, force: number): FrequencyStrike {
   assertAmount(force, "force");
   if (force < trueCount) {
-    return { kind: "frequency", outcome: "blocked", damage: 0, certaintyLost: rules.blockPenalty };
+    return { kind: "frequency", outcome: "blocked", damage: 0, certaintyLost: rules.blockPenalty, force, trueCount };
   }
   const ratio = force === 0 ? 1 : trueCount / force;
-  return { kind: "frequency", outcome: "hit", damage: settle(rules.base * power(ratio, rules.overshootExp)), certaintyLost: 0 };
+  return { kind: "frequency", outcome: "hit", damage: settle(rules.base * power(ratio, rules.overshootExp)), certaintyLost: 0, force, trueCount };
 }
 
 /** Damage is BASE x (1 - |E - D| / (COUNT_TOL x D)), floored at zero. A negative accuracy costs MISS_PENALTY. */
@@ -81,9 +89,9 @@ export function countStrike(rules: DamageRules, trueDistinct: number, estimate: 
   const tolerance = rules.countTol * trueDistinct;
   const accuracy = tolerance === 0 ? (estimate === trueDistinct ? 1 : -1) : 1 - Math.abs(estimate - trueDistinct) / tolerance;
   if (accuracy < 0) {
-    return { kind: "count", outcome: "miss", accuracy: settle(accuracy), damage: 0, certaintyLost: rules.missPenalty };
+    return { kind: "count", outcome: "miss", accuracy: settle(accuracy), damage: 0, certaintyLost: rules.missPenalty, estimate, trueDistinct };
   }
-  return { kind: "count", outcome: "hit", accuracy: settle(accuracy), damage: settle(rules.base * accuracy), certaintyLost: 0 };
+  return { kind: "count", outcome: "hit", accuracy: settle(accuracy), damage: settle(rules.base * accuracy), certaintyLost: 0, estimate, trueDistinct };
 }
 
 /**
@@ -109,5 +117,6 @@ export function presenceStrike(rules: DamageRules, real: boolean[], chosen: numb
     decoyHits,
     damage: settle(rules.hitDamage * realHits),
     certaintyLost: rules.decoyPenalty * decoyHits,
+    realTotal: real.filter(Boolean).length,
   };
 }
