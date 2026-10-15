@@ -3,6 +3,19 @@ import balanceJson from "../balance.json";
 // The engine's tests use their own stand-in constants; this test keeps that stand-in in sync with balance.json.
 import { TEST_CONSTANTS } from "../../engine/src/structures/testUtils";
 import { balance, parseBalance, structureConstants } from "./balance";
+import { structures } from "./structures";
+
+describe("the starting loadout", () => {
+  const owned = balance.STARTING_LOADOUT.map((kind) => structures[kind]);
+
+  it("owns more structures than it has slots, so every fight asks the player to choose", () => {
+    expect(balance.STARTING_LOADOUT.length).toBeGreaterThan(balance.STARTING_SLOTS);
+  });
+
+  it("has a structure built for Count, because Exact Memory fills up and the others cannot count well", () => {
+    expect(owned.some((info) => info.answers.length === 1 && info.answers[0] === "count")).toBe(true);
+  });
+});
 
 describe("balance.json", () => {
   it("validates and carries the spec's starting values", () => {
@@ -27,7 +40,7 @@ describe("balance.json", () => {
 
   it("carries the fight settings the engine needs", () => {
     expect(balance.EXPECTED_TURNS).toBe(5);
-    expect(balance.STARTING_LOADOUT).toEqual(["exactMemory", "reservoirSampling", "bloomFilter"]);
+    expect(balance.STARTING_LOADOUT).toEqual(["exactMemory", "reservoirSampling", "bloomFilter", "linearCounting"]);
     expect(Object.keys(balance.TIERS)).toEqual(["minion", "elite", "boss"]);
   });
 

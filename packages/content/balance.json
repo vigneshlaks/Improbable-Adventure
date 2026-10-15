@@ -7,7 +7,7 @@
   "STARTING_SPACE": 8192,
   "STARTING_CERTAINTY": 100,
   "STARTING_SLOTS": 3,
-  "STARTING_LOADOUT": ["exactMemory", "reservoirSampling", "bloomFilter"],
+  "STARTING_LOADOUT": ["exactMemory", "reservoirSampling", "bloomFilter", "linearCounting"],
   "REST_HEAL": 30,
 
   "BASE": 20,

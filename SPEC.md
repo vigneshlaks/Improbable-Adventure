@@ -283,7 +283,7 @@ A Seeded structure uses a per-fight secret seed. The enemy keeps attacking with 
 
 The MVP run is one act: five fights, one rest stop, one Elite, then a Boss. The full game has three acts.
 
-- **Starting loadout:** Exact Memory, Reservoir Sampling, Bloom Filter; 3 slots; 8,192 bits; 100 Certainty.
+- **Starting loadout (changed 2026-10-14):** Exact Memory, Reservoir Sampling, Bloom Filter, Linear Counting (four owned, three slots, so every fight asks the player to choose); 8,192 bits; 100 Certainty. With the original three, a Count Minion was lost by every bot (0 percent): Exact Memory fills after 128 values, Reservoir Sampling's distinct estimate is too coarse for the tolerance, and Bloom Filter cannot count. Adding Linear Counting won 96 percent of Count Minions (mean of the Greedy, Prober and Cautious bots, 100 seeds each) and raised the natural Minion win rate from 44 to 72 percent and Elite from 20 to between 37 and 44 (two seed sets), with Presence and Frequency unchanged within noise. Exact Memory stays, because dropping it cost Frequency (43 to 26 percent). Count-Min Sketch was not added: alone it fixed nothing for Count and did not help the bots at Frequency.
 - **After each fight:** pick 1 of 3 rewards, drawn from new structures, upgrades, and enchantments. Weights live in `content/balance.json`.
 - **Rest stop:** perform fusions, move enchantments between structures, and restore REST\_HEAL Certainty (default 30).
 - **Enemy pacing:** trait count and levels rise through the act. Minions have 1–2 non-Low traits, Elites 3, the Boss 4 plus two weak points.
@@ -561,7 +561,7 @@ Read SPEC.md before any task. It is the source of truth; if code and spec disagr
 
 - Game title. "Probabilistic Data Structure Roguelike" is a placeholder.
 - Does Certainty carry across the whole run (current spec) or reset per act?
-- Should Exact Memory stay in the starting loadout, or be a reward so early fights force sketch use?
+- Should Exact Memory stay in the starting loadout, or be a reward so early fights force sketch use? (Kept for now: removing it cost Frequency fights; see the starting loadout.)
 - Weak point reveal: on the first challenge (current spec), or only through probing?
 - Export languages after TypeScript and Python: Go, Rust, or Java?
 - Leaderboard hosting for speedruns: static seeds published in-repo first, server later?

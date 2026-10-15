@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
+import { buildFightConfig } from "@pda/content";
 import { STRUCTURE_KINDS } from "@pda/engine";
 import { getBot } from "./bots";
 import { runFights, summarize } from "./report";
 import { META, RECORDS } from "./reportFixtures";
+import { playFight } from "./runner";
+import { minion } from "./testUtils";
 import { wilsonInterval } from "./stats";
 
 describe("summarize", () => {
@@ -83,7 +86,7 @@ describe("runFights", () => {
 
   it("only deploys structures in the chosen loadout", () => {
     const starting = runFights({ ...options, bot: getBot("greedy"), n: 25 });
-    expect(Object.keys(starting.structures).sort()).toEqual(["bloomFilter", "exactMemory", "reservoirSampling"].filter((kind) => kind in starting.structures));
+    expect(Object.keys(starting.structures).sort()).toEqual(["bloomFilter", "exactMemory", "linearCounting", "reservoirSampling"].filter((kind) => kind in starting.structures));
     expect(starting.structures.countMinSketch).toBeUndefined();
 
     const full = runFights({ ...options, bot: getBot("greedy"), loadout: "full", n: 60 });
@@ -94,5 +97,19 @@ describe("runFights", () => {
   it("rejects a bad count", () => {
     expect(() => runFights({ ...options, n: 0 })).toThrow(RangeError);
     expect(() => runFights({ ...options, n: 2.5 })).toThrow(RangeError);
+  });
+});
+
+describe("the starting loadout", () => {
+  it("can win Count fights: a Minion whose weak point is Count is not a loss before it starts", () => {
+    // The loadout was once Exact Memory, Reservoir Sampling and Bloom Filter, which won none of these.
+    let won = 0;
+    const fights = 40;
+    for (let i = 0; i < fights; i++) {
+      const seed = `count-start-${i}`;
+      const config = minion(seed, "count", [...buildFightConfig({ seed, tier: "minion" }).loadout]);
+      if (playFight({ config, seed, bot: getBot("greedy") }).outcome === "won") won++;
+    }
+    expect(won / fights).toBeGreaterThan(0.8);
   });
 });
