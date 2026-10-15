@@ -156,6 +156,8 @@ function strike(state: FightState, action: Extract<Action, { type: "strikeSubset
   } catch (error) {
     throw new IllegalActionError(error instanceof Error ? error.message : "Invalid strike");
   }
+  const multiplier = state.config.rules.damageMultiplier ?? 1;
+  if (multiplier !== 1) result = { ...result, damage: settle(result.damage * multiplier) };
 
   state.enemyHp = Math.max(0, settle(state.enemyHp - result.damage));
   loseCertainty(state, result.certaintyLost, tally);

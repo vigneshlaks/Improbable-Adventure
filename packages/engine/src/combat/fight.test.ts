@@ -95,6 +95,23 @@ function playGreedy(seed: string): { state: FightState; events: GameEvent[] } {
   return { state, events };
 }
 
+describe("damageMultiplier", () => {
+  it("scales the damage of every strike, and the event reports the scaled damage", () => {
+    const strikeDamage = (multiplier?: number) => {
+      const config: FightConfig = { ...CONFIG, rules: { ...CONFIG.rules, ...(multiplier ? { damageMultiplier: multiplier } : {}) } };
+      let state = createFight("mult", config);
+      state = step(state, endDeploy).state;
+      state = step(state, endDeploy).state;
+      const count = groundTruth(state).frequency?.count ?? 1;
+      const result = step(state, { type: "strikeValue", value: count });
+      return { damage: (result.events.find((e) => e.type === "strikeResolved") as { damage: number }).damage, hp: result.state.enemyHp };
+    };
+    expect(strikeDamage()).toMatchObject({ damage: 20, hp: 0 });
+    expect(strikeDamage(1.5)).toMatchObject({ damage: 30, hp: 0 }); // 20 x 1.5, and the enemy's 20 HP are gone
+    expect(strikeDamage(0.5)).toMatchObject({ damage: 10, hp: 10 });
+  });
+});
+
 describe("starting a fight", () => {
   const obs = observe(createFight("start", CONFIG));
 

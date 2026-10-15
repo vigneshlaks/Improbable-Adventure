@@ -37,6 +37,14 @@ export const balanceSchema = z.object({
   STARTING_SLOTS: z.number().int().positive(),
   STARTING_LOADOUT: z.array(z.enum(STRUCTURE_KINDS)).min(1),
   REST_HEAL: z.number().int().nonnegative(),
+  /** The act, in the order the enemies are fought. */
+  RUN_ENCOUNTERS: z.array(z.enum(["minion", "elite", "boss"])).min(1),
+  /** Encounter numbers (counting from 0) that are preceded by a rest stop. */
+  REST_BEFORE: z.array(z.number().int().min(1)),
+  /** How many rewards are offered after a fight. */
+  REWARD_CHOICES: z.number().int().positive(),
+  /** How likely each kind of reward is to be drawn, relative to the others. */
+  REWARD_WEIGHTS: z.object({ structure: z.number().nonnegative(), upgrade: z.number().nonnegative() }).strict(),
 
   BASE: z.number().positive(),
   HIT_DAMAGE: z.number().positive(),

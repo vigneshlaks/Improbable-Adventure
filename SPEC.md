@@ -291,6 +291,16 @@ The MVP run is one act: five fights, one rest stop, one Elite, then a Boss. The 
 - **Enemy pacing:** trait count and levels rise through the act. Minions have 1–2 non-Low traits, Elites 3, the Boss 4 plus two weak points.
 - **End of run:** win or lose, the player can export the toolkit built so far.
 
+**Run loop, step 1 (decided 2026-10-15).** The spec left these open. The run is plain data in the engine (`createRun`, `stepRun`, `legalRunActions`, `observeRun`, `turnsTaken`; the fight's own `step` and `legalActions` keep their names), and the content package builds its `RunConfig` from a run seed (`buildRunConfig`):
+
+- **The act** is `RUN_ENCOUNTERS`: five Minions, an Elite, then the Boss. The rest stop comes before the Elite (`REST_BEFORE` [5]), so the fifth fight's reward is chosen first. The run is won by beating the last encounter and lost with the first lost fight.
+- **Certainty carries from one fight to the next** (the current spec; it stays an open question below). Each fight starts with the run's Certainty.
+- **Rewards** are offered after every won fight except the last: `REWARD_CHOICES` (3) distinct ones, drawn one at a time without replacement in proportion to `REWARD_WEIGHTS` (structure 3, upgrade 2), from a stream of the run seed. A structure the player already owns is never offered, a weight of 0 never is, fewer are offered when fewer are eligible, and the reward phase is skipped when none is. The pool is the structures not in the starting loadout plus the five upgrades.
+- **Upgrades** are in `upgrades.json` (name, summary, effect) and stack. Capacity and Slots apply to every later fight. Resolve raises the maximum and, at once, the current Certainty. Recovery restores Certainty after each won fight, up to the maximum. Power multiplies the damage of every strike (`damageMultiplier` in the fight rules, so the narrated damage is the real damage).
+- **The rest stop** restores `REST_HEAL` Certainty up to the maximum. Its only action for now is `leaveRest`; fusions and enchantments come in later steps.
+- **Seeds:** fight `i` uses `<run seed>/fight/<i>` and encounter `i` is designed from `<run seed>/encounter/<i>`, so the encounters do not copy each other and adding rewards never shifts a stream.
+- A scripted run that strikes the true answer every time wins the whole act on the real content (test), so Certainty carry-over alone does not make the act unwinnable. Whether the bots win it at the spec's balance targets is step 4.
+
 ## Engine API and data
 
 The engine is a pure state machine: `step(state, action)` returns a new state plus events, and the same seed and actions always produce the same result.

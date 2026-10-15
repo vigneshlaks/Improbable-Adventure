@@ -1,4 +1,4 @@
-import type { FightConfig, StructureKind } from "@pda/engine";
+import type { FightConfig, FightRules, StructureKind } from "@pda/engine";
 import { balance, structureConstants, type Balance } from "./balance";
 import { generateEnemy, type TierName } from "./enemies";
 import { traits as defaultTraits, type Traits } from "./traits";
@@ -12,26 +12,31 @@ export interface FightOptions {
   traitData?: Traits;
 }
 
+/** The rules of a fight, from the tuning numbers. */
+export function fightRules(tuning: Balance = balance): FightRules {
+  return {
+    startingSpace: tuning.STARTING_SPACE,
+    startingCertainty: tuning.STARTING_CERTAINTY,
+    startingSlots: tuning.STARTING_SLOTS,
+    base: tuning.BASE,
+    hitDamage: tuning.HIT_DAMAGE,
+    decoyPenalty: tuning.DECOY_PENALTY,
+    blockPenalty: tuning.BLOCK_PENALTY,
+    missPenalty: tuning.MISS_PENALTY,
+    overshootExp: tuning.OVERSHOOT_EXP,
+    countTol: tuning.COUNT_TOL,
+    presenceTargets: tuning.PRESENCE_TARGETS,
+    expectedTurns: tuning.EXPECTED_TURNS,
+    turnLimitPenalty: tuning.TURN_LIMIT_PENALTY,
+  };
+}
+
 /** Everything the engine needs to start a fight: the rules, the player's loadout, and a generated enemy. */
 export function buildFightConfig(options: FightOptions): FightConfig {
   const { seed, tier, tuning = balance, traitData = defaultTraits } = options;
   return {
     constants: structureConstants(tuning),
-    rules: {
-      startingSpace: tuning.STARTING_SPACE,
-      startingCertainty: tuning.STARTING_CERTAINTY,
-      startingSlots: tuning.STARTING_SLOTS,
-      base: tuning.BASE,
-      hitDamage: tuning.HIT_DAMAGE,
-      decoyPenalty: tuning.DECOY_PENALTY,
-      blockPenalty: tuning.BLOCK_PENALTY,
-      missPenalty: tuning.MISS_PENALTY,
-      overshootExp: tuning.OVERSHOOT_EXP,
-      countTol: tuning.COUNT_TOL,
-      presenceTargets: tuning.PRESENCE_TARGETS,
-      expectedTurns: tuning.EXPECTED_TURNS,
-      turnLimitPenalty: tuning.TURN_LIMIT_PENALTY,
-    },
+    rules: fightRules(tuning),
     loadout: options.loadout ?? [...tuning.STARTING_LOADOUT],
     enemy: generateEnemy(seed, tier, tuning, traitData),
     traitTables: traitData.levels,

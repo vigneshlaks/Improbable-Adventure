@@ -1,0 +1,27 @@
+{
+  "capacity": {
+    "name": "Capacity",
+    "summary": "More Space to spend in every fight.",
+    "effect": { "space": 1024 }
+  },
+  "slots": {
+    "name": "Slots",
+    "summary": "One more structure deployed at a time.",
+    "effect": { "slots": 1 }
+  },
+  "resolve": {
+    "name": "Resolve",
+    "summary": "A higher maximum Certainty, and the extra Certainty right away.",
+    "effect": { "maxCertainty": 20 }
+  },
+  "recovery": {
+    "name": "Recovery",
+    "summary": "Certainty restored after every fight.",
+    "effect": { "recovery": 10 }
+  },
+  "power": {
+    "name": "Power",
+    "summary": "Every strike deals more damage.",
+    "effect": { "damagePercent": 10 }
+  }
+}

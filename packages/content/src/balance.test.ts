@@ -32,6 +32,8 @@ describe("balance.json", () => {
       STARTING_CERTAINTY: 100,
       STARTING_SLOTS: 3,
       REST_HEAL: 30,
+      REWARD_CHOICES: 3,
+      REST_BEFORE: [5],
       VALUE_BITS: 32,
       LIKE_THRESHOLD: 0.6,
       CUNNING_SEARCH: 50000,

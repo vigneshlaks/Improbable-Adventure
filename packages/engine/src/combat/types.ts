@@ -22,6 +22,8 @@ export interface FightRules extends DamageRules {
   expectedTurns: number;
   /** Certainty lost when the fight reaches its turn limit. */
   turnLimitPenalty: number;
+  /** Multiplies the damage of every strike. A run sets it from the Power upgrade; a plain fight leaves it at 1. */
+  damageMultiplier?: number;
 }
 
 export interface EnemyConfig {

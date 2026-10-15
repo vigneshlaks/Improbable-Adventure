@@ -9,6 +9,10 @@
   "STARTING_SLOTS": 3,
   "STARTING_LOADOUT": ["exactMemory", "reservoirSampling", "bloomFilter", "linearCounting"],
   "REST_HEAL": 30,
+  "RUN_ENCOUNTERS": ["minion", "minion", "minion", "minion", "minion", "elite", "boss"],
+  "REST_BEFORE": [5],
+  "REWARD_CHOICES": 3,
+  "REWARD_WEIGHTS": { "structure": 3, "upgrade": 2 },
 
   "BASE": 20,
   "HIT_DAMAGE": 5,
