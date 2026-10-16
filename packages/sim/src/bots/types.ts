@@ -1,4 +1,5 @@
 import type { Action, GroundTruth, Observation, Rng, StructureKind } from "@pda/engine";
+import type { RunPolicy } from "../runPolicy";
 
 /** Everything a bot is allowed to know when it chooses an action. */
 export interface BotView {
@@ -22,4 +23,6 @@ export interface Bot {
   /** Whether the runner should show it the true answers. Only the Oracle does. */
   usesTruth: boolean;
   create(): BotPlayer;
+  /** How it chooses rewards and acts at a rest stop. A sensible player's choices when left out. */
+  runPolicy?: RunPolicy;
 }

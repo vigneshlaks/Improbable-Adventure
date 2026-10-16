@@ -70,6 +70,11 @@ export interface FightRecord {
   events?: GameEvent[];
 }
 
+/** Whether a strike cost something: it was blocked, missed the Count band, or hit a decoy. */
+export function isWrongStrike(event: Extract<GameEvent, { type: "strikeResolved" }>): boolean {
+  return event.certaintyLost > 0 || (event.kind === "presence" && event.decoyHits > 0);
+}
+
 /** Compares every structure's answer to the open challenge with the real answer, and adds it to the tallies. */
 function tallyAnswers(observation: Observation, state: FightState, accuracy: FightRecord["accuracy"]): void {
   const truth = groundTruth(state).answer;
@@ -168,7 +173,7 @@ export function playFight({ config, seed, bot, maxSteps = 2000, keepEvents = fal
         if (event.kind === "frequency" && event.outcome === "blocked") record.certaintyLost.blocked += event.certaintyLost;
         if (event.kind === "count" && event.outcome === "miss") record.certaintyLost.misses += event.certaintyLost;
         if (event.kind === "presence") record.certaintyLost.decoys += event.certaintyLost;
-        if (event.certaintyLost > 0 || (event.kind === "presence" && event.decoyHits > 0)) record.strikes.wrong++;
+        if (isWrongStrike(event)) record.strikes.wrong++;
         break;
       case "fightLost":
         record.reason = event.reason;

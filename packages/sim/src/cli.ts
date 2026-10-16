@@ -3,6 +3,8 @@ import { BOTS, getBot } from "./bots";
 import type { Bot } from "./bots/types";
 import { formatComparison, formatReport } from "./format";
 import { runFights, type LoadoutName } from "./report";
+import { formatRunComparison, formatRunReport } from "./runFormat";
+import { checkTargets, runBatch } from "./runReport";
 
 export interface ParsedArgs {
   command: string;
@@ -37,16 +39,18 @@ export interface CliResult {
 const TIERS: TierName[] = ["minion", "elite", "boss"];
 const LOADOUTS: LoadoutName[] = ["starting", "full"];
 const MAX_FIGHTS = 1_000_000;
+const MAX_RUNS = 100_000;
 
 const USAGE = `Usage: pnpm sim <command> [options]
 
 Commands:
   sim fights  --bot <name> [options]    Play many seeded fights with one bot and report the results.
   sim compare --bots <a,b,c> [options]  Play the same fights with several bots and compare them.
-  sim runs    --bot <name> [options]    Play whole runs. Needs the run loop (Milestone 4), not available yet.
+  sim runs    --bot <name> [options]    Play whole runs (five fights, a rest stop, an Elite and the Boss) and check the spec's targets.
+  sim runs    --bots <a,b,c> [options]  Play the same runs with several bots and compare them.
 
 Options:
-  --n <count>                      Number of fights (default 1000)
+  --n <count>                      Number of fights (default 1000), or of runs (default 100)
   --seed-base <number>             First seed; fight i uses seed-base + i (default 1)
   --tier minion|elite|boss         Enemy tier (default minion)
   --loadout starting|full          Structures the bot may deploy (default starting)
@@ -116,11 +120,21 @@ export function main(argv: string[]): CliResult {
         return { code: 0, output: options.json ? JSON.stringify(reports, null, 2) : formatComparison(reports) };
       }
 
-      case "runs":
-        return {
-          code: 1,
-          output: "`sim runs` plays whole runs (fights, rewards, rest stops and fusions), which needs the run loop from Milestone 4. It does not exist yet. Use `sim fights` for now.",
-        };
+      case "runs": {
+        rejectUnknownOptions(options, ["bot", "bots", "n", "seed-base", "json"]);
+        if (typeof options.bot === "string" && typeof options.bots === "string") throw new UsageError("Use --bot or --bots, not both.");
+        const names = typeof options.bot === "string" ? [options.bot] : typeof options.bots === "string" ? options.bots.split(",").map((name) => name.trim()) : [];
+        if (names.length === 0) throw new UsageError(`Missing --bot or --bots. Choose from: ${Object.keys(BOTS).join(", ")}.`);
+        for (const name of names) lookupBot(name);
+        const n = wholeNumber(options.n, 100, 1, MAX_RUNS, "n");
+        const seedBase = wholeNumber(options["seed-base"], 1, 0, Number.MAX_SAFE_INTEGER, "seed-base");
+        const reports = names.map((botName) => runBatch({ botName, n, seedBase }));
+        const checks = checkTargets(reports);
+        if (options.json) return { code: 0, output: JSON.stringify({ reports, targets: checks }, null, 2) };
+        const single = reports.length === 1 ? formatRunReport(reports[0] as (typeof reports)[number], checks) : null;
+        const targets = checks.map((check) => `  ${check.ok ? "met   " : "missed"}  ${check.target}: ${check.detail}`);
+        return { code: 0, output: single ?? [formatRunComparison(reports), "", "Spec targets", ...targets].join("\n") };
+      }
 
       default:
         throw new UsageError(`Unknown command "${command}".\n\n${USAGE}`);

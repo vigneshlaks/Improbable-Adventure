@@ -57,11 +57,35 @@ describe("main", () => {
     expect((JSON.parse(output) as Array<{ bot: string }>).map((report) => report.bot)).toEqual(["random", "oracle"]);
   });
 
-  it("explains that whole runs are not available until the run loop exists", () => {
-    const { code, output } = main(["runs", "--bot", "greedy", "--n", "10"]);
-    expect(code).toBe(1);
-    expect(output).toMatch(/run loop/);
-    expect(output).toMatch(/sim fights/);
+  describe("whole runs", () => {
+    it("plays a batch of runs and prints the report with the spec's targets for that bot", () => {
+      const { code, output } = main(["runs", "--bot", "oracle", "--n", "2", "--seed-base", "4"]);
+      expect(code).toBe(0);
+      expect(output).toMatch(/oracle: 2 runs/);
+      expect(output).toMatch(/Won +100\.0%/);
+      expect(output).toMatch(/Oracle wins over 95 percent of runs/);
+    });
+
+    it("prints JSON, with the targets, on request", () => {
+      const { output } = main(["runs", "--bot", "oracle", "--n", "2", "--json"]);
+      const parsed = JSON.parse(output) as { reports: Array<{ bot: string; runs: number }>; targets: Array<{ id: string; ok: boolean }> };
+      expect(parsed.reports).toMatchObject([{ bot: "oracle", runs: 2 }]);
+      expect(parsed.targets.map((target) => target.id)).toContain("oracle-win-rate");
+    });
+
+    it("compares several bots over the same runs", () => {
+      const { code, output } = main(["runs", "--bots", "oracle,random", "--n", "2"]);
+      expect(code).toBe(0);
+      expect(output).toMatch(/oracle +100\.0%/);
+      expect(output).toMatch(/random/);
+    });
+
+    it("asks for a bot, rejects options that mean nothing for a run, and explains a bad one", () => {
+      expect(main(["runs"])).toMatchObject({ code: 1, output: expect.stringMatching(/--bot or --bots/) });
+      expect(main(["runs", "--bot", "oracle", "--tier", "boss"])).toMatchObject({ code: 1, output: expect.stringMatching(/Unknown option --tier/) });
+      expect(main(["runs", "--bot", "clever"])).toMatchObject({ code: 1, output: expect.stringMatching(/Unknown bot "clever"/) });
+      expect(main(["runs", "--bot", "oracle", "--n", "0"])).toMatchObject({ code: 1, output: expect.stringMatching(/--n must be a whole number/) });
+    });
   });
 
   it("rejects bad input with an explanation", () => {
