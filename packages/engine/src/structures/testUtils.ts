@@ -11,6 +11,8 @@ export const TEST_CONSTANTS: StructureConstants = {
   logLogErrorCoefficient: 1.3,
   hyperLogLogErrorCoefficient: 1.04,
   hyperLogLogSmallRange: 2.8,
+  steadySpaceCost: 0.1,
+  superLogLogErrorCoefficient: 1.05,
 };
 
 /** Every structure's statistical test runs this many seeded trials. */

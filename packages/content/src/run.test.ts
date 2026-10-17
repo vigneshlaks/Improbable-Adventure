@@ -49,6 +49,16 @@ describe("enchantments.json", () => {
     expect(enchantments.seeded?.valid).not.toContain("exactMemory"); // nothing is hashed there
   });
 
+  it("has Steady, which fits Count-Min and LogLog, turns them into their named variants, and is offered as a reward", () => {
+    expect(enchantments.steady).toMatchObject({
+      name: "Steady",
+      valid: ["countMinSketch", "logLog"],
+      transforms: { countMinSketch: "Count-Min with Conservative Update", logLog: "SuperLogLog" },
+      reward: true,
+    });
+    expect(enchantments.steady?.summary).toMatch(/10 percent/);
+  });
+
   it("rejects an enchantment that fits nothing, lists a structure twice, transforms one it does not fit, or has no summary", () => {
     const ok = { name: "X", phase: 1, summary: "Does a thing.", valid: ["bloomFilter"], transforms: {}, reward: true };
     expect(() => parseEnchantments({ x: ok })).not.toThrow();
@@ -63,6 +73,9 @@ describe("enchantments.json", () => {
     expect(variantName("Bloom Filter", "bloomFilter", undefined)).toBe("Bloom Filter");
     expect(variantName("Bloom Filter", "bloomFilter", "seeded")).toBe("Bloom Filter"); // Seeded transforms nothing
     expect(variantName("Bloom Filter", "bloomFilter", "mystery")).toBe("Bloom Filter");
+    expect(variantName("Count-Min Sketch", "countMinSketch", "steady")).toBe("Count-Min with Conservative Update");
+    expect(variantName("LogLog", "logLog", "steady")).toBe("SuperLogLog");
+    expect(variantName("Bloom Filter", "bloomFilter", "steady")).toBe("Bloom Filter"); // it does not fit, so it changes nothing
   });
 });
 
@@ -96,13 +109,17 @@ describe("buildRunConfig", () => {
   });
 
   it("passes the enchantments on, and offers as rewards only those marked as rewards, at the enchantment weight", () => {
-    expect(config.enchantments).toEqual([{ id: "seeded", valid: [...(enchantments.seeded?.valid ?? [])] }]);
-    expect(config.rewards.some((r) => r.kind === "enchantment")).toBe(false); // Seeded is not offered yet
+    expect(config.enchantments).toEqual([
+      { id: "seeded", valid: [...(enchantments.seeded?.valid ?? [])] },
+      { id: "steady", valid: [...(enchantments.steady?.valid ?? [])] },
+    ]);
+    // Steady is offered; Seeded is not (it only matters against an enemy that does not exist yet).
+    expect(config.rewards.filter((r) => r.kind === "enchantment")).toEqual([
+      { id: "enchantment:steady", kind: "enchantment", enchantment: "steady", weight: balance.REWARD_WEIGHTS.enchantment },
+    ]);
     const offered = { ...enchantments, seeded: { ...enchantments.seeded!, reward: true } };
     const withIt = buildRunConfig({ seed: "run-1", enchantmentData: offered });
-    expect(withIt.rewards.filter((r) => r.kind === "enchantment")).toEqual([
-      { id: "enchantment:seeded", kind: "enchantment", enchantment: "seeded", weight: balance.REWARD_WEIGHTS.enchantment },
-    ]);
+    expect(withIt.rewards.filter((r) => r.kind === "enchantment").map((r) => r.id)).toEqual(["enchantment:seeded", "enchantment:steady"]);
   });
 
   it("passes the recipes on, by id", () => {

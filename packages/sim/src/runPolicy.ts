@@ -1,35 +1,36 @@
-import type { FusionDef, Rng, RewardView, RunAction } from "@pda/engine";
+import type { Rng, RewardView, RunAction } from "@pda/engine";
 
 /** How a bot decides what the fight-level bots do not cover: which reward to take, and what to do at a rest stop. */
 export interface RunPolicy {
   /** The index of the reward to take among those on offer. */
   reward(offers: readonly RewardView[], rng: Rng): number;
-  /** The rest-stop action: a fusion that is available, or leaving. */
-  rest(fusions: readonly FusionDef[], rng: Rng): RunAction;
+  /** One of the legal rest-stop actions (fusing, attaching an enchantment, or leaving). The runner asks again until it leaves. */
+  rest(actions: readonly RunAction[], rng: Rng): RunAction;
 }
 
 /** Any legal choice with equal chance, as the Random bot plays the rest of the game. */
 export const randomPolicy: RunPolicy = {
   reward: (offers, rng) => rng.int(offers.length),
-  rest(fusions, rng) {
-    const actions: RunAction[] = [...fusions.map((fusion): RunAction => ({ type: "fuse", recipeId: fusion.id })), { type: "leaveRest" }];
-    return actions[rng.int(actions.length)] as RunAction;
-  },
+  rest: (actions, rng) => actions[rng.int(actions.length)] ?? { type: "leaveRest" },
 };
 
 /**
- * What a sensible player does: take a new structure before an upgrade, then the upgrades in this order, and fuse
- * whenever a fusion is available. The order is a bot's taste and not a game rule; a different order is a different bot.
+ * What a sensible player does: take a new structure before an enchantment, an enchantment before an upgrade, then the
+ * upgrades in this order; at the rest stop make Count-Min steady, fuse when possible, and put Steady on a LogLog only if it
+ * is not about to be fused away. That order is a bot's taste, not a game rule; a different order is a different bot.
  */
 const TASTE = [
   "structure:countMinSketch",
   "structure:logLog",
+  "enchantment:steady",
   "upgrade:power",
   "upgrade:resolve",
   "upgrade:recovery",
   "upgrade:capacity",
   "upgrade:slots",
 ];
+
+const is = (action: RunAction, type: RunAction["type"]) => action.type === type;
 
 export const sensiblePolicy: RunPolicy = {
   reward(offers) {
@@ -39,5 +40,12 @@ export const sensiblePolicy: RunPolicy = {
     }
     return 0;
   },
-  rest: (fusions) => (fusions[0] ? { type: "fuse", recipeId: fusions[0].id } : { type: "leaveRest" }),
+  rest(actions) {
+    const steadyCountMin = actions.find((a) => a.type === "enchant" && a.enchantmentId === "steady" && a.kind === "countMinSketch");
+    if (steadyCountMin) return steadyCountMin;
+    const fuse = actions.find((a) => is(a, "fuse"));
+    if (fuse) return fuse;
+    const steadyLogLog = actions.find((a) => a.type === "enchant" && a.enchantmentId === "steady" && a.kind === "logLog");
+    return steadyLogLog ?? { type: "leaveRest" };
+  },
 };

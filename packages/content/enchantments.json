@@ -12,5 +12,19 @@
     ],
     "transforms": {},
     "reward": false
+  },
+  "steady": {
+    "name": "Steady",
+    "phase": 1,
+    "summary": "For 10 percent more Space, a structure becomes steadier: Count-Min counts conservatively and overshoots far less, though it can no longer take deletes back, and LogLog averages only its smallest registers and becomes SuperLogLog, cutting its error.",
+    "valid": [
+      "countMinSketch",
+      "logLog"
+    ],
+    "transforms": {
+      "countMinSketch": "Count-Min with Conservative Update",
+      "logLog": "SuperLogLog"
+    },
+    "reward": true
   }
 }

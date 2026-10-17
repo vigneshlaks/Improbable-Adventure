@@ -37,7 +37,8 @@ describe("formatRunReport", () => {
     expect(text).toMatch(/Certainty left +30\.0/);
     expect(text).toMatch(/Bloom Filter +100\.0%/);
     expect(text).toMatch(/Count-Min Sketch +50\.0%/);
-    expect(text).toMatch(/Fused a HyperLogLog\W+50\.0%|Fused +50\.0%/);
+    expect(text).toMatch(/Fused +50\.0%/);
+    expect(text).toMatch(/Enchanted +50\.0%/);
   });
 
   it("shows the strike numbers and each target as met or missed", () => {

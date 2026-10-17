@@ -53,6 +53,7 @@ describe("summarizeRuns", () => {
     });
     expect(report.inWinningRuns.openers).toEqual({ bloomFilter: 1 });
     expect(report.inWinningRuns.fusedShare).toBe(0.5);
+    expect(report.inWinningRuns.enchantedShare).toBe(0.5); // only run A attached an enchantment
   });
 
   it("lists where runs ended in act order whatever order the runs come in", () => {
@@ -70,7 +71,7 @@ describe("summarizeRuns", () => {
     const lost = summarizeRuns([RUNS[1]!, RUNS[2]!], RUN_META);
     expect(lost.meanTurnsWhenWon).toBeNull();
     expect(lost.meanCertaintyLeftWhenWon).toBeNull();
-    expect(lost.inWinningRuns).toEqual({ runs: 0, structures: {}, openers: {}, fusedShare: 0 });
+    expect(lost.inWinningRuns).toEqual({ runs: 0, structures: {}, openers: {}, fusedShare: 0, enchantedShare: 0 });
   });
 
   it("refuses to summarize nothing", () => {
@@ -91,7 +92,7 @@ describe("checkTargets", () => {
     ...summarizeRuns(RUNS, { bot, seedBase: 1 }),
     winRate,
     strikes: { meanPerRun: 20, wrongShare },
-    inWinningRuns: { runs: wonRuns, structures, openers, fusedShare: 0 },
+    inWinningRuns: { runs: wonRuns, structures, openers, fusedShare: 0, enchantedShare: 0 },
   });
   const all = { exactMemory: 0.5, reservoirSampling: 0.5, bloomFilter: 0.5, countMinSketch: 0.5, logLog: 0.5, linearCounting: 0.5 };
   const by = (checks: ReturnType<typeof checkTargets>, id: string) => checks.find((check) => check.id === id);
@@ -173,7 +174,7 @@ describe("checkTargets", () => {
   });
 
   it("fails the checks that need winning runs when there are none, and says why", () => {
-    const none: RunReport = { ...reportFor("greedy", 0), inWinningRuns: { runs: 0, structures: {}, openers: {}, fusedShare: 0 } };
+    const none: RunReport = { ...reportFor("greedy", 0), inWinningRuns: { runs: 0, structures: {}, openers: {}, fusedShare: 0, enchantedShare: 0 } };
     const checks = checkTargets([none]);
     expect(by(checks, "family-opener")).toMatchObject({ ok: false, detail: expect.stringMatching(/no winning runs/i) });
     expect(by(checks, "family-structures")).toMatchObject({ ok: false, detail: expect.stringMatching(/no winning runs/i) });

@@ -41,6 +41,7 @@ export function formatRunReport(report: RunReport, checks: TargetCheck[]): strin
       row("Turns per won run", (report.meanTurnsWhenWon as number).toFixed(1)),
       row("Certainty left", (report.meanCertaintyLeftWhenWon as number).toFixed(1)),
       row("Fused", percent(won.fusedShare)),
+      row("Enchanted", percent(won.enchantedShare)),
       "  Structures deployed in these runs",
       ...byShare(won.structures).map(([kind, share]) => row(`  ${nameOf(kind)}`, percent(share))),
       "  First structure deployed",

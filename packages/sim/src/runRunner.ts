@@ -2,6 +2,7 @@ import {
   createRun,
   groundTruth,
   legalActions as fightActions,
+  legalRunActions,
   observe,
   observeRun,
   Rng,
@@ -40,6 +41,8 @@ export interface RunRecord {
   rewards: string[];
   /** Ids of the fusions done. */
   fused: string[];
+  /** Each enchantment attached, as `<enchantment>:<structure kind>`, in order (a move counts again). */
+  enchanted: string[];
   owned: StructureKind[];
   upgrades: Record<string, number>;
   /** The first structure deployed in the run. */
@@ -92,7 +95,7 @@ export function playRun({ config, seed, bot, maxSteps = DEFAULT_MAX_STEPS }: Pla
     } else if (state.phase === "reward") {
       action = { type: "chooseReward", index: policy.reward(observeRun(state).offers ?? [], rng) };
     } else {
-      action = policy.rest(observeRun(state).fusions ?? [], rng);
+      action = policy.rest(legalRunActions(state), rng);
     }
     try {
       const result = stepRun(state, action);
@@ -116,6 +119,7 @@ export function playRun({ config, seed, bot, maxSteps = DEFAULT_MAX_STEPS }: Pla
     certaintyLeft: state.certainty,
     rewards: [],
     fused: [],
+    enchanted: [],
     owned: [...state.owned],
     upgrades: { ...state.upgrades },
     opener: null,
@@ -156,6 +160,9 @@ export function playRun({ config, seed, bot, maxSteps = DEFAULT_MAX_STEPS }: Pla
         break;
       case "fused":
         record.fused.push(event.recipeId);
+        break;
+      case "enchanted":
+        record.enchanted.push(`${event.enchantmentId}:${event.kind}`);
         break;
     }
   }

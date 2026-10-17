@@ -22,6 +22,9 @@ const CASES: Array<{ kind: StructureKind; options: StructureOptions }> = [
   { kind: "logLog", options: { spaceBits: 640, hashSeed: 12345 } },
   { kind: "linearCounting", options: { spaceBits: 1024, hashSeed: 12345 } },
   { kind: "hyperLogLog", options: { spaceBits: 640, hashSeed: 12345 } },
+  // The enchanted variants: Count-Min with Conservative Update, SuperLogLog.
+  { kind: "countMinSketch", options: { spaceBits: 4500, knob: 4, hashSeed: 12345, enchantment: "steady" } },
+  { kind: "logLog", options: { spaceBits: 800, hashSeed: 12345, enchantment: "steady" } },
 ];
 
 const UNIVERSE = distinctValues(trialRng("snapshot-universe", 0), 300);

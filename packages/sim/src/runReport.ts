@@ -35,6 +35,8 @@ export interface RunReport {
     structures: Partial<Record<StructureKind, number>>;
     openers: Partial<Record<StructureKind, number>>;
     fusedShare: number;
+    /** The share that attached at least one enchantment. */
+    enchantedShare: number;
   };
 }
 
@@ -95,6 +97,7 @@ export function summarizeRuns(records: RunRecord[], meta: RunReportMeta): RunRep
       structures: shareOf((record) => record.deployed),
       openers: shareOf((record) => (record.opener ? [record.opener] : [])),
       fusedShare: won.length === 0 ? 0 : won.filter((record) => record.fused.length > 0).length / won.length,
+      enchantedShare: won.length === 0 ? 0 : won.filter((record) => record.enchanted.length > 0).length / won.length,
     },
   };
 }

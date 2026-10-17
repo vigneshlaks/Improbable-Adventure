@@ -33,6 +33,8 @@ export const balanceSchema = z.object({
   LOGLOG_ERROR_COEFFICIENT: z.number().positive(),
   HLL_ERROR_COEFFICIENT: z.number().positive(),
   HLL_SMALL_RANGE: z.number().positive(),
+  STEADY_SPACE_COST: z.number().nonnegative(),
+  SUPERLOGLOG_ERROR_COEFFICIENT: z.number().positive(),
 
   STARTING_SPACE: z.number().int().positive(),
   STARTING_CERTAINTY: z.number().int().positive(),
@@ -87,5 +89,7 @@ export function structureConstants(b: Balance = balance): StructureConstants {
     logLogErrorCoefficient: b.LOGLOG_ERROR_COEFFICIENT,
     hyperLogLogErrorCoefficient: b.HLL_ERROR_COEFFICIENT,
     hyperLogLogSmallRange: b.HLL_SMALL_RANGE,
+    steadySpaceCost: b.STEADY_SPACE_COST,
+    superLogLogErrorCoefficient: b.SUPERLOGLOG_ERROR_COEFFICIENT,
   };
 }

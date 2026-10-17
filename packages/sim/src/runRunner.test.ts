@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Rng, type RewardView } from "@pda/engine";
+import { Rng, type RewardView, type RunAction, type StructureKind } from "@pda/engine";
 import { buildRunConfig } from "@pda/content";
 import { getBot } from "./bots";
 import type { Bot } from "./bots/types";
@@ -14,27 +14,42 @@ const upgrade = (id: string): RewardView => ({ id: `upgrade:${id}`, kind: "upgra
 
 describe("the run policies", () => {
   const rng = Rng.fromSeed("policy");
+  const enchantment = (id: string): RewardView => ({ id: `enchantment:${id}`, kind: "enchantment", enchantment: id });
+  const leave: RunAction = { type: "leaveRest" };
+  const fuse: RunAction = { type: "fuse", recipeId: "hyperLogLog" };
+  const attach = (enchantmentId: string, kind: StructureKind): RunAction => ({ type: "enchant", enchantmentId, kind });
 
-  it("the sensible one takes a new structure before any upgrade, and the upgrades in its own order", () => {
+  it("the sensible one takes a new structure before an enchantment, and an enchantment before any upgrade", () => {
     expect(sensiblePolicy.reward([upgrade("power"), structure("logLog"), upgrade("slots")], rng)).toBe(1);
-    expect(sensiblePolicy.reward([upgrade("slots"), upgrade("recovery"), upgrade("power")], rng)).toBe(2);
-    expect(sensiblePolicy.reward([upgrade("slots"), upgrade("capacity")], rng)).toBe(1);
+    expect(sensiblePolicy.reward([upgrade("power"), enchantment("steady"), structure("logLog")], rng)).toBe(2);
+    expect(sensiblePolicy.reward([upgrade("power"), enchantment("steady")], rng)).toBe(1);
     expect(sensiblePolicy.reward([structure("logLog"), structure("countMinSketch")], rng)).toBe(1); // Count-Min first
-    expect(sensiblePolicy.reward([upgrade("mystery")], rng)).toBe(0); // anything it does not know is still a legal choice
   });
 
-  it("the sensible one fuses when it can, and otherwise leaves", () => {
-    const recipe = { id: "hyperLogLog", inputs: ["logLog", "linearCounting"] as ["logLog", "linearCounting"], result: "hyperLogLog" as const };
-    expect(sensiblePolicy.rest([recipe], rng)).toEqual({ type: "fuse", recipeId: "hyperLogLog" });
-    expect(sensiblePolicy.rest([], rng)).toEqual({ type: "leaveRest" });
+  it("the sensible one takes upgrades in its own order, and anything it does not know is still a legal choice", () => {
+    expect(sensiblePolicy.reward([upgrade("slots"), upgrade("recovery"), upgrade("power")], rng)).toBe(2);
+    expect(sensiblePolicy.reward([upgrade("slots"), upgrade("capacity")], rng)).toBe(1);
+    expect(sensiblePolicy.reward([upgrade("mystery")], rng)).toBe(0);
+  });
+
+  it("the sensible one makes Count-Min steady first, then fuses, and otherwise leaves", () => {
+    expect(sensiblePolicy.rest([leave], rng)).toEqual(leave);
+    expect(sensiblePolicy.rest([fuse, leave], rng)).toEqual(fuse);
+    expect(sensiblePolicy.rest([attach("steady", "countMinSketch"), attach("steady", "logLog"), fuse, leave], rng)).toEqual(attach("steady", "countMinSketch"));
+  });
+
+  it("the sensible one does not waste Steady on a LogLog that is about to be fused, or attach what does not help", () => {
+    expect(sensiblePolicy.rest([attach("steady", "logLog"), fuse, leave], rng)).toEqual(fuse);
+    expect(sensiblePolicy.rest([attach("steady", "logLog"), leave], rng)).toEqual(attach("steady", "logLog")); // nothing to fuse: it is the best use
+    expect(sensiblePolicy.rest([attach("seeded", "bloomFilter"), leave], rng)).toEqual(leave);
   });
 
   it("the random one picks every reward and every rest action sometimes", () => {
     const picks = new Set(Array.from({ length: 80 }, () => randomPolicy.reward([upgrade("a"), upgrade("b"), upgrade("c")], rng)));
     expect([...picks].sort()).toEqual([0, 1, 2]);
-    const recipe = { id: "hyperLogLog", inputs: ["logLog", "linearCounting"] as ["logLog", "linearCounting"], result: "hyperLogLog" as const };
-    const rests = new Set(Array.from({ length: 80 }, () => randomPolicy.rest([recipe], rng).type));
-    expect([...rests].sort()).toEqual(["fuse", "leaveRest"]);
+    const actions = [fuse, attach("steady", "countMinSketch"), leave];
+    const rests = new Set(Array.from({ length: 120 }, () => randomPolicy.rest(actions, rng).type));
+    expect([...rests].sort()).toEqual(["enchant", "fuse", "leaveRest"]);
   });
 });
 
@@ -70,6 +85,14 @@ describe("playRun", () => {
     expect(lost!.encounterReached).toBe(lost!.fightsWon); // it died in the fight after the last one it won
     expect(lost!.fights.at(-1)?.outcome).toBe("lost");
     expect(lost!.certaintyLeft).toBe(0);
+  });
+
+  it("records the enchantments attached, as enchantment and structure, in the order they were attached", () => {
+    const records = Array.from({ length: 80 }, (_, i) => play("greedy", `ench-${i}`));
+    const attached = records.flatMap((record) => record.enchanted);
+    expect(attached.length).toBeGreaterThan(0);
+    for (const entry of attached) expect(["steady:countMinSketch", "steady:logLog"]).toContain(entry);
+    expect(records.filter((record) => record.enchanted.length > 0).every((record) => record.rewards.includes("enchantment:steady"))).toBe(true);
   });
 
   it("records why a fight was lost: the turn limit or Certainty", () => {

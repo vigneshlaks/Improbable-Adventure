@@ -54,6 +54,10 @@ export interface StructureConstants {
   hyperLogLogErrorCoefficient: number;
   /** HyperLogLog counts empty registers instead while that count is below this multiple of the register count. */
   hyperLogLogSmallRange: number;
+  /** The extra share of Space a Steady structure costs for the same grid of counters or registers. */
+  steadySpaceCost: number;
+  /** SuperLogLog (LogLog with Steady) relative error is this divided by sqrt(register count). */
+  superLogLogErrorCoefficient: number;
 }
 
 /** Anything that survives JSON.stringify and JSON.parse unchanged. */
@@ -106,6 +110,14 @@ export const COUNTER_BITS = 32;
 
 /** Bits in one LogLog register. */
 export const LOGLOG_REGISTER_BITS = 5;
+
+/** The enchantment that makes a Count-Min Sketch conservative and a LogLog a SuperLogLog, for 10 percent more Space. */
+export const STEADY = "steady";
+
+/** The Space a Steady structure builds its grid from: the Space it was given, less the cost of being Steady. */
+export function steadySpace(spaceBits: number, steadyCost: number): number {
+  return Math.floor(spaceBits / (1 + steadyCost));
+}
 
 export function assertSpace(kind: StructureKind, spaceBits: number, minBits: number): void {
   if (!Number.isInteger(spaceBits) || spaceBits < minBits) {

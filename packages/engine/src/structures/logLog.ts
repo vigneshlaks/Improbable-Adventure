@@ -6,6 +6,8 @@ import {
   assertSpace,
   DEFAULT_HASH_SEED,
   LOGLOG_REGISTER_BITS,
+  STEADY,
+  steadySpace,
   type Answer,
   type Challenge,
   type Structure,
@@ -23,6 +25,15 @@ const ALPHA_INFINITY = 0.39701;
 
 const MAX_REGISTER = 2 ** LOGLOG_REGISTER_BITS - 1;
 
+/** SuperLogLog averages only this share of the registers, the smallest, and throws the lucky outliers away. */
+const KEPT_SHARE = 0.7;
+
+/**
+ * SuperLogLog's bias correction, for the estimate `m0 * 2^(mean of the m0 smallest registers)`. Calibrated by simulation
+ * (the published asymptotic constant is 0.7735 / 0.7, about 1.105, and the finite-size values here run from 1.09 to 1.13).
+ */
+const SUPERLOGLOG_ALPHA = 1.1;
+
 /** The bias correction adjusted for the actual register count. */
 function alphaFor(m: number): number {
   return ALPHA_INFINITY - (2 * Math.PI * Math.PI + Math.LN2 * Math.LN2) / (48 * m);
@@ -31,7 +42,9 @@ function alphaFor(m: number): number {
 /**
  * LogLog counter: m five-bit registers, where m is the largest power of two that fits in Space.
  * Each register remembers the rarest hash pattern (longest run of leading zeros) among the values routed to it.
- * Accurate on large streams, biased on small ones. Cannot delete, so it counts values that were deleted since
+ * Accurate on large streams, biased on small ones. With the Steady enchantment it is a SuperLogLog: it averages only the
+ * smallest 70 percent of the registers, which cuts the standard error from 1.30 / sqrt(m) to about 1.05 / sqrt(m), and it
+ * is built from Space / (1 + the Steady cost). Cannot delete, so it counts values that were deleted since
  * (ghosts). It counts the inserts and deletes it sees and lowers its range's low bound by the ghosts they allow.
  */
 export class LogLog implements Structure {
@@ -41,6 +54,7 @@ export class LogLog implements Structure {
   private registers: Uint8Array;
   private insertCount = 0;
   private deleteCount = 0;
+  private readonly truncated: boolean;
   private readonly b: number;
   private readonly m: number;
   private readonly seed: number;
@@ -49,8 +63,10 @@ export class LogLog implements Structure {
     private readonly options: StructureOptions,
     private readonly constants: StructureConstants,
   ) {
-    assertSpace("logLog", options.spaceBits, LOGLOG_REGISTER_BITS * MIN_LOGLOG_REGISTERS);
-    this.b = Math.floor(Math.log2(options.spaceBits / LOGLOG_REGISTER_BITS));
+    this.truncated = options.enchantment === STEADY;
+    const registerBits = this.truncated ? steadySpace(options.spaceBits, constants.steadySpaceCost) : options.spaceBits;
+    assertSpace("logLog", registerBits, LOGLOG_REGISTER_BITS * MIN_LOGLOG_REGISTERS);
+    this.b = Math.floor(Math.log2(registerBits / LOGLOG_REGISTER_BITS));
     this.m = 2 ** this.b;
     this.seed = options.hashSeed ?? DEFAULT_HASH_SEED;
     this.registers = new Uint8Array(this.m);
@@ -58,12 +74,14 @@ export class LogLog implements Structure {
   }
 
   spaceBits(): number {
-    return LOGLOG_REGISTER_BITS * this.m;
+    const registers = LOGLOG_REGISTER_BITS * this.m;
+    return this.truncated ? Math.min(this.options.spaceBits, Math.ceil(registers * (1 + this.constants.steadySpaceCost))) : registers;
   }
 
   /** Relative standard error predicted by theory. */
   get standardError(): number {
-    return this.constants.logLogErrorCoefficient / Math.sqrt(this.m);
+    const coefficient = this.truncated ? this.constants.superLogLogErrorCoefficient : this.constants.logLogErrorCoefficient;
+    return coefficient / Math.sqrt(this.m);
   }
 
   /** Insert events seen. */
@@ -90,6 +108,13 @@ export class LogLog implements Structure {
   }
 
   estimate(): number {
+    if (this.truncated) {
+      const kept = Math.floor(KEPT_SHARE * this.m);
+      const smallest = Array.from(this.registers).sort((a, b) => a - b).slice(0, kept);
+      let sum = 0;
+      for (const r of smallest) sum += r;
+      return SUPERLOGLOG_ALPHA * kept * Math.pow(2, sum / kept);
+    }
     let sum = 0;
     for (const r of this.registers) sum += r;
     return alphaFor(this.m) * this.m * Math.pow(2, sum / this.m);

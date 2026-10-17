@@ -14,6 +14,7 @@ const run = (overrides: Partial<RunRecord>): RunRecord => ({
   certaintyLeft: 40,
   rewards: [],
   fused: [],
+  enchanted: [],
   owned: [],
   upgrades: {},
   opener: "bloomFilter",
@@ -24,7 +25,7 @@ const run = (overrides: Partial<RunRecord>): RunRecord => ({
 
 /** Four hand-made runs whose combined numbers are easy to check by hand: two won, one lost early, one lost to the Elite. */
 export const RUNS: RunRecord[] = [
-  run({ seed: "A", deployed: ["bloomFilter", "countMinSketch", "hyperLogLog"], fused: ["hyperLogLog"], certaintyLeft: 40 }),
+  run({ seed: "A", deployed: ["bloomFilter", "countMinSketch", "hyperLogLog"], fused: ["hyperLogLog"], enchanted: ["steady:countMinSketch"], certaintyLeft: 40 }),
   run({
     seed: "B",
     outcome: "lost",
