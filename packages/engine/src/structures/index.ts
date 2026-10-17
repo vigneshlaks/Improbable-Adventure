@@ -4,8 +4,9 @@ import { ExactMemory } from "./exactMemory";
 import { HyperLogLog } from "./hyperLogLog";
 import { LinearCounting } from "./linearCounting";
 import { LogLog } from "./logLog";
+import { StableBloomFilter } from "./stableBloomFilter";
 import { ReservoirSampling } from "./reservoirSampling";
-import type { Structure, StructureConstants, StructureKind, StructureOptions, StructureSnapshot } from "./types";
+import { FADING, type Structure, type StructureConstants, type StructureKind, type StructureOptions, type StructureSnapshot } from "./types";
 
 export * from "./types";
 export { BloomFilter, bloomFalsePositiveRate, bloomOptimalK, DEFAULT_BITS_PER_ITEM } from "./bloomFilter";
@@ -15,6 +16,7 @@ export { HyperLogLog, MIN_HLL_REGISTERS } from "./hyperLogLog";
 export { LinearCounting } from "./linearCounting";
 export { LogLog, MIN_LOGLOG_REGISTERS } from "./logLog";
 export { ReservoirSampling } from "./reservoirSampling";
+export { forgetProbability, stableDecrements, StableBloomFilter } from "./stableBloomFilter";
 
 /** Rebuilds a live structure from a snapshot. Throws a RangeError if the snapshot is malformed. */
 export function restoreStructure(snapshot: StructureSnapshot, constants: StructureConstants): Structure {
@@ -24,7 +26,7 @@ export function restoreStructure(snapshot: StructureSnapshot, constants: Structu
     case "reservoirSampling":
       return ReservoirSampling.fromSnapshot(snapshot, constants);
     case "bloomFilter":
-      return BloomFilter.fromSnapshot(snapshot, constants);
+      return snapshot.enchantment === FADING ? StableBloomFilter.fromSnapshot(snapshot, constants) : BloomFilter.fromSnapshot(snapshot, constants);
     case "countMinSketch":
       return CountMinSketch.fromSnapshot(snapshot, constants);
     case "logLog":
@@ -45,7 +47,7 @@ export function createStructure(kind: StructureKind, options: StructureOptions, 
     case "reservoirSampling":
       return new ReservoirSampling(options, constants);
     case "bloomFilter":
-      return new BloomFilter(options, constants);
+      return options.enchantment === FADING ? new StableBloomFilter(options, constants) : new BloomFilter(options, constants);
     case "countMinSketch":
       return new CountMinSketch(options, constants);
     case "logLog":

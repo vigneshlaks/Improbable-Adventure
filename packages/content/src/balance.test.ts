@@ -85,6 +85,7 @@ describe("balance.json", () => {
         hyperLogLogSmallRange: 2.8,
         steadySpaceCost: 0.1,
         superLogLogErrorCoefficient: 1.05,
+        fadingCellBits: 3,
       });
     }
     // matches the stand-in constants used by the engine's tests

@@ -58,6 +58,8 @@ export interface StructureConstants {
   steadySpaceCost: number;
   /** SuperLogLog (LogLog with Steady) relative error is this divided by sqrt(register count). */
   superLogLogErrorCoefficient: number;
+  /** Bits in one cell of a Stable Bloom Filter (a Bloom Filter with Fading). Its cells count from 0 to 2^bits - 1. */
+  fadingCellBits: number;
 }
 
 /** Anything that survives JSON.stringify and JSON.parse unchanged. */
@@ -113,6 +115,9 @@ export const LOGLOG_REGISTER_BITS = 5;
 
 /** The enchantment that makes a Count-Min Sketch conservative and a LogLog a SuperLogLog, for 10 percent more Space. */
 export const STEADY = "steady";
+
+/** The enchantment that makes a Bloom Filter a Stable Bloom Filter: its cells fade, so it forgets old values. */
+export const FADING = "fading";
 
 /** The Space a Steady structure builds its grid from: the Space it was given, less the cost of being Steady. */
 export function steadySpace(spaceBits: number, steadyCost: number): number {

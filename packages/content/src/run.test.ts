@@ -66,6 +66,11 @@ describe("enchantments.json", () => {
       });
       expect(enchantments.steady?.summary).toMatch(/10 percent/);
     }
+    // has Fading, which fits only the Bloom Filter, turns it into a Stable Bloom Filter, and is offered as a reward
+    {
+      expect(enchantments.fading).toMatchObject({ name: "Fading", valid: ["bloomFilter"], transforms: { bloomFilter: "Stable Bloom Filter" }, reward: true });
+      expect(variantName("Bloom Filter", "bloomFilter", "fading")).toBe("Stable Bloom Filter");
+    }
     // rejects an enchantment that fits nothing, lists a structure twice, transforms one it does not fit, or has no summary
     {
       const ok = { name: "X", phase: 1, summary: "Does a thing.", valid: ["bloomFilter"], transforms: {}, reward: true };
@@ -123,14 +128,16 @@ describe("buildRunConfig", () => {
       expect(config.enchantments).toEqual([
         { id: "seeded", valid: [...(enchantments.seeded?.valid ?? [])] },
         { id: "steady", valid: [...(enchantments.steady?.valid ?? [])] },
+        { id: "fading", valid: [...(enchantments.fading?.valid ?? [])] },
       ]);
-      // Steady is offered; Seeded is not (it only matters against an enemy that does not exist yet).
+      // Steady and Fading are offered; Seeded is not (it only matters against an enemy that does not exist yet).
       expect(config.rewards.filter((r) => r.kind === "enchantment")).toEqual([
+        { id: "enchantment:fading", kind: "enchantment", enchantment: "fading", weight: balance.REWARD_WEIGHTS.enchantment },
         { id: "enchantment:steady", kind: "enchantment", enchantment: "steady", weight: balance.REWARD_WEIGHTS.enchantment },
       ]);
       const offered = { ...enchantments, seeded: { ...enchantments.seeded!, reward: true } };
       const withIt = buildRunConfig({ seed: "run-1", enchantmentData: offered });
-      expect(withIt.rewards.filter((r) => r.kind === "enchantment").map((r) => r.id)).toEqual(["enchantment:seeded", "enchantment:steady"]);
+      expect(withIt.rewards.filter((r) => r.kind === "enchantment").map((r) => r.id)).toEqual(["enchantment:fading", "enchantment:seeded", "enchantment:steady"]);
     }
     // passes the recipes on, by id
     {

@@ -35,6 +35,7 @@ export const balanceSchema = z.object({
   HLL_SMALL_RANGE: z.number().positive(),
   STEADY_SPACE_COST: z.number().nonnegative(),
   SUPERLOGLOG_ERROR_COEFFICIENT: z.number().positive(),
+  FADING_CELL_BITS: z.number().int().min(2).max(8),
 
   STARTING_SPACE: z.number().int().positive(),
   STARTING_CERTAINTY: z.number().int().positive(),
@@ -91,5 +92,6 @@ export function structureConstants(b: Balance = balance): StructureConstants {
     hyperLogLogSmallRange: b.HLL_SMALL_RANGE,
     steadySpaceCost: b.STEADY_SPACE_COST,
     superLogLogErrorCoefficient: b.SUPERLOGLOG_ERROR_COEFFICIENT,
+    fadingCellBits: b.FADING_CELL_BITS,
   };
 }

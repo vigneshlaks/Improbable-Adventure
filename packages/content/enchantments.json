@@ -26,5 +26,17 @@
       "logLog": "SuperLogLog"
     },
     "reward": true
+  },
+  "fading": {
+    "name": "Fading",
+    "phase": 1,
+    "summary": "Old information decays: the Bloom Filter's bits become small counters that count down as new values arrive, so it never fills up and deleted values fade, at the price of forgetting values that were inserted long ago (false negatives).",
+    "valid": [
+      "bloomFilter"
+    ],
+    "transforms": {
+      "bloomFilter": "Stable Bloom Filter"
+    },
+    "reward": true
   }
 }

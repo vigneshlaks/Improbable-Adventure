@@ -25,6 +25,8 @@ const CASES: Array<{ kind: StructureKind; options: StructureOptions }> = [
   // The enchanted variants: Count-Min with Conservative Update, SuperLogLog.
   { kind: "countMinSketch", options: { spaceBits: 4500, knob: 4, hashSeed: 12345, enchantment: "steady" } },
   { kind: "logLog", options: { spaceBits: 800, hashSeed: 12345, enchantment: "steady" } },
+  // A Bloom Filter with Fading is a Stable Bloom Filter.
+  { kind: "bloomFilter", options: { spaceBits: 3000, knob: 100, hashSeed: 12345, enchantment: "fading" } },
 ];
 
 const UNIVERSE = distinctValues(trialRng("snapshot-universe", 0), 300);

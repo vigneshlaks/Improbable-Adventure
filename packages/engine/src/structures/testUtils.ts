@@ -13,6 +13,7 @@ export const TEST_CONSTANTS: StructureConstants = {
   hyperLogLogSmallRange: 2.8,
   steadySpaceCost: 0.1,
   superLogLogErrorCoefficient: 1.05,
+  fadingCellBits: 3,
 };
 
 /** Every structure's statistical test runs this many seeded trials. */
