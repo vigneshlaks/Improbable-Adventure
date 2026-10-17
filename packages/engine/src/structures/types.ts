@@ -68,6 +68,8 @@ export interface StructureSnapshot {
   spaceBits: number;
   knob?: number;
   hashSeed?: number;
+  /** The enchantment the structure was built with, if any. */
+  enchantment?: string;
   state: { [key: string]: Json };
 }
 
@@ -93,6 +95,8 @@ export interface StructureOptions {
   hashSeed?: number;
   /** Randomness source, required by structures that sample (Reservoir Sampling). */
   rng?: Rng;
+  /** The enchantment attached to this kind of structure (see the run), if any. It can change how the structure behaves. */
+  enchantment?: string;
 }
 
 export const DEFAULT_HASH_SEED = PUBLIC_HASH_SEED;

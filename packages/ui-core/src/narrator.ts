@@ -1,4 +1,4 @@
-import { narration, structures, upgrades, type EventTemplateKey } from "@pda/content";
+import { enchantments, narration, structures, upgrades, type EventTemplateKey } from "@pda/content";
 import type { Challenge, EnemyConfig, GameEvent, RunEvent, StructureKind } from "@pda/engine";
 
 /** Shows whole numbers plainly and rounds the rest to at most two decimals. */
@@ -93,12 +93,14 @@ export function narrateEvents(events: readonly GameEvent[], options: NarrateOpti
   return events.flatMap((event) => narrateEvent(event, options));
 }
 
-const RUN_EVENT_TYPES = new Set(["fightStarted", "rewardOffered", "rewardChosen", "restStarted", "fused", "runWon", "runLost"]);
+const RUN_EVENT_TYPES = new Set(["fightStarted", "rewardOffered", "rewardChosen", "restStarted", "fused", "enchanted", "runWon", "runLost"]);
 
 /** The player-facing name of a reward id such as "structure:logLog" or "upgrade:power". */
 export function rewardName(id: string): string {
   const [kind, name] = id.split(":") as [string, string];
-  return kind === "structure" ? (structures[name as StructureKind]?.name ?? name) : (upgrades[name]?.name ?? name);
+  if (kind === "structure") return structures[name as StructureKind]?.name ?? name;
+  if (kind === "enchantment") return enchantments[name]?.name ?? name;
+  return upgrades[name]?.name ?? name;
 }
 
 const structureNames = (kinds: readonly StructureKind[]) => kinds.map((kind) => structures[kind].name).join(" and ");
@@ -116,6 +118,12 @@ export function narrateRunEvent(event: RunEvent): string[] {
       return [say("restStarted", { healed: formatNumber(event.healed) })];
     case "fused":
       return [say("fused", { inputs: structureNames(event.inputs), result: structures[event.result].name })];
+    case "enchanted": {
+      const enchantment = enchantments[event.enchantmentId]?.name ?? event.enchantmentId;
+      const structure = structures[event.kind].name;
+      if (event.replaced === null) return [say("enchanted", { enchantment, structure })];
+      return [say("enchantedReplacing", { enchantment, structure, replaced: enchantments[event.replaced]?.name ?? event.replaced })];
+    }
     case "runWon":
       return [say("runWon", { turns: event.turns, certaintyLeft: formatNumber(event.certaintyLeft) })];
     case "runLost":

@@ -243,6 +243,15 @@ The earlier "Precision" and "Compactness" upgrades are removed. They would make 
 
 The HyperLogLog recipe is a teaching shortcut: historically its main change from LogLog is harmonic-mean averaging, with linear counting only correcting small counts. The in-game description should say so.
 
+**Enchantments, step 3a (decided 2026-10-17).** The spec says an enchantment is "attached to one structure slot", but nothing is deployed at a rest stop, so an enchantment is attached to an **owned structure** (one of each kind is owned) and applies whenever that structure is deployed in a later fight. The action is `{ type: "enchant"; enchantmentId: string; kind: StructureKind }`, replacing the `slot` in the sketch above.
+
+- **Getting them:** enchantments are rewards (`enchantment:<id>`, weight `REWARD_WEIGHTS.enchantment`) and go into the run's pack unattached. The same one can be taken twice. `enchantments.json` holds, for each, its name, phase, summary, the structures it fits, the variant name it turns a structure into (if any) and whether it can be offered as a reward at all (`reward`); `buildRunConfig` offers only those marked as rewards.
+- **Attaching:** at a rest stop only. `enchant` attaches a held enchantment to an owned structure it fits and is not already on. A structure holds **one** at a time: attaching another sends the first back to the pack. An attached enchantment can be **moved** by attaching it to another structure (the rest stop's "move enchantments between structures"). Fusing returns the inputs' enchantments to the pack, and the result starts without one. Attaching does not end the rest stop.
+- **In a fight:** the fight config carries the enchantment of each owned kind (`FightConfig.enchantments`). The structure's snapshot records it (`enchantment`), so it survives JSON, and the player sees it in the structure's name (the variant's name if it transforms the structure, otherwise the structure's own name followed by the enchantment in brackets).
+- **Seeded** gives a structure a hash seed of its own for the fight: drawn from the structure's own random stream (a named sub-stream, so it never shifts a sampler's choices), different for each deployment, the same on replay. Its only purpose is to defeat an enemy that searches for collisions against the public seed (Cunning, Milestone 9), which does not exist yet, so Seeded is **not offered as a reward** until it does. It is in the content and fully tested so the mechanism is ready.
+- **Merge** (the spec's enchantment for multi-enemy fights) is **not built**: there are no multi-enemy fights in the MVP. It waits for them.
+- Steady (Count-Min with Conservative Update, SuperLogLog), Fading (Stable Bloom Filter) and Light follow in later steps, each with its own error behavior and statistical test.
+
 ## Enemy stream generation
 
 An enemy is a seeded generator of stream events, `{ op: "insert" | "delete", value: uint32 }`, shaped by its traits. Values are drawn by rank from a Zipf distribution, then mapped to concrete values through a seeded permutation.
@@ -513,6 +522,7 @@ The CLI and web UI share one command parser and one narrator; both only translat
 | help \[topic\] | help bloom | none |
 | choose \<number> | choose 2 | chooseReward (a reward is on offer; `take` and `pick` also work, and so does a bare number) |
 | fuse \[name] | fuse hll | fuse (at a rest stop; the name is the recipe id or the result's name or alias, and may be left out when only one fusion is available) |
+| enchant \<enchantment> \[structure] | enchant seeded bloom | enchant (at a rest stop; the structure may be left out when the enchantment fits only one) |
 | leave | leave | leaveRest (also `ready`, `go`, `done`, `continue`) |
 
 **Narration** is generated from engine events using templates in content, never by hand inside UI code. Enemy flavor text comes from its traits.

@@ -51,6 +51,8 @@ export interface FightConfig {
   rules: FightRules;
   /** The structure kinds the player owns and may deploy. */
   loadout: StructureKind[];
+  /** The enchantment attached to each kind of structure, by id. A run sets it; a plain fight leaves it out. */
+  enchantments?: Partial<Record<StructureKind, string>>;
   enemy: EnemyConfig;
   traitTables: TraitTables;
   /** Defaults to the spec's starting values. */
@@ -114,6 +116,8 @@ export interface StructureView {
   kind: StructureKind;
   params: Readonly<Record<string, number>>;
   spaceBits: number;
+  /** The enchantment it was built with, if any. */
+  enchantment?: string;
   /** The structure's answer to the open challenge, or null when it cannot answer or there is none. */
   answer: Answer | null;
 }

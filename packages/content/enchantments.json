@@ -1,0 +1,16 @@
+{
+  "seeded": {
+    "name": "Seeded",
+    "phase": 1,
+    "summary": "Hashes with a secret seed chosen for each fight, so an enemy that searches for collisions against the public seed gets nothing.",
+    "valid": [
+      "bloomFilter",
+      "countMinSketch",
+      "logLog",
+      "linearCounting",
+      "hyperLogLog"
+    ],
+    "transforms": {},
+    "reward": false
+  }
+}

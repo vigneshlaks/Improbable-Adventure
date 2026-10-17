@@ -3,8 +3,8 @@ import type { FusionDef, RewardView, RunEvent } from "@pda/engine";
 import { eachCase } from "../../engine/src/testCases";
 import { narrateRunStep } from "./narrator";
 import { parseRunCommand, type RunParseResult } from "./parser";
-import { renderRest, renderRewards, renderRunStatus } from "./views";
-import { observation, runObservation } from "./testUtils";
+import { renderQuery, renderRest, renderRewards, renderRunStatus, renderStatus } from "./views";
+import { answer, observation, runObservation, view } from "./testUtils";
 
 const offers: RewardView[] = [
   { id: "structure:countMinSketch", kind: "structure", structure: "countMinSketch" },
@@ -28,7 +28,7 @@ describe("parseRunCommand during a fight", () => {
   });
 
   it("explains that the run commands have to wait", () => {
-    for (const word of ["choose 1", "fuse", "leave"]) expect(errorOf(parse(word))).toMatch(/not now|nothing to|no reward|no rest/i);
+    for (const word of ["choose 1", "fuse", "leave", "enchant seeded bloom"]) expect(errorOf(parse(word))).toMatch(/not now|nothing to|no reward|no rest/i);
   });
 });
 
@@ -161,5 +161,94 @@ describe("renderRunStatus", () => {
 
   it("says no upgrades yet when there are none", () => {
     expect(renderRunStatus(runObservation()).join("\n")).toMatch(/Upgrades: none/);
+  });
+});
+
+describe("enchantments at the screens", () => {
+  const seededOffer: RewardView = { id: "enchantment:seeded", kind: "enchantment", enchantment: "seeded" };
+  const enchantable = [
+    { enchantmentId: "seeded", kind: "bloomFilter" as const },
+    { enchantmentId: "seeded", kind: "linearCounting" as const },
+  ];
+  const withPack = runObservation({
+    phase: "rest",
+    fight: null,
+    enchantments: ["seeded"],
+    enchantable,
+    owned: ["exactMemory", "bloomFilter", "linearCounting"],
+  });
+
+  it("lists an enchantment among the rewards with what it does", () => {
+    expect(renderRewards([seededOffer]).join("\n")).toMatch(/1\) Seeded \(enchantment\): Hashes with a secret seed/);
+  });
+
+  it("shows the structures an enchantment fits at the rest stop, and how to attach it", () => {
+    const text = renderRest(withPack).join("\n");
+    expect(text).toMatch(/Enchantments you can attach:/);
+    expect(text).toMatch(/Seeded \(fits: Bloom Filter, Linear Counting\)/);
+    expect(text).toMatch(/enchant <enchantment> <structure>/);
+  });
+
+  it("mentions fusions and enchantments together, and says when there is neither", () => {
+    const both = renderRest({ ...withPack, fusions: [hyper] }).join("\n");
+    expect(both).toMatch(/Fusions you can do:/);
+    expect(both).toMatch(/Enchantments you can attach:/);
+    expect(renderRest(runObservation({ phase: "rest", fight: null, fusions: [], enchantable: [] })).join("\n")).toMatch(/Nothing to fuse or enchant/);
+  });
+
+  it("shows, in the run status, what is attached and what is still in the pack", () => {
+    const text = renderRunStatus(runObservation({ attached: { bloomFilter: "seeded" }, enchantments: ["seeded"] })).join("\n");
+    expect(text).toMatch(/Enchantments: Seeded on Bloom Filter; in the pack: Seeded/);
+    expect(renderRunStatus(runObservation()).join("\n")).toMatch(/Enchantments: none/);
+  });
+
+  it("marks an enchanted structure by name wherever structures are listed", () => {
+    const enchanted = { ...view(0, "bloomFilter", answer([1], 1, 1)), enchantment: "seeded" };
+    expect(renderStatus(observation({ structures: [enchanted], slotsFree: 2 })).join("\n")).toMatch(/1\. Bloom Filter \(Seeded\) \(1024 bits\)/);
+    const query = renderQuery(observation({ phase: "strike", challenge: { kind: "presence", targets: [1] }, structures: [enchanted] })).join("\n");
+    expect(query).toMatch(/\[1\] Bloom Filter \(Seeded\)/);
+  });
+
+  it("narrates attaching, and replacing", () => {
+    expect(narrateRunStep([{ type: "enchanted", enchantmentId: "seeded", kind: "bloomFilter", replaced: null }]).join(" ")).toMatch(/Seeded is attached to Bloom Filter\./);
+    const replacing = narrateRunStep([{ type: "enchanted", enchantmentId: "seeded", kind: "bloomFilter", replaced: "other" }]).join(" ");
+    expect(replacing).toMatch(/Seeded is attached to Bloom Filter/);
+    expect(replacing).toMatch(/other returns to the pack/i);
+    expect(narrateRunStep([{ type: "rewardChosen", id: "enchantment:seeded" }]).join(" ")).toMatch(/You take Seeded\./);
+  });
+});
+
+describe("parseRunCommand: enchant", () => {
+  const restWith = (enchantable: Array<{ enchantmentId: string; kind: "bloomFilter" | "linearCounting" }>) =>
+    runObservation({ phase: "rest", fight: null, enchantments: ["seeded"], enchantable });
+  const both = restWith([
+    { enchantmentId: "seeded", kind: "bloomFilter" },
+    { enchantmentId: "seeded", kind: "linearCounting" },
+  ]);
+  const attach = (kind: string) => ({ kind: "runAction", action: { type: "enchant", enchantmentId: "seeded", kind } });
+
+  it("attaches an enchantment by its id or name to a structure by its alias or name", () => {
+    eachCase(["enchant seeded bloom", "enchant Seeded Bloom Filter", "enchant seeded bloomFilter", " ENCHANT  seeded   bloom "].map((i) => [i, i] as const), (input) => {
+      expect(parse(input, both)).toEqual(attach("bloomFilter"));
+    });
+    expect(parse("enchant seeded linear", both)).toEqual(attach("linearCounting"));
+  });
+
+  it("lets the structure be left out when only one fits", () => {
+    expect(parse("enchant seeded", restWith([{ enchantmentId: "seeded", kind: "bloomFilter" }]))).toEqual(attach("bloomFilter"));
+    expect(errorOf(parse("enchant seeded", both))).toMatch(/which structure.*Bloom Filter.*Linear Counting/i);
+  });
+
+  it("explains a mistake: nothing named, an unknown enchantment or structure, one that does not fit, or nothing to attach", () => {
+    expect(errorOf(parse("enchant", both))).toMatch(/Usage: enchant/);
+    expect(errorOf(parse("enchant mystery bloom", both))).toMatch(/no enchantment called "mystery"/i);
+    expect(errorOf(parse("enchant seeded skiplist", both))).toMatch(/no structure called "skiplist"/i);
+    expect(errorOf(parse("enchant seeded exact", both))).toMatch(/cannot be attached to Exact Memory|does not fit/i);
+    expect(errorOf(parse("enchant seeded bloom", restWith([])))).toMatch(/nothing to enchant/i);
+  });
+
+  it("belongs to the rest stop", () => {
+    expect(errorOf(parse("enchant seeded bloom", runObservation()))).toMatch(/no rest stop/i);
+    expect(errorOf(parse("enchant seeded bloom", reward))).toMatch(/reward/i);
   });
 });

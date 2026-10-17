@@ -23,7 +23,7 @@ describe("narration.json", () => {
       for (const level of ["low", "medium", "high"] as const) expect(narration.enemy.traits[trait][level].length).toBeGreaterThan(0);
     }
     for (const tier of ["minion", "elite", "boss"] as const) expect(narration.enemy.intro[tier].length).toBeGreaterThan(0);
-    for (const command of ["deploy", "remove", "ready", "query", "strike", "status", "help", "quit", "choose", "fuse", "leave"] as const) {
+    for (const command of ["deploy", "remove", "ready", "query", "strike", "status", "help", "quit", "choose", "fuse", "enchant", "leave"] as const) {
       expect(narration.commands[command].usage.startsWith(command)).toBe(true);
       expect(narration.commands[command].summary.length).toBeGreaterThan(5);
     }

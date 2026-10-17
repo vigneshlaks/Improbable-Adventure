@@ -23,6 +23,7 @@ export function observe(state: FightState): Observation {
       kind: snapshot.kind,
       params: structure.params,
       spaceBits: snapshot.spaceBits,
+      ...(snapshot.enchantment !== undefined ? { enchantment: snapshot.enchantment } : {}),
       answer: challenge ? structure.query(challenge) : null,
     });
   });

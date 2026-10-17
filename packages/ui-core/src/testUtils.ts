@@ -43,6 +43,9 @@ export function runObservation(overrides: Partial<RunObservation> = {}): RunObse
     fight: observation(),
     offers: null,
     fusions: null,
+    enchantments: [],
+    attached: {},
+    enchantable: null,
     ...overrides,
   };
 }

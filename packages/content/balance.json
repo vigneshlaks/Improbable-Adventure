@@ -14,7 +14,7 @@
   "RUN_ENCOUNTERS": ["minion", "minion", "minion", "minion", "minion", "elite", "boss"],
   "REST_BEFORE": [5],
   "REWARD_CHOICES": 3,
-  "REWARD_WEIGHTS": { "structure": 3, "upgrade": 2 },
+  "REWARD_WEIGHTS": { "structure": 3, "upgrade": 2, "enchantment": 2 },
 
   "BASE": 20,
   "HIT_DAMAGE": 5,

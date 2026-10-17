@@ -63,6 +63,10 @@ export function runConfig(overrides: Partial<RunConfig> = {}): RunConfig {
     rewardChoices: 3,
     rewards: REWARDS,
     fusions: [{ id: "hyperLogLog", inputs: ["logLog", "linearCounting"], result: "hyperLogLog" }],
+    enchantments: [
+      { id: "seeded", valid: ["bloomFilter", "countMinSketch", "logLog", "linearCounting", "hyperLogLog"] },
+      { id: "other", valid: ["bloomFilter", "exactMemory"] },
+    ],
     upgrades: {
       capacity: { space: 1024 },
       slots: { slots: 1 },

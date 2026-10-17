@@ -46,12 +46,19 @@ function validate(config: RunConfig): void {
     need(new Set(fusion.inputs).size === fusion.inputs.length, `fusion ${fusion.id} lists an input twice`);
     need(!fusion.inputs.includes(fusion.result), `fusion ${fusion.id} would produce one of its own inputs`);
   }
+  const enchantmentIds = new Set<string>();
+  for (const enchantment of config.enchantments) {
+    need(!enchantmentIds.has(enchantment.id), `enchantment id ${enchantment.id} is used twice`);
+    enchantmentIds.add(enchantment.id);
+    need(enchantment.valid.length >= 1, `enchantment ${enchantment.id} fits no structure`);
+  }
   const ids = new Set<string>();
   for (const reward of config.rewards) {
     need(!ids.has(reward.id), `reward id ${reward.id} is used twice`);
     ids.add(reward.id);
     need(reward.weight >= 0, `reward ${reward.id} has a negative weight`);
     if (reward.kind === "upgrade") need(reward.upgrade in config.upgrades, `reward ${reward.id} names the unknown upgrade ${reward.upgrade}`);
+    if (reward.kind === "enchantment") need(enchantmentIds.has(reward.enchantment), `reward ${reward.id} names the unknown enchantment ${reward.enchantment}`);
   }
 }
 
@@ -68,6 +75,7 @@ function startFight(state: RunState, encounter: number): { state: RunState; even
       damageMultiplier: 1 + stats.damagePercent / 100,
     },
     loadout: [...state.owned],
+    enchantments: { ...state.attached },
     enemy: config.encounters[encounter] as FightConfig["enemy"],
     traitTables: config.traitTables,
   };
@@ -91,6 +99,8 @@ export function createRun(seed: string, config: RunConfig): RunState {
     maxCertainty: config.rules.startingCertainty,
     owned: [...config.loadout],
     consumed: [],
+    enchantments: [],
+    attached: {},
     upgrades: {},
     offers: null,
     rewardRng: Rng.fromSeed(`${seed}/rewards`).getState(),
@@ -162,6 +172,8 @@ function chooseReward(state: RunState, index: number, events: Array<GameEvent | 
   let chosen: RunState;
   if (reward.kind === "structure") {
     chosen = { ...state, owned: [...state.owned, reward.structure as StructureKind] };
+  } else if (reward.kind === "enchantment") {
+    chosen = { ...state, enchantments: [...state.enchantments, reward.enchantment] };
   } else {
     const effect = state.config.upgrades[reward.upgrade] as UpgradeEffect;
     const extra = effect.maxCertainty ?? 0;
@@ -188,11 +200,60 @@ function fuse(state: RunState, recipeId: string, events: Array<GameEvent | RunEv
   const recipe = availableFusions(state).find((fusion) => fusion.id === recipeId);
   if (!recipe) throw new IllegalActionError(`The fusion "${recipeId}" is not available`);
   events.push({ type: "fused", recipeId, inputs: [...recipe.inputs], result: recipe.result });
+  // An input's enchantment is not lost with it: it goes back to the inventory, and the result starts without one.
+  const attached = { ...state.attached };
+  const returned: string[] = [];
+  for (const input of recipe.inputs) {
+    const enchantment = attached[input];
+    if (enchantment !== undefined) returned.push(enchantment);
+    delete attached[input];
+  }
   return {
     ...state,
     owned: [...state.owned.filter((kind) => !recipe.inputs.includes(kind)), recipe.result],
     consumed: [...state.consumed, ...recipe.inputs],
+    enchantments: [...state.enchantments, ...returned],
+    attached,
   };
+}
+
+/** Every enchantment id the player holds, whether in the inventory or attached, each once. */
+function heldEnchantments(state: RunState): string[] {
+  return [...new Set([...state.enchantments, ...(Object.values(state.attached) as string[])])].sort();
+}
+
+/** The attachments that can be made now: a held enchantment onto an owned structure it fits and does not already sit on. */
+function availableEnchantments(state: RunState): Array<{ enchantmentId: string; kind: StructureKind }> {
+  const options: Array<{ enchantmentId: string; kind: StructureKind }> = [];
+  for (const enchantmentId of heldEnchantments(state)) {
+    const def = state.config.enchantments.find((candidate) => candidate.id === enchantmentId);
+    if (!def) continue;
+    for (const kind of state.owned) {
+      if (def.valid.includes(kind) && state.attached[kind] !== enchantmentId) options.push({ enchantmentId, kind });
+    }
+  }
+  return options;
+}
+
+function enchant(state: RunState, enchantmentId: string, kind: StructureKind, events: Array<GameEvent | RunEvent>): RunState {
+  const allowed = availableEnchantments(state).some((option) => option.enchantmentId === enchantmentId && option.kind === kind);
+  if (!allowed) throw new IllegalActionError(`${enchantmentId} cannot be attached to ${kind} now`);
+
+  const attached = { ...state.attached };
+  const inventory = [...state.enchantments];
+  // Take it from the inventory if it is there, otherwise move it off the structure that holds it.
+  const spare = inventory.indexOf(enchantmentId);
+  if (spare >= 0) inventory.splice(spare, 1);
+  else {
+    const holder = (Object.keys(attached) as StructureKind[]).find((candidate) => attached[candidate] === enchantmentId) as StructureKind;
+    delete attached[holder];
+  }
+  // A structure holds one enchantment at a time, so the one it had goes back to the inventory.
+  const replaced = attached[kind] ?? null;
+  if (replaced !== null) inventory.push(replaced);
+  attached[kind] = enchantmentId;
+  events.push({ type: "enchanted", enchantmentId, kind, replaced });
+  return { ...state, enchantments: inventory, attached };
 }
 
 /** Applies one action and returns the new state plus what happened. The input state is not modified. */
@@ -207,7 +268,7 @@ export function step(state: RunState, action: RunAction): RunStepResult {
       throw new IllegalActionError("The run is over");
 
     case "fight": {
-      if (action.type === "chooseReward" || action.type === "leaveRest" || action.type === "fuse") throw new IllegalActionError(`${action.type} is not allowed during a fight`);
+      if (action.type === "chooseReward" || action.type === "leaveRest" || action.type === "fuse" || action.type === "enchant") throw new IllegalActionError(`${action.type} is not allowed during a fight`);
       const result = stepFight(state.fight as NonNullable<RunState["fight"]>, action);
       events.push(...result.events);
       reward = result.reward;
@@ -228,6 +289,10 @@ export function step(state: RunState, action: RunAction): RunStepResult {
     case "rest": {
       if (action.type === "fuse") {
         next = fuse(state, action.recipeId, events);
+        break;
+      }
+      if (action.type === "enchant") {
+        next = enchant(state, action.enchantmentId, action.kind, events);
         break;
       }
       if (action.type !== "leaveRest") throw new IllegalActionError("The rest stop ends with leaveRest");
@@ -251,14 +316,23 @@ export function legalActions(state: RunState): RunAction[] {
     case "reward":
       return (state.offers ?? []).map((_, index) => ({ type: "chooseReward", index }));
     case "rest":
-      return [...availableFusions(state).map((fusion): RunAction => ({ type: "fuse", recipeId: fusion.id })), { type: "leaveRest" }];
+      return [
+        ...availableFusions(state).map((fusion): RunAction => ({ type: "fuse", recipeId: fusion.id })),
+        ...availableEnchantments(state).map((option): RunAction => ({ type: "enchant", ...option })),
+        { type: "leaveRest" },
+      ];
   }
 }
 
 function viewOf(reward: RewardDef): RewardView {
-  return reward.kind === "structure"
-    ? { id: reward.id, kind: "structure", structure: reward.structure }
-    : { id: reward.id, kind: "upgrade", upgrade: reward.upgrade };
+  switch (reward.kind) {
+    case "structure":
+      return { id: reward.id, kind: "structure", structure: reward.structure };
+    case "upgrade":
+      return { id: reward.id, kind: "upgrade", upgrade: reward.upgrade };
+    case "enchantment":
+      return { id: reward.id, kind: "enchantment", enchantment: reward.enchantment };
+  }
 }
 
 /** Everything the player may see of the run. */
@@ -277,6 +351,9 @@ export function observeRun(state: RunState): RunObservation {
       ? state.offers.map((id) => viewOf(state.config.rewards.find((reward) => reward.id === id) as RewardDef))
       : null,
     fusions: state.phase === "rest" ? availableFusions(state) : null,
+    enchantments: [...state.enchantments],
+    attached: { ...state.attached },
+    enchantable: state.phase === "rest" ? availableEnchantments(state) : null,
   };
 }
 

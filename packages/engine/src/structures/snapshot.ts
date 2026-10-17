@@ -14,13 +14,14 @@ type State = StructureSnapshot["state"];
 export function snapshotHeader(
   kind: StructureKind,
   options: StructureOptions,
-): Pick<StructureSnapshot, "kind" | "spaceBits" | "knob" | "hashSeed"> {
+): Pick<StructureSnapshot, "kind" | "spaceBits" | "knob" | "hashSeed" | "enchantment"> {
   // Optional fields are left out entirely when unset, so the snapshot survives JSON unchanged.
   return {
     kind,
     spaceBits: options.spaceBits,
     ...(options.knob !== undefined ? { knob: options.knob } : {}),
     ...(options.hashSeed !== undefined ? { hashSeed: options.hashSeed } : {}),
+    ...(options.enchantment !== undefined ? { enchantment: options.enchantment } : {}),
   };
 }
 
@@ -30,6 +31,7 @@ export function optionsFromSnapshot(snapshot: StructureSnapshot): StructureOptio
     spaceBits: snapshot.spaceBits,
     ...(snapshot.knob !== undefined ? { knob: snapshot.knob } : {}),
     ...(snapshot.hashSeed !== undefined ? { hashSeed: snapshot.hashSeed } : {}),
+    ...(snapshot.enchantment !== undefined ? { enchantment: snapshot.enchantment } : {}),
   };
 }
 

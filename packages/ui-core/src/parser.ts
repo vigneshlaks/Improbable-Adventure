@@ -1,4 +1,4 @@
-import { findStructure, structures } from "@pda/content";
+import { enchantments, findStructure, structures } from "@pda/content";
 import type { Action, Observation, RunAction, RunObservation, StructureKind, StructureView } from "@pda/engine";
 
 /** What a typed line means. Errors carry a message for the player; the parser never throws on bad input. */
@@ -263,12 +263,12 @@ export function parseCommand(input: string, context: ParseContext): ParseResult 
 
 
 /** What a typed line means during a run: everything the fight parser knows, plus the choices between fights. */
-export type RunParseResult = ParseResult | { kind: "runAction"; action: Extract<RunAction, { type: "chooseReward" | "fuse" | "leaveRest" }> };
+export type RunParseResult = ParseResult | { kind: "runAction"; action: Extract<RunAction, { type: "chooseReward" | "fuse" | "enchant" | "leaveRest" }> };
 
 const CHOOSE_WORDS = ["choose", "take", "pick"];
 const LEAVE_WORDS = ["leave", "ready", "go", "done", "continue"];
 const FIGHT_WORDS = ["deploy", "remove", "strike"];
-const RUN_WORDS = [...CHOOSE_WORDS, "fuse", ...LEAVE_WORDS, ...FIGHT_WORDS];
+const RUN_WORDS = [...CHOOSE_WORDS, "fuse", "enchant", ...LEAVE_WORDS, ...FIGHT_WORDS];
 
 const normalize = (text: string) => text.toLowerCase().replace(/[^a-z0-9]/g, "");
 
@@ -296,6 +296,44 @@ function parseFuse(tokens: string[], run: RunObservation): RunParseResult {
   return error(fusions.length === 0 ? "There is nothing to fuse." : `There is no fusion called "${wanted}". Choose one of: ${available}.`);
 }
 
+function parseEnchant(tokens: string[], run: RunObservation): RunParseResult {
+  const options = run.enchantable ?? [];
+  const usage = "Usage: enchant <enchantment> [structure]";
+  if (tokens.length === 0) return error(usage);
+  if (options.length === 0) return error("There is nothing to enchant: you hold no enchantment that fits a structure you own.");
+
+  // The enchantment's name is the longest start of the line that names one (an id, or its name without punctuation).
+  let enchantmentId: string | null = null;
+  let used = 0;
+  for (let count = tokens.length; count >= 1 && enchantmentId === null; count--) {
+    const wanted = normalize(tokens.slice(0, count).join(" "));
+    const id = Object.keys(enchantments).find((candidate) => normalize(candidate) === wanted || normalize(enchantments[candidate]?.name ?? "") === wanted);
+    if (id !== undefined) {
+      enchantmentId = id;
+      used = count;
+    }
+  }
+  const ids = [...new Set(options.map((option) => option.enchantmentId))];
+  const held = ids.map((id) => enchantments[id]?.name ?? id).join(", ");
+  if (enchantmentId === null || !ids.includes(enchantmentId)) {
+    return error(`There is no enchantment called "${tokens[0]}" that you can attach. You can attach: ${held}.`);
+  }
+
+  const fits = options.filter((option) => option.enchantmentId === enchantmentId).map((option) => option.kind);
+  const attach = (kind: StructureKind): RunParseResult => ({ kind: "runAction", action: { type: "enchant", enchantmentId: enchantmentId as string, kind } });
+  const wantedStructure = tokens.slice(used).join(" ");
+  if (wantedStructure === "") {
+    if (fits.length === 1) return attach(fits[0] as StructureKind);
+    return error(`Which structure? ${enchantments[enchantmentId]?.name ?? enchantmentId} fits: ${fits.map((kind) => structures[kind].name).join(", ")}.`);
+  }
+  const kind = findStructure(wantedStructure);
+  if (kind === null) return error(`There is no structure called "${wantedStructure}".`);
+  if (!fits.includes(kind)) {
+    return error(`${enchantments[enchantmentId]?.name ?? enchantmentId} cannot be attached to ${structures[kind].name} now. It fits: ${fits.map((fit) => structures[fit].name).join(", ")}.`);
+  }
+  return attach(kind);
+}
+
 /** Turns one typed line into an action for the run, a request for information, or an explanation. Never throws. */
 export function parseRunCommand(input: string, run: RunObservation): RunParseResult {
   const tokens = input.toLowerCase().trim().split(/\s+/).filter(Boolean);
@@ -314,6 +352,7 @@ export function parseRunCommand(input: string, run: RunObservation): RunParseRes
   if (run.phase === "fight") {
     if (CHOOSE_WORDS.includes(word)) return error("There is no reward to choose right now.");
     if (word === "fuse") return error("There is no rest stop to fuse at right now.");
+    if (word === "enchant") return error("There is no rest stop to enchant at right now.");
     if (word === "leave" || word === "continue") return error("There is no rest stop to leave right now.");
     return parseCommand(input, { observation: run.fight as Observation, loadout: run.owned });
   }
@@ -325,6 +364,7 @@ export function parseRunCommand(input: string, run: RunObservation): RunParseRes
     if (RUN_WORDS.includes(word)) return error('Choose a reward first, for example "choose 1".');
   } else {
     if (word === "fuse") return parseFuse(rest, run);
+    if (word === "enchant") return parseEnchant(rest, run);
     if (LEAVE_WORDS.includes(word)) return { kind: "runAction", action: { type: "leaveRest" } };
     if (RUN_WORDS.includes(word) || isWhole(word)) return error('You are at a rest stop: "fuse" something, or "leave" to go on.');
   }

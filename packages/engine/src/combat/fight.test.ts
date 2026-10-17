@@ -96,6 +96,67 @@ function playGreedy(seed: string): { state: FightState; events: GameEvent[] } {
   return { state, events };
 }
 
+describe("enchantments in a fight", () => {
+  const bloom = (slot: number): Action => ({ type: "deploy", slot, kind: "bloomFilter", spaceBits: 2048 });
+  const enchanted: FightConfig = { ...CONFIG, loadout: ["bloomFilter", "exactMemory"], enchantments: { bloomFilter: "seeded" } };
+  const hashSeedOf = (state: FightState, slot: number) => state.slots[slot]?.hashSeed;
+
+  it("builds a Seeded structure with a hash seed of its own, and leaves other structures on the public seed", () => {
+    let state = createFight("seeded", enchanted);
+    state = step(state, bloom(0)).state;
+    state = step(state, { type: "deploy", slot: 1, kind: "exactMemory", spaceBits: 1024 }).state;
+    expect(hashSeedOf(state, 0)).toBeTypeOf("number");
+    expect(state.slots[0]).toMatchObject({ kind: "bloomFilter", enchantment: "seeded" });
+    expect(state.slots[1]?.enchantment).toBeUndefined();
+    expect(hashSeedOf(state, 1)).toBeUndefined(); // Exact Memory is not enchanted and keeps the default
+  });
+
+  it("gives a different seed to each deployment, the same seed to the same deployment in the same fight, and another fight another seed", () => {
+    const seeds = (fightSeed: string) => {
+      let state = createFight(fightSeed, enchanted);
+      state = step(state, bloom(0)).state;
+      state = step(state, bloom(1)).state;
+      return [hashSeedOf(state, 0), hashSeedOf(state, 1)];
+    };
+    const [a, b] = seeds("fight-a");
+    expect(a).not.toBe(b);
+    expect(seeds("fight-a")).toEqual([a, b]);
+    expect(seeds("fight-b")).not.toEqual([a, b]);
+  });
+
+  it("draws the seed from a stream of its own, so it never shifts the choices a sampling structure makes", () => {
+    const sampleAfter = (config: FightConfig) => {
+      let state = createFight("stream", config);
+      state = step(state, { type: "deploy", slot: 0, kind: "reservoirSampling", spaceBits: 32 * 20 }).state;
+      state = step(state, endDeploy).state;
+      return state.slots[0]?.state.sample;
+    };
+    const plain: FightConfig = { ...CONFIG, loadout: ["reservoirSampling"] };
+    expect(sampleAfter({ ...plain, enchantments: { reservoirSampling: "seeded" } })).toEqual(sampleAfter(plain));
+  });
+
+  it("does not touch an unenchanted structure, and the enchantment shows to the player", () => {
+    let state = createFight("plain", { ...CONFIG, loadout: ["bloomFilter"] });
+    state = step(state, bloom(0)).state;
+    expect(hashSeedOf(state, 0)).toBeUndefined();
+    expect(observe(state).structures[0]?.enchantment).toBeUndefined();
+
+    let fancy = createFight("fancy", enchanted);
+    fancy = step(fancy, bloom(0)).state;
+    expect(observe(fancy).structures[0]?.enchantment).toBe("seeded");
+  });
+
+  it("survives a snapshot round trip: the structure comes back with its seed and its enchantment", () => {
+    let state = createFight("round", enchanted);
+    state = step(state, bloom(0)).state;
+    const revived = JSON.parse(JSON.stringify(state)) as FightState;
+    expect(revived).toEqual(state);
+    expect(observe(revived).structures[0]).toMatchObject({ kind: "bloomFilter", enchantment: "seeded" });
+    // And it keeps working: the stream arrives and the structure ingests it.
+    expect(() => step(revived, endDeploy)).not.toThrow();
+  });
+});
+
 describe("damageMultiplier", () => {
   it("scales the damage of every strike, and the event reports the scaled damage", () => {
     const strikeDamage = (multiplier?: number) => {

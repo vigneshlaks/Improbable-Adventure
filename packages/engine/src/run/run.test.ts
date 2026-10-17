@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import { IllegalActionError } from "../combat/types";
 import { createRun, legalActions, observeRun, step, turnsTaken } from "./run";
 import { play, runConfig, winFight } from "./testUtils";
-import type { RunState } from "./types";
+import type { StructureKind } from "../structures/types";
+import type { RunAction, RunState } from "./types";
 
 const start = (seed = "r1", overrides = {}) => createRun(seed, runConfig(overrides));
 const types = (events: Array<{ type: string }>) => events.map((e) => e.type);
@@ -285,5 +286,121 @@ describe("fusions at the rest stop", () => {
     expect(() => start("x", { fusions: [{ id: "a", inputs: ["logLog"], result: "hyperLogLog" }] })).toThrow(RangeError);
     const twice = { id: "a", inputs: ["logLog", "linearCounting"] as const, result: "hyperLogLog" as const };
     expect(() => start("x", { fusions: [twice, twice] })).toThrow(RangeError);
+  });
+});
+
+describe("enchantments", () => {
+  const seeded = { id: "enchantment:seeded", kind: "enchantment" as const, enchantment: "seeded", weight: 1 };
+  const other = { id: "enchantment:other", kind: "enchantment" as const, enchantment: "other", weight: 1 };
+
+  /** A run that offers only the given enchantments, takes the first offer each time, and stops at the rest stop (before encounter 2). */
+  function atRest(rewards = [seeded], overrides = {}) {
+    return until(createRun("ench", runConfig({ rewards, ...overrides })), "rest");
+  }
+  const enchant = (enchantmentId: string, kind: StructureKind): RunAction => ({ type: "enchant", enchantmentId, kind });
+
+  it("is offered as a reward, and taking it puts it in the inventory without attaching it", () => {
+    const reward = until(createRun("ench", runConfig({ rewards: [seeded] })), "reward");
+    expect(observeRun(reward).offers).toEqual([{ id: "enchantment:seeded", kind: "enchantment", enchantment: "seeded" }]);
+    const taken = play(reward, { type: "chooseReward", index: 0 }).state;
+    expect(taken.enchantments).toEqual(["seeded"]);
+    expect(taken.attached).toEqual({});
+  });
+
+  it("keeps every enchantment taken, even the same one twice", () => {
+    const rest = atRest(); // two fights, two rewards
+    expect(rest.enchantments).toEqual(["seeded", "seeded"]);
+    expect(observeRun(rest)).toMatchObject({ enchantments: ["seeded", "seeded"], attached: {} });
+  });
+
+  it("lists, at the rest stop, each owned structure an enchantment from the inventory fits", () => {
+    const rest = atRest();
+    const options = observeRun(rest).enchantable;
+    // Seeded fits Bloom Filter and Linear Counting here; the other owned structures are not hashed.
+    expect(options).toEqual([
+      { enchantmentId: "seeded", kind: "bloomFilter" },
+      { enchantmentId: "seeded", kind: "linearCounting" },
+    ]);
+    expect(legalActions(rest)).toEqual([enchant("seeded", "bloomFilter"), enchant("seeded", "linearCounting"), { type: "leaveRest" }]);
+  });
+
+  it("attaches to a structure, uses the enchantment up from the inventory, and the next fight builds the structure enchanted", () => {
+    const { state, events } = play(atRest(), enchant("seeded", "bloomFilter"));
+    expect(state.phase).toBe("rest"); // attaching does not end the rest stop
+    expect(state.attached).toEqual({ bloomFilter: "seeded" });
+    expect(state.enchantments).toEqual(["seeded"]); // one of the two is used
+    expect(events).toContainEqual({ type: "enchanted", enchantmentId: "seeded", kind: "bloomFilter", replaced: null });
+
+    const fight = play(state, { type: "leaveRest" }).state;
+    expect(fight.fight?.config.enchantments).toEqual({ bloomFilter: "seeded" });
+    const deployed = play(fight, { type: "deploy", slot: 0, kind: "bloomFilter", spaceBits: 1024 }).state;
+    expect(observeRun(deployed).fight?.structures[0]).toMatchObject({ kind: "bloomFilter", enchantment: "seeded" });
+  });
+
+  it("holds one enchantment per structure: attaching another returns the first to the inventory", () => {
+    const both = atRest([seeded, other]); // offers both each time; the first offer is taken
+    const withBoth = { ...both, enchantments: ["seeded", "other"] };
+    let state = play(withBoth, enchant("seeded", "bloomFilter")).state;
+    expect(state.attached).toEqual({ bloomFilter: "seeded" });
+    state = play(state, enchant("other", "bloomFilter")).state;
+    expect(state.attached).toEqual({ bloomFilter: "other" });
+    expect(state.enchantments).toEqual(["seeded"]);
+    expect(play(withBoth, enchant("seeded", "bloomFilter"), enchant("other", "bloomFilter")).events.at(-1)).toEqual({
+      type: "enchanted",
+      enchantmentId: "other",
+      kind: "bloomFilter",
+      replaced: "seeded",
+    });
+  });
+
+  it("moves an attached enchantment to another structure", () => {
+    let state = play(atRest(), enchant("seeded", "bloomFilter")).state;
+    state = { ...state, enchantments: [] }; // nothing left in the inventory, so only the attached one can be moved
+    expect(legalActions(state)).toContainEqual(enchant("seeded", "linearCounting"));
+    state = play(state, enchant("seeded", "linearCounting")).state;
+    expect(state.attached).toEqual({ linearCounting: "seeded" });
+    expect(state.enchantments).toEqual([]);
+  });
+
+  it("returns the enchantments of fused structures to the inventory, and the result starts without one", () => {
+    const rewards = [{ id: "structure:logLog", kind: "structure" as const, structure: "logLog" as const, weight: 1 }, seeded];
+    let rest = createRun("fuse-ench", runConfig({ rewards }));
+    rest = until(rest, "reward");
+    rest = play(rest, { type: "chooseReward", index: (observeRun(rest).offers ?? []).findIndex((o) => o.id === "structure:logLog") }).state;
+    rest = until(rest, "reward");
+    rest = play(rest, { type: "chooseReward", index: (observeRun(rest).offers ?? []).findIndex((o) => o.id === "enchantment:seeded") }).state;
+    expect(rest.phase).toBe("rest");
+    const fused = play(rest, enchant("seeded", "logLog"), { type: "fuse", recipeId: "hyperLogLog" }).state;
+    expect(fused.attached).toEqual({});
+    expect(fused.enchantments).toEqual(["seeded"]);
+    expect(fused.owned).toContain("hyperLogLog");
+  });
+
+  it("refuses an enchant out of turn, for a structure not owned or not fitting, an enchantment not held, or one already there", () => {
+    expect(() => step(start(), enchant("seeded", "bloomFilter"))).toThrow(IllegalActionError); // in a fight
+    const rest = atRest();
+    expect(() => step(rest, enchant("seeded", "countMinSketch"))).toThrow(IllegalActionError); // not owned
+    expect(() => step(rest, enchant("seeded", "exactMemory"))).toThrow(IllegalActionError); // does not fit
+    expect(() => step(rest, enchant("mystery", "bloomFilter"))).toThrow(IllegalActionError); // unknown
+    expect(() => step(rest, enchant("other", "bloomFilter"))).toThrow(IllegalActionError); // not held
+    const attached = play(rest, enchant("seeded", "bloomFilter")).state;
+    expect(() => step(attached, enchant("seeded", "bloomFilter"))).toThrow(IllegalActionError); // already there
+  });
+
+  it("is not a repeat of the same offer: rewards of other kinds still work alongside it", () => {
+    const mixed = createRun("mixed", runConfig({ rewards: [seeded, { id: "upgrade:power", kind: "upgrade", upgrade: "power", weight: 1 }] }));
+    expect(new Set((observeRun(until(mixed, "reward")).offers ?? []).map((o) => o.kind))).toEqual(new Set(["enchantment", "upgrade"]));
+  });
+
+  it("rejects a config whose reward names an enchantment that does not exist, or one that fits nothing", () => {
+    expect(() => start("x", { rewards: [{ id: "enchantment:mystery", kind: "enchantment", enchantment: "mystery", weight: 1 }] })).toThrow(RangeError);
+    expect(() => start("x", { enchantments: [{ id: "a", valid: [] }] })).toThrow(RangeError);
+    expect(() => start("x", { enchantments: [{ id: "a", valid: ["bloomFilter"] }, { id: "a", valid: ["bloomFilter"] }] })).toThrow(RangeError);
+  });
+
+  it("survives JSON unchanged with enchantments attached", () => {
+    const state = play(atRest(), enchant("seeded", "bloomFilter")).state;
+    const revived = JSON.parse(JSON.stringify(state)) as RunState;
+    expect(play(revived, { type: "leaveRest" }).state).toEqual(play(state, { type: "leaveRest" }).state);
   });
 });

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createRun, groundTruth, legalRunActions, observeRun, STRUCTURE_KINDS, stepRun, turnsTaken, type RunAction, type RunState } from "@pda/engine";
 import { balance } from "./balance";
 import { buildRunConfig } from "./run";
+import { enchantments, parseEnchantments, variantName } from "./enchantments";
 import { fusions, parseFusions } from "./fusions";
 import { parseUpgrades, upgrades } from "./upgrades";
 
@@ -42,6 +43,29 @@ describe("fusions.json", () => {
   });
 });
 
+describe("enchantments.json", () => {
+  it("has Seeded, which fits every structure that hashes, and is not yet offered as a reward", () => {
+    expect(enchantments.seeded).toMatchObject({ name: "Seeded", valid: ["bloomFilter", "countMinSketch", "logLog", "linearCounting", "hyperLogLog"], reward: false });
+    expect(enchantments.seeded?.valid).not.toContain("exactMemory"); // nothing is hashed there
+  });
+
+  it("rejects an enchantment that fits nothing, lists a structure twice, transforms one it does not fit, or has no summary", () => {
+    const ok = { name: "X", phase: 1, summary: "Does a thing.", valid: ["bloomFilter"], transforms: {}, reward: true };
+    expect(() => parseEnchantments({ x: ok })).not.toThrow();
+    expect(() => parseEnchantments({ x: { ...ok, valid: [] } })).toThrow();
+    expect(() => parseEnchantments({ x: { ...ok, valid: ["bloomFilter", "bloomFilter"] } })).toThrow();
+    expect(() => parseEnchantments({ x: { ...ok, transforms: { logLog: "Super" } } })).toThrow();
+    expect(() => parseEnchantments({ x: { ...ok, summary: undefined } })).toThrow();
+    expect(() => parseEnchantments({ x: { ...ok, valid: ["skipList"] } })).toThrow();
+  });
+
+  it("names a structure by its variant when the enchantment turns it into one, and by its own name otherwise", () => {
+    expect(variantName("Bloom Filter", "bloomFilter", undefined)).toBe("Bloom Filter");
+    expect(variantName("Bloom Filter", "bloomFilter", "seeded")).toBe("Bloom Filter"); // Seeded transforms nothing
+    expect(variantName("Bloom Filter", "bloomFilter", "mystery")).toBe("Bloom Filter");
+  });
+});
+
 describe("buildRunConfig", () => {
   const config = buildRunConfig({ seed: "run-1" });
 
@@ -69,6 +93,16 @@ describe("buildRunConfig", () => {
     expect(config.rewards.filter((r) => r.kind === "upgrade").map((r) => r.id).sort()).toEqual(Object.keys(upgrades).map((id) => `upgrade:${id}`).sort());
     for (const reward of config.rewards) expect(reward.weight).toBe(reward.kind === "structure" ? balance.REWARD_WEIGHTS.structure : balance.REWARD_WEIGHTS.upgrade);
     expect(config.rewardChoices).toBe(balance.REWARD_CHOICES);
+  });
+
+  it("passes the enchantments on, and offers as rewards only those marked as rewards, at the enchantment weight", () => {
+    expect(config.enchantments).toEqual([{ id: "seeded", valid: [...(enchantments.seeded?.valid ?? [])] }]);
+    expect(config.rewards.some((r) => r.kind === "enchantment")).toBe(false); // Seeded is not offered yet
+    const offered = { ...enchantments, seeded: { ...enchantments.seeded!, reward: true } };
+    const withIt = buildRunConfig({ seed: "run-1", enchantmentData: offered });
+    expect(withIt.rewards.filter((r) => r.kind === "enchantment")).toEqual([
+      { id: "enchantment:seeded", kind: "enchantment", enchantment: "seeded", weight: balance.REWARD_WEIGHTS.enchantment },
+    ]);
   });
 
   it("passes the recipes on, by id", () => {

@@ -1,11 +1,18 @@
-import { findStructure, fusions, narration, structures, upgrades } from "@pda/content";
+import { enchantments, findStructure, fusions, narration, structures, upgrades, variantName } from "@pda/content";
 import { STRUCTURE_KINDS, type Answer, type Observation, type RewardView, type RunObservation, type StructureKind, type StructureView } from "@pda/engine";
 import { formatNumber, TRAIT_NAMES, title } from "./narrator";
 
 // The layouts of the status, query and help screens. Story text lives in content; these are the displays.
 
 const PHASES = { deploy: "deploy phase", strike: "strike phase", won: "victory", lost: "defeat" } as const;
-const nameOf = (view: StructureView) => structures[view.kind].name;
+/** A structure's name with its enchantment: the variant it turns into, or its own name followed by the enchantment in brackets. */
+export function structureLabel(kind: StructureKind, enchantment?: string): string {
+  const own = structures[kind].name;
+  if (enchantment === undefined) return own;
+  const variant = variantName(own, kind, enchantment);
+  return variant !== own ? variant : `${own} (${enchantments[enchantment]?.name ?? enchantment})`;
+}
+const nameOf = (view: StructureView) => structureLabel(view.kind, view.enchantment);
 const percent = (confidence: number) => `${Math.round(confidence * 100)}%`;
 const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? "" : "s"}`;
 
@@ -122,10 +129,10 @@ export function renderHelp(topic?: string, loadout?: readonly StructureKind[]): 
 /** The rewards on offer, numbered from 1 as the player types them. */
 export function renderRewards(offers: readonly RewardView[]): string[] {
   return offers.map((offer, position) => {
-    const text =
-      offer.kind === "structure"
-        ? `${structures[offer.structure].name} (new structure): ${structures[offer.structure].summary}`
-        : `${upgrades[offer.upgrade]?.name ?? offer.upgrade} (upgrade): ${upgrades[offer.upgrade]?.summary ?? ""}`;
+    let text: string;
+    if (offer.kind === "structure") text = `${structures[offer.structure].name} (new structure): ${structures[offer.structure].summary}`;
+    else if (offer.kind === "enchantment") text = `${enchantments[offer.enchantment]?.name ?? offer.enchantment} (enchantment): ${enchantments[offer.enchantment]?.summary ?? ""}`;
+    else text = `${upgrades[offer.upgrade]?.name ?? offer.upgrade} (upgrade): ${upgrades[offer.upgrade]?.summary ?? ""}`;
     return `  ${position + 1}) ${text}`;
   });
 }
@@ -133,16 +140,44 @@ export function renderRewards(offers: readonly RewardView[]): string[] {
 /** What can be done at a rest stop. */
 export function renderRest(run: RunObservation): string[] {
   const available = run.fusions ?? [];
-  if (available.length === 0) return ['Nothing to fuse. Type "leave" to go on to the next fight.'];
-  return [
-    "Fusions you can do:",
-    ...available.map((fusion) => {
-      const info = fusions[fusion.id];
-      const inputs = fusion.inputs.map((kind) => structures[kind].name).join(" and ");
-      return `  ${info?.name ?? fusion.id}: ${inputs} become ${structures[fusion.result].name}. ${info?.summary ?? ""}`.trimEnd();
-    }),
-    'Type "fuse <name>" to fuse (the originals are used up), or "leave" to go on to the next fight.',
+  const attachable = run.enchantable ?? [];
+  if (available.length === 0 && attachable.length === 0) return ['Nothing to fuse or enchant. Type "leave" to go on to the next fight.'];
+
+  const lines: string[] = [];
+  if (available.length > 0) {
+    lines.push(
+      "Fusions you can do:",
+      ...available.map((fusion) => {
+        const info = fusions[fusion.id];
+        const inputs = fusion.inputs.map((kind) => structures[kind].name).join(" and ");
+        return `  ${info?.name ?? fusion.id}: ${inputs} become ${structures[fusion.result].name}. ${info?.summary ?? ""}`.trimEnd();
+      }),
+    );
+  }
+  if (attachable.length > 0) {
+    const ids = [...new Set(attachable.map((option) => option.enchantmentId))];
+    lines.push(
+      "Enchantments you can attach:",
+      ...ids.map((id) => {
+        const fits = attachable.filter((option) => option.enchantmentId === id).map((option) => structures[option.kind].name);
+        return `  ${enchantments[id]?.name ?? id} (fits: ${fits.join(", ")}): ${enchantments[id]?.summary ?? ""}`.trimEnd();
+      }),
+    );
+  }
+  const how = [
+    ...(available.length > 0 ? ['"fuse <name>" to fuse (the originals are used up)'] : []),
+    ...(attachable.length > 0 ? ['"enchant <enchantment> <structure>" to attach one (a structure holds one at a time)'] : []),
+    '"leave" to go on to the next fight',
   ];
+  lines.push(`Type ${how.join(", or ")}.`);
+  return lines;
+}
+
+function enchantmentSummary(run: RunObservation): string {
+  const name = (id: string) => enchantments[id]?.name ?? id;
+  const onStructures = (Object.entries(run.attached) as Array<[StructureKind, string]>).map(([kind, id]) => `${name(id)} on ${structures[kind].name}`);
+  const parts = [...onStructures.join(", ") ? [onStructures.join(", ")] : [], ...(run.enchantments.length > 0 ? [`in the pack: ${run.enchantments.map(name).join(", ")}`] : [])];
+  return parts.length > 0 ? parts.join("; ") : "none";
 }
 
 /** Where the player is in the act, what they own, and (in a fight) the fight's own status. */
@@ -155,6 +190,7 @@ export function renderRunStatus(run: RunObservation): string[] {
     `Certainty: ${formatNumber(run.certainty)} of ${formatNumber(run.maxCertainty)}`,
     `Owned: ${run.owned.map((kind) => structures[kind].name).join(", ")}`,
     `Upgrades: ${taken.length > 0 ? taken.join(", ") : "none"}`,
+    `Enchantments: ${enchantmentSummary(run)}`,
     ...(run.fight ? renderStatus(run.fight).filter((line) => !line.startsWith("Certainty:")) : []),
   ];
 }

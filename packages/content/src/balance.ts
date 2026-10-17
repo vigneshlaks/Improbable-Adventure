@@ -46,7 +46,7 @@ export const balanceSchema = z.object({
   /** How many rewards are offered after a fight. */
   REWARD_CHOICES: z.number().int().positive(),
   /** How likely each kind of reward is to be drawn, relative to the others. */
-  REWARD_WEIGHTS: z.object({ structure: z.number().nonnegative(), upgrade: z.number().nonnegative() }).strict(),
+  REWARD_WEIGHTS: z.object({ structure: z.number().nonnegative(), upgrade: z.number().nonnegative(), enchantment: z.number().nonnegative() }).strict(),
 
   BASE: z.number().positive(),
   HIT_DAMAGE: z.number().positive(),

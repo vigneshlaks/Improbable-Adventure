@@ -31,6 +31,8 @@ export const EVENT_TEMPLATES = {
   fused: ["inputs", "result"],
   runWon: ["turns", "certaintyLeft"],
   runLost: ["number"],
+  enchanted: ["enchantment", "structure"],
+  enchantedReplacing: ["enchantment", "structure", "replaced"],
 } as const;
 
 export type EventTemplateKey = keyof typeof EVENT_TEMPLATES;
@@ -84,6 +86,7 @@ export const narrationSchema = z
         quit: command,
         choose: command,
         fuse: command,
+        enchant: command,
         leave: command,
       })
       .strict(),

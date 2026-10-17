@@ -9,7 +9,7 @@ const text = (lines: string[]) => lines.join("\n");
 /** The real act, with enemies that any Frequency strike of enough force kills, so whole runs can be played in a few commands. */
 function easyConfig(seed: string, overrides: Partial<RunConfig> = {}): RunConfig {
   const base = buildRunConfig({ seed });
-  return { ...base, encounters: base.encounters.map((enemy) => ({ ...enemy, hp: 0.001, weakPoints: ["frequency" as const] })), ...overrides };
+  return { ...base, encounters: base.encounters.map((enemy) => ({ ...enemy, hp: 0.000001, weakPoints: ["frequency" as const] })), ...overrides };
 }
 const start = (seed = "r1", overrides: Partial<RunConfig> = {}): Session => createRunSession({ seed, config: easyConfig(seed, overrides) });
 
@@ -172,6 +172,54 @@ describe("the rest stop and fusions", () => {
   it("does not offer a fusion the player cannot do", () => {
     const session = start("rest", { rewards: [{ id: "upgrade:power", kind: "upgrade", upgrade: "power", weight: 1 }] });
     expect(toRest(session)).toMatch(/Nothing to fuse/);
+  });
+});
+
+describe("enchantments", () => {
+  /** Only Seeded is ever offered, so by the rest stop the player holds two of it. */
+  const seededOnly = () => start("ench", { rewards: [{ id: "enchantment:seeded", kind: "enchantment", enchantment: "seeded", weight: 1 }] });
+  function toRest(session: Session): void {
+    for (let guard = 0; guard < 100 && !/\[rest stop/.test(session.prompt()); guard++) {
+      if (/\[reward/.test(session.prompt())) session.handle("choose 1");
+      else winFight(session);
+    }
+  }
+
+  it("is offered as a reward with what it does, and goes into the pack when taken", () => {
+    const session = seededOnly();
+    const offer = winFight(session);
+    expect(offer).toMatch(/1\) Seeded \(enchantment\): Hashes with a secret seed/);
+    expect(text(session.handle("choose 1").lines)).toMatch(/You take Seeded\./);
+    expect(text(session.handle("status").lines)).toMatch(/Enchantments: in the pack: Seeded/);
+  });
+
+  it("is attached at the rest stop, and the structure is shown enchanted in the next fight", () => {
+    const session = seededOnly();
+    toRest(session);
+    const rest = text(session.handle("status").lines);
+    expect(rest).toMatch(/Enchantments: in the pack: Seeded, Seeded/);
+    expect(text(session.handle("enchant seeded bloom").lines)).toMatch(/Seeded is attached to Bloom Filter\./);
+    expect(text(session.handle("status").lines)).toMatch(/Enchantments: Seeded on Bloom Filter; in the pack: Seeded/);
+    session.handle("leave");
+    expect(text(session.handle("deploy bloom 2048").lines)).toMatch(/Bloom Filter takes slot 1/);
+    expect(text(session.handle("status").lines)).toMatch(/1\. Bloom Filter \(Seeded\) \(2048 bits\)/);
+  });
+
+  it("lists what can be attached at the rest stop, and explains a mistake", () => {
+    const session = seededOnly();
+    toRest(session);
+    expect(text(session.handle("status").lines)).toMatch(/Fight 6 of 7/);
+    const mistakes = [session.handle("enchant seeded exact"), session.handle("enchant mystery bloom"), session.handle("enchant")].map((reply) => text(reply.lines));
+    expect(mistakes[0]).toMatch(/cannot be attached to Exact Memory/);
+    expect(mistakes[1]).toMatch(/no enchantment called "mystery"/);
+    expect(mistakes[2]).toMatch(/Usage: enchant/);
+  });
+
+  it("is refused in a fight and on the reward screen", () => {
+    const session = seededOnly();
+    expect(text(session.handle("enchant seeded bloom").lines)).toMatch(/no rest stop/i);
+    winFight(session);
+    expect(text(session.handle("enchant seeded bloom").lines)).toMatch(/Choose a reward first/);
   });
 });
 

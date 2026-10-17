@@ -24,7 +24,9 @@
     "restStarted": "You reach a rest stop and recover {healed} Certainty.",
     "fused": "{inputs} fuse into {result}.",
     "runWon": "The act is won in {turns} turns, with {certaintyLeft} Certainty left.",
-    "runLost": "The run ends in fight {number}."
+    "runLost": "The run ends in fight {number}.",
+    "enchanted": "{enchantment} is attached to {structure}.",
+    "enchantedReplacing": "{enchantment} is attached to {structure}, and {replaced} returns to the pack."
   },
   "enemy": {
     "intro": {
@@ -105,6 +107,10 @@
     "leave": {
       "usage": "leave",
       "summary": "Leave the rest stop and go on to the next fight."
+    },
+    "enchant": {
+      "usage": "enchant <enchantment> [structure]",
+      "summary": "At a rest stop, attach an enchantment to a structure you own. A structure holds one at a time."
     }
   },
   "game": {

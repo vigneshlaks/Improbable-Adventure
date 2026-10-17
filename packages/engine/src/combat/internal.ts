@@ -13,6 +13,9 @@ import {
 
 // Helpers shared by the fight's step function and its read-only views.
 
+/** The enchantment that gives a structure a secret hash seed for the fight. */
+export const SEEDED = "seeded";
+
 /** The spec's starting reward weights. */
 export const DEFAULT_REWARDS: RewardWeights = { enemyDefeated: 1, perTurn: 0.01, perCertaintyLost: 0.005, runLoss: 1 };
 
@@ -42,12 +45,17 @@ type DeployAction = Extract<Action, { type: "deploy" }>;
 
 /** Builds the structure a deploy action asks for. Each gets its own random stream, derived from the seed. */
 export function buildStructure(state: FightState, action: DeployAction): Structure {
+  const rng = Rng.fromSeed(`${state.seed}/structure/${state.turn}/${action.slot}`);
+  const enchantment = state.config.enchantments?.[action.kind];
   return createStructure(
     action.kind,
     {
       spaceBits: action.spaceBits,
       ...(action.knob !== undefined ? { knob: action.knob } : {}),
-      rng: Rng.fromSeed(`${state.seed}/structure/${state.turn}/${action.slot}`),
+      rng,
+      ...(enchantment !== undefined ? { enchantment } : {}),
+      // Seeded: a hash seed nobody could know before the fight, from the structure's own stream so no other stream shifts.
+      ...(enchantment === SEEDED ? { hashSeed: rng.split("hash").next() } : {}),
     },
     state.config.constants,
   );
