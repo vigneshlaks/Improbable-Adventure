@@ -86,6 +86,9 @@ describe("balance.json", () => {
         steadySpaceCost: 0.1,
         superLogLogErrorCoefficient: 1.05,
         fadingCellBits: 3,
+        fadingWindow: 1.5,
+        lightCounterBits: 8,
+        lightRegisterBits: 3,
       });
     }
     // matches the stand-in constants used by the engine's tests

@@ -4,6 +4,7 @@ import {
   assertSpace,
   COUNTER_BITS,
   DEFAULT_HASH_SEED,
+  LIGHT,
   STEADY,
   steadySpace,
   type Answer,
@@ -22,6 +23,9 @@ const COUNTER_MAX = 2 ** COUNTER_BITS - 1;
  * Knob: depth. It never underestimates a live value; it can only overshoot, by at most about
  * (e / width) * N, where N is the number of live values. Deletes decrement counters and stop at zero.
  *
+ * With the Light enchantment its counters are narrower (8 bits), so the same Space buys four times the columns, but a counter
+ * stops at 255: it then only says "at least", is never decremented, and an estimate that reaches it has no upper bound.
+ *
  * With the Steady enchantment it is Count-Min with Conservative Update: an insert raises only the counters that
  * sit at the value's current minimum, so cells shared with other values are inflated far less and the estimate
  * overshoots much less (it still never underestimates). The price is that deletes cannot be undone, so they are
@@ -38,6 +42,8 @@ export class CountMinSketch implements Structure {
   private total = 0;
   private deleteCount = 0;
   private readonly conservative: boolean;
+  private readonly counterBits: number;
+  private readonly counterMax: number;
   private readonly width: number;
   private readonly depth: number;
   private readonly seed: number;
@@ -49,9 +55,11 @@ export class CountMinSketch implements Structure {
   ) {
     this.depth = Math.max(1, Math.floor(options.knob ?? constants.cmsDefaultDepth));
     this.conservative = options.enchantment === STEADY;
+    this.counterBits = options.enchantment === LIGHT ? constants.lightCounterBits : COUNTER_BITS;
+    this.counterMax = this.counterBits >= 32 ? COUNTER_MAX : 2 ** this.counterBits - 1;
     const gridBits = this.conservative ? steadySpace(options.spaceBits, constants.steadySpaceCost) : options.spaceBits;
-    assertSpace("countMinSketch", gridBits, COUNTER_BITS * this.depth);
-    this.width = Math.floor(gridBits / (COUNTER_BITS * this.depth));
+    assertSpace("countMinSketch", gridBits, this.counterBits * this.depth);
+    this.width = Math.floor(gridBits / (this.counterBits * this.depth));
     this.seed = options.hashSeed ?? DEFAULT_HASH_SEED;
     this.rowSeeds = Array.from({ length: this.depth }, (_, row) => murmur3U32(row, this.seed));
     this.counters = new Uint32Array(this.width * this.depth);
@@ -59,7 +67,7 @@ export class CountMinSketch implements Structure {
   }
 
   spaceBits(): number {
-    const grid = COUNTER_BITS * this.width * this.depth;
+    const grid = this.counterBits * this.width * this.depth;
     return this.conservative ? Math.min(this.options.spaceBits, Math.ceil(grid * (1 + this.constants.steadySpaceCost))) : grid;
   }
 
@@ -97,7 +105,7 @@ export class CountMinSketch implements Structure {
   }
 
   estimate(value: number): number {
-    let best = COUNTER_MAX;
+    let best = this.counterMax;
     for (const slot of this.slots(value)) best = Math.min(best, this.counters[slot] ?? 0);
     return best;
   }
@@ -117,14 +125,14 @@ export class CountMinSketch implements Structure {
     if (event.op === "insert") {
       for (const slot of slots) {
         const c = this.counters[slot] ?? 0;
-        if (c < COUNTER_MAX) this.counters[slot] = c + 1;
+        if (c < this.counterMax) this.counters[slot] = c + 1;
       }
       this.total++;
       return;
     }
     for (const slot of slots) {
       const c = this.counters[slot] ?? 0;
-      if (c > 0) this.counters[slot] = c - 1;
+      if (c > 0 && c < this.counterMax) this.counters[slot] = c - 1; // a counter that has stopped is no longer reliable, so it is left alone
     }
     if (this.total > 0) this.total--;
   }
@@ -133,10 +141,12 @@ export class CountMinSketch implements Structure {
     if (challenge.kind !== "frequency") return null;
     const est = this.estimate(challenge.value);
     // A conservative sketch leaves deleted units in its counters, so the live count can be that many lower.
+    // A counter that has stopped only says "at least", so an estimate that reaches the stop has no upper bound.
+    const stopped = this.counterBits < COUNTER_BITS && est >= this.counterMax;
     return {
       estimate: est,
       low: Math.max(0, est - this.errorBand - (this.conservative ? this.deleteCount : 0)),
-      high: est, // one-sided: never underestimates
+      high: stopped ? Number.POSITIVE_INFINITY : est, // otherwise one-sided: never underestimates
       confidence: this.bandConfidence,
     };
   }
@@ -176,7 +186,7 @@ export class CountMinSketch implements Structure {
     }
     const merged = this.clone();
     for (let i = 0; i < merged.counters.length; i++) {
-      merged.counters[i] = Math.min(COUNTER_MAX, (merged.counters[i] ?? 0) + (other.counters[i] ?? 0));
+      merged.counters[i] = Math.min(this.counterMax, (merged.counters[i] ?? 0) + (other.counters[i] ?? 0));
     }
     merged.total = this.total + other.total;
     merged.deleteCount = this.deleteCount + other.deleteCount;

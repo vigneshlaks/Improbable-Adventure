@@ -1,7 +1,7 @@
 import { doubleHashIndices } from "../hash/doubleHash";
 import { murmur3U32 } from "../hash/murmur3";
 import { binomialUpper } from "../stats/stats";
-import { bloomOptimalK, DEFAULT_BITS_PER_ITEM } from "./bloomFilter";
+import { bloomOptimalK } from "./bloomFilter";
 import { expectKind, optionsFromSnapshot, readCounts, readNumber, snapshotHeader } from "./snapshot";
 import {
   assertSpace,
@@ -81,7 +81,7 @@ export class StableBloomFilter implements Structure {
     assertSpace("bloomFilter", options.spaceBits, bits * MIN_CELLS);
     this.cells = Math.floor(options.spaceBits / bits);
     this.max = 2 ** bits - 1;
-    const items = Math.max(1, Math.floor(options.knob ?? this.cells / DEFAULT_BITS_PER_ITEM));
+    const items = Math.max(1, Math.floor(options.knob ?? this.cells * constants.fadingWindow));
     this.k = bloomOptimalK(this.cells, items);
     this.decrements = stableDecrements(this.cells, this.k, items, this.max);
     this.seed = options.hashSeed ?? DEFAULT_HASH_SEED;

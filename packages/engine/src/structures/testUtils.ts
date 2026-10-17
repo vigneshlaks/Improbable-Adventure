@@ -14,6 +14,9 @@ export const TEST_CONSTANTS: StructureConstants = {
   steadySpaceCost: 0.1,
   superLogLogErrorCoefficient: 1.05,
   fadingCellBits: 3,
+  fadingWindow: 1.5,
+  lightCounterBits: 8,
+  lightRegisterBits: 3,
 };
 
 /** Every structure's statistical test runs this many seeded trials. */

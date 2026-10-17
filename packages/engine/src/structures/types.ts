@@ -60,6 +60,12 @@ export interface StructureConstants {
   superLogLogErrorCoefficient: number;
   /** Bits in one cell of a Stable Bloom Filter (a Bloom Filter with Fading). Its cells count from 0 to 2^bits - 1. */
   fadingCellBits: number;
+  /** The window a Stable Bloom Filter remembers when the player gives none, as a multiple of its cell count (in values). */
+  fadingWindow: number;
+  /** Bits in one Count-Min counter with the Light enchantment. Such a counter stops at 2^bits - 1. */
+  lightCounterBits: number;
+  /** Bits in one HyperLogLog register with the Light enchantment. Such a register stops at rank 2^bits - 1. */
+  lightRegisterBits: number;
 }
 
 /** Anything that survives JSON.stringify and JSON.parse unchanged. */
@@ -115,6 +121,9 @@ export const LOGLOG_REGISTER_BITS = 5;
 
 /** The enchantment that makes a Count-Min Sketch conservative and a LogLog a SuperLogLog, for 10 percent more Space. */
 export const STEADY = "steady";
+
+/** The enchantment that narrows Count-Min counters and HyperLogLog registers: more of them in the same Space, but they can fill up. */
+export const LIGHT = "light";
 
 /** The enchantment that makes a Bloom Filter a Stable Bloom Filter: its cells fade, so it forgets old values. */
 export const FADING = "fading";

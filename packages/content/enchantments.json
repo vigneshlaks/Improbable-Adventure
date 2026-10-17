@@ -38,5 +38,16 @@
       "bloomFilter": "Stable Bloom Filter"
     },
     "reward": true
+  },
+  "light": {
+    "name": "Light",
+    "phase": 1,
+    "summary": "Narrower cells: Count-Min counters shrink to 8 bits and HyperLogLog registers to 3, so the same Space buys four times the columns or about 1.7 times the registers, until a cell fills up (a counter stops at 255, a register at rank 7) and the answer loses its upper bound.",
+    "valid": [
+      "countMinSketch",
+      "hyperLogLog"
+    ],
+    "transforms": {},
+    "reward": true
   }
 }

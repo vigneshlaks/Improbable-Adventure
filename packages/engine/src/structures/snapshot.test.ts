@@ -25,6 +25,9 @@ const CASES: Array<{ kind: StructureKind; options: StructureOptions }> = [
   // The enchanted variants: Count-Min with Conservative Update, SuperLogLog.
   { kind: "countMinSketch", options: { spaceBits: 4500, knob: 4, hashSeed: 12345, enchantment: "steady" } },
   { kind: "logLog", options: { spaceBits: 800, hashSeed: 12345, enchantment: "steady" } },
+  // The narrowed variants (Light).
+  { kind: "countMinSketch", options: { spaceBits: 4096, knob: 4, hashSeed: 12345, enchantment: "light" } },
+  { kind: "hyperLogLog", options: { spaceBits: 600, hashSeed: 12345, enchantment: "light" } },
   // A Bloom Filter with Fading is a Stable Bloom Filter.
   { kind: "bloomFilter", options: { spaceBits: 3000, knob: 100, hashSeed: 12345, enchantment: "fading" } },
 ];

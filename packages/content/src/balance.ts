@@ -36,6 +36,9 @@ export const balanceSchema = z.object({
   STEADY_SPACE_COST: z.number().nonnegative(),
   SUPERLOGLOG_ERROR_COEFFICIENT: z.number().positive(),
   FADING_CELL_BITS: z.number().int().min(2).max(8),
+  FADING_WINDOW: z.number().positive(),
+  LIGHT_COUNTER_BITS: z.number().int().min(2).max(31),
+  LIGHT_REGISTER_BITS: z.number().int().min(2).max(5),
 
   STARTING_SPACE: z.number().int().positive(),
   STARTING_CERTAINTY: z.number().int().positive(),
@@ -93,5 +96,8 @@ export function structureConstants(b: Balance = balance): StructureConstants {
     steadySpaceCost: b.STEADY_SPACE_COST,
     superLogLogErrorCoefficient: b.SUPERLOGLOG_ERROR_COEFFICIENT,
     fadingCellBits: b.FADING_CELL_BITS,
+    fadingWindow: b.FADING_WINDOW,
+    lightCounterBits: b.LIGHT_COUNTER_BITS,
+    lightRegisterBits: b.LIGHT_REGISTER_BITS,
   };
 }

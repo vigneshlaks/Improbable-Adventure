@@ -18,6 +18,9 @@ describe("StableBloomFilter", () => {
     expect(s.params).toMatchObject({ cells: 1000, k: 7, expectedItems: 100, cellMax: 7 });
     expect(s.spaceBits()).toBe(3000);
     expect(fading(8192).params.cells).toBe(2730);
+    // With no knob it remembers about 1.5 times as many values as it has cells (measured best on Elite and Boss sized streams).
+    expect(fading(8192).params.expectedItems).toBe(4095);
+    expect(fading(3000).params.expectedItems).toBe(1500);
     expect(() => fading(30)).toThrow(RangeError);
     expect(() => new StableBloomFilter({ spaceBits: 3000 }, TEST_CONSTANTS)).not.toThrow(); // the class is the fading variant whatever the option says
     // The factory builds it only for the Fading enchantment, and a plain Bloom Filter otherwise.
@@ -43,6 +46,16 @@ describe("StableBloomFilter", () => {
     for (const value of values.slice(1, 2000)) s.ingest({ op: "insert", value });
     expect(flagged(values[0]!)).toBe(false); // 2,000 later inserts: a window of about 100 items has long passed
     expect(s.inserts).toBe(2000);
+    // With the default window a value survives a whole turn's worth of later inserts (200 of them), almost always.
+    let remembered = 0;
+    for (let t = 0; t < 300; t++) {
+      const [marker, ...others] = distinctValues(trialRng("sbf-default-window", t), 201);
+      const roomy = fading(3000, undefined, t + 1);
+      roomy.ingest({ op: "insert", value: marker! });
+      for (const value of others) roomy.ingest({ op: "insert", value });
+      if ((roomy.query({ kind: "presence", targets: [marker!] })?.estimate as number[]).length === 1) remembered++;
+    }
+    expect(remembered / 300).toBeGreaterThan(0.98);
     // Deleted values can still be flagged, so the low bound allows for them: 5 flagged, 2 deleted, no collisions to speak of.
     const ghosty = fading(30000, 100);
     const five = distinctValues(trialRng("sbf-ghosts", 0), 5);

@@ -5,6 +5,7 @@ import { expectKind, optionsFromSnapshot, readCounts, readNumber, snapshotHeader
 import {
   assertSpace,
   DEFAULT_HASH_SEED,
+  LIGHT,
   LOGLOG_REGISTER_BITS,
   type Answer,
   type Challenge,
@@ -17,8 +18,6 @@ import {
 
 /** Fewest registers that still behave like HyperLogLog rather than noise. */
 export const MIN_HLL_REGISTERS = 16;
-
-const MAX_REGISTER = 2 ** LOGLOG_REGISTER_BITS - 1;
 
 /** The bias correction of the harmonic mean (Flajolet et al.), which depends on the register count for small m. */
 function alphaFor(m: number): number {
@@ -33,6 +32,9 @@ function alphaFor(m: number): number {
  * remembers the rarest hash pattern among the values routed to it; the harmonic mean of those patterns gives the count,
  * with relative standard error about 1.04 / sqrt(m). When many registers are still empty (a small stream) it counts the
  * empty registers instead, as Linear Counting does, because the harmonic mean is far too high there.
+ * With the Light enchantment its registers are narrower (3 bits, so a register stops at rank 7): the same Space buys more of
+ * them, but a register that has stopped no longer tells how rare its pattern was. Stopping can only make the harmonic sum too
+ * large, so the estimate becomes a floor and the upper bound widens by exactly what the stopped registers can hide.
  * Cannot delete, so it counts values that were deleted since (ghosts), and lowers its range's low bound by the ghosts
  * the inserts and deletes it sees allow.
  */
@@ -41,6 +43,8 @@ export class HyperLogLog implements Structure {
   readonly params: Readonly<Record<string, number>>;
 
   private registers: Uint8Array;
+  private readonly registerBits: number;
+  private readonly maxRank: number;
   private insertCount = 0;
   private deleteCount = 0;
   private readonly b: number;
@@ -51,8 +55,10 @@ export class HyperLogLog implements Structure {
     private readonly options: StructureOptions,
     private readonly constants: StructureConstants,
   ) {
-    assertSpace("hyperLogLog", options.spaceBits, LOGLOG_REGISTER_BITS * MIN_HLL_REGISTERS);
-    this.b = Math.floor(Math.log2(options.spaceBits / LOGLOG_REGISTER_BITS));
+    this.registerBits = options.enchantment === LIGHT ? constants.lightRegisterBits : LOGLOG_REGISTER_BITS;
+    this.maxRank = 2 ** this.registerBits - 1;
+    assertSpace("hyperLogLog", options.spaceBits, this.registerBits * MIN_HLL_REGISTERS);
+    this.b = Math.floor(Math.log2(options.spaceBits / this.registerBits));
     this.m = 2 ** this.b;
     this.seed = options.hashSeed ?? DEFAULT_HASH_SEED;
     this.registers = new Uint8Array(this.m);
@@ -60,7 +66,7 @@ export class HyperLogLog implements Structure {
   }
 
   spaceBits(): number {
-    return LOGLOG_REGISTER_BITS * this.m;
+    return this.registerBits * this.m;
   }
 
   /** Relative standard error predicted by theory. */
@@ -94,8 +100,24 @@ export class HyperLogLog implements Structure {
     const h = murmur3U32(event.value, this.seed);
     const idx = h >>> (32 - this.b);
     const rest = (h << this.b) >>> 0;
-    const rank = Math.min(MAX_REGISTER, rest === 0 ? 33 - this.b : Math.clz32(rest) + 1);
+    const rank = Math.min(this.maxRank, rest === 0 ? 33 - this.b : Math.clz32(rest) + 1);
     if (rank > (this.registers[idx] ?? 0)) this.registers[idx] = rank;
+  }
+
+  /**
+   * How much the registers that have stopped can hide from the upper bound: S / (S - stopped x 2^-max), where S is the
+   * harmonic sum. 1 when none has stopped or the registers are not narrowed, infinite when every register has.
+   */
+  private get stoppedFactor(): number {
+    if (this.registerBits >= LOGLOG_REGISTER_BITS) return 1;
+    let sum = 0;
+    let stopped = 0;
+    for (const r of this.registers) {
+      sum += 2 ** -r;
+      if (r === this.maxRank) stopped++;
+    }
+    const left = sum - stopped * 2 ** -this.maxRank;
+    return stopped === 0 ? 1 : left <= 1e-12 ? Number.POSITIVE_INFINITY : sum / left;
   }
 
   /** The harmonic-mean estimate, which is only sound once the stream is a few times larger than the register count. */
@@ -132,7 +154,9 @@ export class HyperLogLog implements Structure {
     if (est === 0) return { estimate: 0, low: 0, high: 0 };
     const relative = this.usesEmptyCount ? this.emptyCountError(est) : this.standardError;
     const half = zForConfidence(confidence) * relative * est;
-    return { estimate: est, low: Math.max(0, est - half), high: est + half };
+    // Stopped registers only matter to the harmonic mean; counting empty registers is unaffected.
+    const widen = this.usesEmptyCount ? 1 : this.stoppedFactor;
+    return { estimate: est, low: Math.max(0, est - half), high: widen === Number.POSITIVE_INFINITY ? widen : (est + half) * widen };
   }
 
   query(challenge: Challenge): Answer | null {
