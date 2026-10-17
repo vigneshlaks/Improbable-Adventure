@@ -125,6 +125,6 @@ describe("a whole act on the real content", () => {
     expect(fused).toBe(true);
     expect(run.owned).toContain("hyperLogLog");
     expect(run.certainty).toBeGreaterThan(0);
-    expect(turnsTaken(run)).toBeGreaterThanOrEqual(7 * 3); // at least a stream turn and two more per fight
+    expect(turnsTaken(run)).toBeGreaterThanOrEqual(7 * 2); // at least a stream turn and a strike turn in every fight
   });
 });

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { balance } from "@pda/content";
 import { burstSize, resolveStreamParams, type Action, type GroundTruth } from "@pda/engine";
 import { getBot } from "./bots";
 import type { Bot } from "./bots/types";
@@ -20,7 +21,7 @@ describe("playFight", () => {
     const futile = scripted("futile", () => (view) => (view.observation.phase === "deploy" ? { type: "endDeploy" } : { type: "strikeValue", value: 1 }));
     const record = playFight({ config: minion("futile", "frequency"), seed: "futile", bot: futile });
     // Minion: attack 3 for 8 turns, 7 blocked strikes at 3 each (turns 2 to 8), and the turn-limit penalty of 20.
-    expect(record).toMatchObject({ outcome: "lost", reason: "turnLimit", turns: 8, certaintyLeft: 100 - 24 - 21 - 20 });
+    expect(record).toMatchObject({ outcome: "lost", reason: "turnLimit", turns: 8, certaintyLeft: balance.STARTING_CERTAINTY - 24 - 21 - 20 });
     expect(record.certaintyLost).toEqual({ blocked: 21, decoys: 0, misses: 0, attacks: 24, turnLimit: 20 });
     expect(record.strikes).toEqual({ total: 7, wrong: 7 });
   });

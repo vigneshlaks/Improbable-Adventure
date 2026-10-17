@@ -37,7 +37,7 @@ describe("buildFightConfig", () => {
 
   it("starts a fight the engine accepts, with the spec's starting resources", () => {
     const state = createFight("start", buildFightConfig({ seed: "start", tier: "minion" }));
-    expect(state).toMatchObject({ turn: 1, phase: "deploy", certainty: 100, enemyHp: balance.TIERS.minion.hp });
+    expect(state).toMatchObject({ turn: 1, phase: "deploy", certainty: balance.STARTING_CERTAINTY, enemyHp: balance.TIERS.minion.hp });
     expect(state.slots).toHaveLength(3);
   });
 

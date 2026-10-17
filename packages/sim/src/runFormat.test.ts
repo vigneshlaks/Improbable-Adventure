@@ -27,7 +27,7 @@ describe("formatRunReport", () => {
 
   it("gives the win rate of the fights of each tier, in act order", () => {
     expect(text).toMatch(/minion +17 of 18 +94\.4%/);
-    expect(text).toMatch(/elite +2 of 3 +66\.7%/);
+    expect(text).toMatch(/elite +2 of 3 +66\.7% +1 to the turn limit/);
     expect(text).toMatch(/boss +2 of 2 +100\.0%/);
     expect(text.indexOf("minion")).toBeLessThan(text.indexOf("boss"));
   });

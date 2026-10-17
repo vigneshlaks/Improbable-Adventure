@@ -72,6 +72,14 @@ describe("playRun", () => {
     expect(lost!.certaintyLeft).toBe(0);
   });
 
+  it("records why a fight was lost: the turn limit or Certainty", () => {
+    const records = ["x1", "x2", "x3", "x4", "x5", "x6", "x7", "x8"].map((seed) => play("random", seed));
+    const lostFights = records.flatMap((record) => record.fights.filter((fight) => fight.outcome === "lost"));
+    expect(lostFights.length).toBeGreaterThan(0);
+    for (const fight of lostFights) expect(["turnLimit", "certainty"]).toContain(fight.reason);
+    for (const fight of records.flatMap((record) => record.fights.filter((f) => f.outcome === "won"))) expect(fight.reason).toBeNull();
+  });
+
   it("calls a run that never finishes stalled", () => {
     expect(play("greedy", "slow", 25)).toMatchObject({ outcome: "stalled" });
   });

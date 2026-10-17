@@ -28,7 +28,7 @@ export function formatRunReport(report: RunReport, checks: TargetCheck[]): strin
       .sort((a, b) => TIER_ORDER.indexOf(a) - TIER_ORDER.indexOf(b))
       .map((tier) => {
         const entry = report.fights[tier]!;
-        return row(tier, `${entry.won} of ${entry.played}`, percent(entry.winRate));
+        return row(tier, `${entry.won} of ${entry.played}`, percent(entry.winRate)) + (entry.lostToTurnLimit > 0 ? `   ${entry.lostToTurnLimit} to the turn limit` : "");
       }),
     "",
   ];

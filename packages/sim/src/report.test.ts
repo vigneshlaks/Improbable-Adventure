@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildFightConfig } from "@pda/content";
+import { balance, buildFightConfig } from "@pda/content";
 import { STRUCTURE_KINDS } from "@pda/engine";
 import { getBot } from "./bots";
 import { runFights, summarize } from "./report";
@@ -73,8 +73,9 @@ describe("runFights", () => {
   it("plays the requested number of fights and reports them", () => {
     const report = runFights(options);
     expect(report).toMatchObject({ bot: "oracle", tier: "minion", loadout: "starting", seedBase: 1, fights: 12, winRate: 1 });
-    expect(report.meanTurns).toBe(3);
-    expect(report.meanCertaintyLeft).toBe(94);
+    // One perfect strike ends a Minion (HP 20) on turn 2, after a single enemy attack at the end of turn 1.
+    expect(report.meanTurns).toBe(2);
+    expect(report.meanCertaintyLeft).toBe(balance.STARTING_CERTAINTY - balance.TIERS.minion.attack);
     expect(report.structures).toEqual({});
   });
 

@@ -22,6 +22,8 @@ export interface RunFightRecord {
   /** "stalled" is only possible for the fight in progress when the run hit its step limit. */
   outcome: "won" | "lost" | "stalled";
   turns: number;
+  /** Why the fight was lost, or null if it was not lost. */
+  reason: "turnLimit" | "certainty" | null;
 }
 
 export interface RunRecord {
@@ -125,7 +127,7 @@ export function playRun({ config, seed, bot, maxSteps = DEFAULT_MAX_STEPS }: Pla
   for (const event of events) {
     switch (event.type) {
       case "fightStarted":
-        record.fights.push({ tier: event.tier, outcome: "stalled", turns: 0 });
+        record.fights.push({ tier: event.tier, outcome: "stalled", turns: 0, reason: null });
         break;
       case "fightWon": {
         const fight = record.fights.at(-1) as RunFightRecord;
@@ -138,6 +140,7 @@ export function playRun({ config, seed, bot, maxSteps = DEFAULT_MAX_STEPS }: Pla
         const fight = record.fights.at(-1) as RunFightRecord;
         fight.outcome = "lost";
         fight.turns = event.turn;
+        fight.reason = event.reason;
         break;
       }
       case "structureDeployed":

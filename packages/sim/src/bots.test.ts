@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { preferredKinds } from "./bots/common";
 import { eachCase } from "../../engine/src/testCases";
-import { buildFightConfig, type TierName } from "@pda/content";
+import { balance, buildFightConfig, type TierName } from "@pda/content";
 import {
   createFight,
   observe,
@@ -100,11 +100,11 @@ describe("choosing structures", () => {
 });
 
 describe("Oracle", () => {
-  it("wins a Minion fight on turn 3 without losing Certainty to its own strikes", () => {
+  it("wins a Minion fight on turn 2 without losing Certainty to its own strikes", () => {
     for (const weakPoint of WEAK_POINTS) {
       for (let i = 0; i < 5; i++) {
         const record = playFight({ config: minion(`oracle-${i}`, weakPoint), seed: `oracle-${i}`, bot: getBot("oracle") });
-        expect(record).toMatchObject({ outcome: "won", turns: 3, certaintyLeft: 94 });
+        expect(record).toMatchObject({ outcome: "won", turns: 2, certaintyLeft: balance.STARTING_CERTAINTY - balance.TIERS.minion.attack });
         expect(record.certaintyLost).toMatchObject({ blocked: 0, decoys: 0, misses: 0 });
         expect(record.deployed).toEqual([]);
       }

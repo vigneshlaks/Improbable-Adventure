@@ -1,6 +1,6 @@
 import type { RunFightRecord, RunRecord } from "./runRunner";
 
-const fight = (tier: string, outcome: RunFightRecord["outcome"] = "won", turns = 3): RunFightRecord => ({ tier, outcome, turns });
+const fight = (tier: string, outcome: RunFightRecord["outcome"] = "won", turns = 3, reason: RunFightRecord["reason"] = null): RunFightRecord => ({ tier, outcome, turns, reason });
 const minions = (n: number) => Array.from({ length: n }, () => fight("minion"));
 
 const run = (overrides: Partial<RunRecord>): RunRecord => ({
@@ -30,7 +30,7 @@ export const RUNS: RunRecord[] = [
     outcome: "lost",
     encounterReached: 2,
     fightsWon: 2,
-    fights: [fight("minion"), fight("minion"), fight("minion", "lost")],
+    fights: [fight("minion"), fight("minion"), fight("minion", "lost", 3, "certainty")],
     turns: 9,
     certaintyLeft: 0,
     opener: "exactMemory",
@@ -42,7 +42,7 @@ export const RUNS: RunRecord[] = [
     outcome: "lost",
     encounterReached: 5,
     fightsWon: 5,
-    fights: [...minions(5), fight("elite", "lost")],
+    fights: [...minions(5), fight("elite", "lost", 10, "turnLimit")],
     turns: 18,
     certaintyLeft: 0,
     fused: ["hyperLogLog"], // it fused and then lost the Elite, so fusing shows in the lost runs too

@@ -22,9 +22,14 @@ describe("summarizeRuns", () => {
   });
 
   it("gives the win rate of the fights of each tier", () => {
-    expect(report.fights.minion).toEqual({ played: 18, won: 17, winRate: 17 / 18 });
-    expect(report.fights.elite).toEqual({ played: 3, won: 2, winRate: 2 / 3 });
-    expect(report.fights.boss).toEqual({ played: 2, won: 2, winRate: 1 });
+    expect(report.fights.minion).toEqual({ played: 18, won: 17, winRate: 17 / 18, lostToTurnLimit: 0 });
+    expect(report.fights.elite).toEqual({ played: 3, won: 2, winRate: 2 / 3, lostToTurnLimit: 1 });
+    expect(report.fights.boss).toEqual({ played: 2, won: 2, winRate: 1, lostToTurnLimit: 0 });
+  });
+
+  it("counts the fights lost to the turn limit, which are the ones lost without running out of Certainty", () => {
+    expect(report.fights.minion?.lostToTurnLimit).toBe(0); // the one Minion fight lost ran out of Certainty
+    expect(report.fights.elite?.lostToTurnLimit).toBe(1);
   });
 
   it("averages the turns and the Certainty left over the won runs only", () => {
@@ -55,10 +60,10 @@ describe("summarizeRuns", () => {
   });
 
   it("leaves a fight that never finished out of the tier win rates, and counts a run that stalled", () => {
-    const stalled = { ...RUNS[1]!, outcome: "stalled" as const, fights: [...RUNS[1]!.fights.slice(0, 2), { tier: "minion", outcome: "stalled" as const, turns: 0 }] };
+    const stalled = { ...RUNS[1]!, outcome: "stalled" as const, fights: [...RUNS[1]!.fights.slice(0, 2), { tier: "minion", outcome: "stalled" as const, turns: 0, reason: null }] };
     const report = summarizeRuns([stalled], RUN_META);
     expect(report.outcomes).toEqual({ won: 0, lost: 0, stalled: 1 });
-    expect(report.fights.minion).toEqual({ played: 2, won: 2, winRate: 1 });
+    expect(report.fights.minion).toEqual({ played: 2, won: 2, winRate: 1, lostToTurnLimit: 0 });
   });
 
   it("handles a batch with no won runs", () => {
@@ -75,11 +80,18 @@ describe("summarizeRuns", () => {
 
 describe("checkTargets", () => {
   /** A report with the given win rate and wrong-strike share, and winning runs that use these structures and openers. */
-  const reportFor = (bot: string, winRate: number, wrongShare = 0.2, structures: RunReport["inWinningRuns"]["structures"] = {}, openers: RunReport["inWinningRuns"]["openers"] = { bloomFilter: 0.3, exactMemory: 0.3, linearCounting: 0.4 }): RunReport => ({
+  const reportFor = (
+    bot: string,
+    winRate: number,
+    wrongShare = 0.2,
+    structures: RunReport["inWinningRuns"]["structures"] = {},
+    openers: RunReport["inWinningRuns"]["openers"] = { bloomFilter: 0.3, exactMemory: 0.3, linearCounting: 0.4 },
+    wonRuns = 10,
+  ): RunReport => ({
     ...summarizeRuns(RUNS, { bot, seedBase: 1 }),
     winRate,
     strikes: { meanPerRun: 20, wrongShare },
-    inWinningRuns: { runs: 10, structures, openers, fusedShare: 0 },
+    inWinningRuns: { runs: wonRuns, structures, openers, fusedShare: 0 },
   });
   const all = { exactMemory: 0.5, reservoirSampling: 0.5, bloomFilter: 0.5, countMinSketch: 0.5, logLog: 0.5, linearCounting: 0.5 };
   const by = (checks: ReturnType<typeof checkTargets>, id: string) => checks.find((check) => check.id === id);
@@ -95,14 +107,35 @@ describe("checkTargets", () => {
 
   it("only checks the bots it was given", () => {
     expect(checkTargets([reportFor("greedy", 0.6)]).map((check) => check.id)).not.toContain("random-win-rate");
+    // With no Greedy-family bot at all there is nothing to say about openers or structure use.
+    expect(checkTargets([reportFor("oracle", 1)]).map((check) => check.id)).toEqual(["oracle-win-rate"]);
   });
 
-  it("checks that no opener is used in more than 40 percent of a Greedy-family bot's winning runs", () => {
-    const over = by(checkTargets([reportFor("greedy", 0.6, 0.2, all, { bloomFilter: 0.4, exactMemory: 0.6 })]), "greedy-opener");
-    expect(over?.ok).toBe(false); // 0.6 is over the limit
-    expect(over?.detail).toMatch(/exactMemory/);
-    expect(by(checkTargets([reportFor("greedy", 0.6, 0.2, all, { bloomFilter: 0.4, exactMemory: 0.3, linearCounting: 0.3 })]), "greedy-opener")?.ok).toBe(true);
-    expect(by(checkTargets([reportFor("prober", 0.6, 0.2, all, { reservoirSampling: 1 })]), "prober-opener")?.ok).toBe(false);
+  it("checks that no opener is used in more than 40 percent of the winning runs of the Greedy family, pooled over the bots given", () => {
+    // Prober always opens with Reservoir Sampling, so that is only a problem if it is most of what the family does.
+    const greedy = reportFor("greedy", 0.6, 0.2, all, { bloomFilter: 0.5, exactMemory: 0.5 }, 10);
+    const prober = reportFor("prober", 0.4, 0.2, all, { reservoirSampling: 1 }, 10);
+    const cautious = reportFor("cautious", 0.2, 0.2, all, { linearCounting: 1 }, 10);
+    const pooled = by(checkTargets([greedy, prober, cautious]), "family-opener");
+    expect(pooled?.ok).toBe(true); // 5 + 5 of 30 for Bloom and Exact Memory, 10 of 30 for Reservoir and for Linear Counting: 33 percent at most
+
+    const lopsided = by(checkTargets([reportFor("greedy", 0.6, 0.2, all, { bloomFilter: 1 }, 10), prober]), "family-opener");
+    expect(lopsided?.ok).toBe(false); // Bloom is 10 of 20
+    expect(lopsided?.detail).toMatch(/bloomFilter 50\.0%/);
+    expect(checkTargets([reportFor("greedy", 0.6, 0.2, all, { bloomFilter: 0.4, exactMemory: 0.6 }, 10)]).find((c) => c.id === "family-opener")?.ok).toBe(false);
+    expect(checkTargets([reportFor("greedy", 0.6, 0.2, all, { bloomFilter: 0.4, exactMemory: 0.3, linearCounting: 0.3 }, 10)]).find((c) => c.id === "family-opener")?.ok).toBe(true); // 40 percent is allowed
+  });
+
+  it("weights each bot by how many winning runs it had", () => {
+    const many = reportFor("greedy", 0.6, 0.2, all, { bloomFilter: 1 }, 90);
+    const few = reportFor("prober", 0.4, 0.2, all, { reservoirSampling: 1 }, 10);
+    expect(by(checkTargets([many, few]), "family-opener")?.detail).toMatch(/bloomFilter 90\.0%/);
+  });
+
+  it("ignores the Oracle and Random when pooling, since they do not choose openers like a player", () => {
+    const oracle = reportFor("oracle", 1, 0, { bloomFilter: 1 }, { bloomFilter: 1 }, 100); // were it pooled, Bloom would open 103 of 110 runs
+    const greedy = reportFor("greedy", 0.6, 0.2, all, { bloomFilter: 0.3, exactMemory: 0.3, linearCounting: 0.4 }, 10);
+    expect(by(checkTargets([greedy, oracle]), "family-opener")?.ok).toBe(true);
   });
 
   it("includes both ends of the wrong-strike range", () => {
@@ -116,19 +149,34 @@ describe("checkTargets", () => {
     expect(by(checkTargets([reportFor("greedy", 0.6, 0.31)]), "greedy-wrong-strikes")?.ok).toBe(false);
   });
 
-  it("checks that every MVP structure appears in at least 15 percent of Greedy's winning runs, naming the ones that do not", () => {
-    expect(by(checkTargets([reportFor("greedy", 0.6, 0.2, all)]), "greedy-structures")?.ok).toBe(true);
-    const missing = by(checkTargets([reportFor("greedy", 0.6, 0.2, { ...all, logLog: 0.14, countMinSketch: 0 })]), "greedy-structures");
+  it("checks that every MVP structure appears in at least 15 percent of the winning runs of the Greedy family, naming the ones that do not", () => {
+    expect(by(checkTargets([reportFor("greedy", 0.6, 0.2, all)]), "family-structures")?.ok).toBe(true);
+    const missing = by(checkTargets([reportFor("greedy", 0.6, 0.2, { ...all, logLog: 0.14, countMinSketch: 0 })]), "family-structures");
     expect(missing?.ok).toBe(false);
     expect(missing?.detail).toMatch(/logLog/);
     expect(missing?.detail).toMatch(/countMinSketch/);
   });
 
+  it("allows a structure to be in exactly 15 percent of the winning runs", () => {
+    const edge = { exactMemory: 0.15, reservoirSampling: 0.15, bloomFilter: 0.15, countMinSketch: 0.15, logLog: 0.15, linearCounting: 0.15 };
+    expect(by(checkTargets([reportFor("greedy", 0.6, 0.2, edge)]), "family-structures")?.ok).toBe(true);
+    expect(by(checkTargets([reportFor("greedy", 0.6, 0.2, { ...edge, logLog: 0.149 })]), "family-structures")?.ok).toBe(false);
+  });
+
+  it("counts a structure used by any bot of the family: Greedy never deploys Reservoir Sampling, but the Prober always does", () => {
+    const { reservoirSampling: _unused, ...withoutReservoir } = all;
+    void _unused;
+    const greedy = reportFor("greedy", 0.6, 0.2, withoutReservoir, { bloomFilter: 1 }, 10);
+    expect(by(checkTargets([greedy]), "family-structures")?.ok).toBe(false);
+    const prober = reportFor("prober", 0.4, 0.2, { reservoirSampling: 1 }, { reservoirSampling: 1 }, 10);
+    expect(by(checkTargets([greedy, prober]), "family-structures")?.ok).toBe(true); // Reservoir: 10 of 20
+  });
+
   it("fails the checks that need winning runs when there are none, and says why", () => {
     const none: RunReport = { ...reportFor("greedy", 0), inWinningRuns: { runs: 0, structures: {}, openers: {}, fusedShare: 0 } };
     const checks = checkTargets([none]);
-    expect(by(checks, "greedy-opener")).toMatchObject({ ok: false, detail: expect.stringMatching(/no winning runs/i) });
-    expect(by(checks, "greedy-structures")).toMatchObject({ ok: false, detail: expect.stringMatching(/no winning runs/i) });
+    expect(by(checks, "family-opener")).toMatchObject({ ok: false, detail: expect.stringMatching(/no winning runs/i) });
+    expect(by(checks, "family-structures")).toMatchObject({ ok: false, detail: expect.stringMatching(/no winning runs/i) });
   });
 });
 
@@ -140,6 +188,15 @@ describe("runBatch", () => {
     expect(report.fights.boss?.played).toBe(3);
     expect(runBatch(options)).toEqual(report);
     expect(runBatch({ ...options, seedBase: 50 })).not.toEqual(report);
+  });
+
+  it("keeps the act winnable and not trivial (measured over 300 runs: Greedy 48 percent, Random 0.3, Oracle 100)", () => {
+    // These are floors and ceilings well away from the measured numbers, to catch a regression such as the 1.3 percent
+    // Greedy won before the Elite and Boss were retuned. The spec's target for Greedy is 55 to 70 percent; see the notes.
+    const rate = (botName: string) => runBatch({ botName, n: 60, seedBase: 1 }).winRate;
+    expect(rate("oracle")).toBeGreaterThan(0.95);
+    expect(rate("greedy")).toBeGreaterThan(0.3);
+    expect(rate("random")).toBeLessThan(0.05);
   });
 
   it("rejects a bad count", () => {

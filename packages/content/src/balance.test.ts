@@ -29,7 +29,7 @@ describe("balance.json", () => {
       COUNT_TOL: 0.25,
       RANK_TOL: 0.1,
       STARTING_SPACE: 8192,
-      STARTING_CERTAINTY: 100,
+      STARTING_CERTAINTY: 150,
       STARTING_SLOTS: 3,
       REST_HEAL: 30,
       REWARD_CHOICES: 3,

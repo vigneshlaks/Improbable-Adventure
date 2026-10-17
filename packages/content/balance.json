@@ -7,7 +7,7 @@
   "HLL_SMALL_RANGE": 2.8,
 
   "STARTING_SPACE": 8192,
-  "STARTING_CERTAINTY": 100,
+  "STARTING_CERTAINTY": 150,
   "STARTING_SLOTS": 3,
   "STARTING_LOADOUT": ["exactMemory", "reservoirSampling", "bloomFilter", "linearCounting"],
   "REST_HEAL": 30,
@@ -37,7 +37,7 @@
   "TIERS": {
     "minion": {
       "size": 1000,
-      "hp": 40,
+      "hp": 20,
       "attack": 3,
       "turnLimit": 8,
       "traitCount": { "min": 1, "max": 2 },
@@ -46,7 +46,7 @@
     },
     "elite": {
       "size": 4000,
-      "hp": 90,
+      "hp": 30,
       "attack": 6,
       "turnLimit": 10,
       "traitCount": { "min": 3, "max": 3 },
@@ -55,7 +55,7 @@
     },
     "boss": {
       "size": 12000,
-      "hp": 200,
+      "hp": 50,
       "attack": 9,
       "turnLimit": 12,
       "traitCount": { "min": 4, "max": 4 },

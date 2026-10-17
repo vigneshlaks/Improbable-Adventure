@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { balance } from "@pda/content";
 import { createSession, type Session } from "./session";
 
 const start = (overrides: Partial<Parameters<typeof createSession>[0]> = {}): Session =>
@@ -12,7 +13,7 @@ describe("opening", () => {
     expect(opening).toMatch(/A minion approaches/);
     expect(opening).toMatch(/Type "help"/);
     expect(opening).toMatch(/Turn 1, deploy phase/);
-    expect(opening).toMatch(/Certainty: 100/);
+    expect(opening).toMatch(new RegExp(`Certainty: ${balance.STARTING_CERTAINTY}`));
   });
 });
 
@@ -159,7 +160,7 @@ describe("prompt", () => {
     const prompt = start().prompt();
     expect(prompt).toMatch(/turn 1/i);
     expect(prompt).toMatch(/deploy/i);
-    expect(prompt).toMatch(/Certainty 100/);
+    expect(prompt).toMatch(new RegExp(`Certainty ${balance.STARTING_CERTAINTY}`));
     expect(prompt).toMatch(/8192 bits/);
     expect(prompt.endsWith("> ")).toBe(true);
   });

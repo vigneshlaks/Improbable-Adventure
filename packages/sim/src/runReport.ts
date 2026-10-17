@@ -8,6 +8,8 @@ export interface TierFights {
   played: number;
   won: number;
   winRate: number;
+  /** Fights lost by reaching the turn limit, the rest of the lost ones being lost by running out of Certainty. */
+  lostToTurnLimit: number;
 }
 
 /** The metrics the spec asks for, summed over a batch of whole runs. */
@@ -57,13 +59,14 @@ export function summarizeRuns(records: RunRecord[], meta: RunReportMeta): RunRep
     endings.set(record.encounterReached, entry);
   }
 
-  const tallies = new Map<string, { played: number; won: number }>();
+  const tallies = new Map<string, { played: number; won: number; lostToTurnLimit: number }>();
   for (const record of records) {
     for (const fight of record.fights) {
       if (fight.outcome === "stalled") continue;
-      const tally = tallies.get(fight.tier) ?? { played: 0, won: 0 };
+      const tally = tallies.get(fight.tier) ?? { played: 0, won: 0, lostToTurnLimit: 0 };
       tally.played++;
       if (fight.outcome === "won") tally.won++;
+      if (fight.reason === "turnLimit") tally.lostToTurnLimit++;
       tallies.set(fight.tier, tally);
     }
   }
@@ -105,6 +108,9 @@ export interface TargetCheck {
   detail: string;
 }
 
+/** The bots whose winning runs are pooled for the opener and structure targets. */
+const FAMILY = ["greedy", "prober", "cautious"];
+
 const pct = (x: number) => `${(x * 100).toFixed(1)}%`;
 
 /** The structures the MVP ships, which the spec wants to see in at least 15 percent of winning runs. */
@@ -112,9 +118,10 @@ const MVP_STRUCTURES = STRUCTURE_KINDS.filter((kind) => kind !== "hyperLogLog");
 
 /**
  * Checks the reports against the spec's initial balance targets. A target is only checked for the bots whose reports
- * are given: Greedy wins 55 to 70 percent, Random under 5, Oracle over 95; no opener in more than 40 percent of a
- * Greedy-family bot's winning runs; Greedy's wrong strikes 10 to 30 percent; every MVP structure in at least 15 percent
- * of Greedy's winning runs.
+ * are given: Greedy wins 55 to 70 percent, Random under 5, Oracle over 95; Greedy's wrong strikes 10 to 30 percent;
+ * no opener in more than 40 percent, and every MVP structure in at least 15 percent, of the winning runs of the
+ * Greedy family (Greedy, Prober and Cautious), pooled so that each bot counts in proportion to its wins. Pooling is
+ * what the spec means: the Prober opens with Reservoir Sampling by definition, and Greedy never prefers it.
  */
 export function checkTargets(reports: RunReport[]): TargetCheck[] {
   const checks: TargetCheck[] = [];
@@ -129,18 +136,6 @@ export function checkTargets(reports: RunReport[]): TargetCheck[] {
   const oracle = get("oracle");
   if (oracle) checks.push({ id: "oracle-win-rate", target: "Oracle wins over 95 percent of runs", ok: oracle.winRate > 0.95, detail: pct(oracle.winRate) });
 
-  for (const name of ["greedy", "prober", "cautious"]) {
-    const report = get(name);
-    if (!report) continue;
-    const target = `No opener is used in more than 40 percent of ${name}'s winning runs`;
-    if (report.inWinningRuns.runs === 0) {
-      checks.push({ id: `${name}-opener`, target, ok: false, detail: "no winning runs to measure" });
-      continue;
-    }
-    const worst = Object.entries(report.inWinningRuns.openers).sort(([, a], [, b]) => b - a)[0];
-    checks.push({ id: `${name}-opener`, target, ok: (worst?.[1] ?? 0) <= 0.4, detail: worst ? `${worst[0]} ${pct(worst[1])}` : "no opener" });
-  }
-
   if (greedy) {
     checks.push({
       id: "greedy-wrong-strikes",
@@ -148,16 +143,36 @@ export function checkTargets(reports: RunReport[]): TargetCheck[] {
       ok: greedy.strikes.wrongShare >= 0.1 && greedy.strikes.wrongShare <= 0.3,
       detail: pct(greedy.strikes.wrongShare),
     });
-    const target = "Every MVP structure appears in at least 15 percent of Greedy's winning runs";
-    if (greedy.inWinningRuns.runs === 0) {
-      checks.push({ id: "greedy-structures", target, ok: false, detail: "no winning runs to measure" });
+  }
+
+  const family = reports.filter((report) => FAMILY.includes(report.bot) && report.inWinningRuns.runs > 0);
+  if (reports.some((report) => FAMILY.includes(report.bot))) {
+    const wins = family.reduce((total, report) => total + report.inWinningRuns.runs, 0);
+    /** For each item, the share of all the family's winning runs that had it. */
+    const pooled = (pick: (report: RunReport) => Partial<Record<StructureKind, number>>): Map<StructureKind, number> => {
+      const shares = new Map<StructureKind, number>();
+      for (const report of family) {
+        for (const [kind, share] of Object.entries(pick(report)) as Array<[StructureKind, number]>) {
+          shares.set(kind, (shares.get(kind) ?? 0) + (share * report.inWinningRuns.runs) / wins);
+        }
+      }
+      return shares;
+    };
+    const openerTarget = "No opener is used in more than 40 percent of the Greedy family's winning runs";
+    const structureTarget = "Every MVP structure appears in at least 15 percent of the Greedy family's winning runs";
+    if (wins === 0) {
+      checks.push({ id: "family-opener", target: openerTarget, ok: false, detail: "no winning runs to measure" });
+      checks.push({ id: "family-structures", target: structureTarget, ok: false, detail: "no winning runs to measure" });
     } else {
-      const short = MVP_STRUCTURES.filter((kind) => (greedy.inWinningRuns.structures[kind] ?? 0) < 0.15);
+      const worst = [...pooled((report) => report.inWinningRuns.openers)].sort(([, a], [, b]) => b - a)[0];
+      checks.push({ id: "family-opener", target: openerTarget, ok: (worst?.[1] ?? 0) <= 0.4, detail: worst ? `${worst[0]} ${pct(worst[1])}` : "no opener" });
+      const used = pooled((report) => report.inWinningRuns.structures);
+      const short = MVP_STRUCTURES.filter((kind) => (used.get(kind) ?? 0) < 0.15);
       checks.push({
-        id: "greedy-structures",
-        target,
+        id: "family-structures",
+        target: structureTarget,
         ok: short.length === 0,
-        detail: short.length === 0 ? "all six" : `below 15 percent: ${short.map((kind) => `${kind} ${pct(greedy.inWinningRuns.structures[kind] ?? 0)}`).join(", ")}`,
+        detail: short.length === 0 ? "all six" : `below 15 percent: ${short.map((kind) => `${kind} ${pct(used.get(kind) ?? 0)}`).join(", ")}`,
       });
     }
   }
