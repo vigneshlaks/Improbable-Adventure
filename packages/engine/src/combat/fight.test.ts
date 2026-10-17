@@ -101,59 +101,62 @@ describe("enchantments in a fight", () => {
   const enchanted: FightConfig = { ...CONFIG, loadout: ["bloomFilter", "exactMemory"], enchantments: { bloomFilter: "seeded" } };
   const hashSeedOf = (state: FightState, slot: number) => state.slots[slot]?.hashSeed;
 
-  it("builds a Seeded structure with a hash seed of its own, and leaves other structures on the public seed", () => {
-    let state = createFight("seeded", enchanted);
-    state = step(state, bloom(0)).state;
-    state = step(state, { type: "deploy", slot: 1, kind: "exactMemory", spaceBits: 1024 }).state;
-    expect(hashSeedOf(state, 0)).toBeTypeOf("number");
-    expect(state.slots[0]).toMatchObject({ kind: "bloomFilter", enchantment: "seeded" });
-    expect(state.slots[1]?.enchantment).toBeUndefined();
-    expect(hashSeedOf(state, 1)).toBeUndefined(); // Exact Memory is not enchanted and keeps the default
-  });
-
-  it("gives a different seed to each deployment, the same seed to the same deployment in the same fight, and another fight another seed", () => {
-    const seeds = (fightSeed: string) => {
-      let state = createFight(fightSeed, enchanted);
+  it("builds a Seeded structure with a hash seed of its own, and leaves other structures on the public seed; gives a different seed to each deployment, the same seed to the same deployment in the same fight, and another fight another seed; draws the seed from a stream of its own, so it never shifts the choices a sampling structure makes; and 2 more", () => {
+    // builds a Seeded structure with a hash seed of its own, and leaves other structures on the public seed
+    {
+      let state = createFight("seeded", enchanted);
       state = step(state, bloom(0)).state;
-      state = step(state, bloom(1)).state;
-      return [hashSeedOf(state, 0), hashSeedOf(state, 1)];
-    };
-    const [a, b] = seeds("fight-a");
-    expect(a).not.toBe(b);
-    expect(seeds("fight-a")).toEqual([a, b]);
-    expect(seeds("fight-b")).not.toEqual([a, b]);
-  });
+      state = step(state, { type: "deploy", slot: 1, kind: "exactMemory", spaceBits: 1024 }).state;
+      expect(hashSeedOf(state, 0)).toBeTypeOf("number");
+      expect(state.slots[0]).toMatchObject({ kind: "bloomFilter", enchantment: "seeded" });
+      expect(state.slots[1]?.enchantment).toBeUndefined();
+      expect(hashSeedOf(state, 1)).toBeUndefined(); // Exact Memory is not enchanted and keeps the default
+    }
+    // gives a different seed to each deployment, the same seed to the same deployment in the same fight, and another fight another seed
+    {
+      const seeds = (fightSeed: string) => {
+        let state = createFight(fightSeed, enchanted);
+        state = step(state, bloom(0)).state;
+        state = step(state, bloom(1)).state;
+        return [hashSeedOf(state, 0), hashSeedOf(state, 1)];
+      };
+      const [a, b] = seeds("fight-a");
+      expect(a).not.toBe(b);
+      expect(seeds("fight-a")).toEqual([a, b]);
+      expect(seeds("fight-b")).not.toEqual([a, b]);
+    }
+    // draws the seed from a stream of its own, so it never shifts the choices a sampling structure makes
+    {
+      const sampleAfter = (config: FightConfig) => {
+        let state = createFight("stream", config);
+        state = step(state, { type: "deploy", slot: 0, kind: "reservoirSampling", spaceBits: 32 * 20 }).state;
+        state = step(state, endDeploy).state;
+        return state.slots[0]?.state.sample;
+      };
+      const plain: FightConfig = { ...CONFIG, loadout: ["reservoirSampling"] };
+      expect(sampleAfter({ ...plain, enchantments: { reservoirSampling: "seeded" } })).toEqual(sampleAfter(plain));
+    }
+    // does not touch an unenchanted structure, and the enchantment shows to the player
+    {
+      let state = createFight("plain", { ...CONFIG, loadout: ["bloomFilter"] });
+      state = step(state, bloom(0)).state;
+      expect(hashSeedOf(state, 0)).toBeUndefined();
+      expect(observe(state).structures[0]?.enchantment).toBeUndefined();
 
-  it("draws the seed from a stream of its own, so it never shifts the choices a sampling structure makes", () => {
-    const sampleAfter = (config: FightConfig) => {
-      let state = createFight("stream", config);
-      state = step(state, { type: "deploy", slot: 0, kind: "reservoirSampling", spaceBits: 32 * 20 }).state;
-      state = step(state, endDeploy).state;
-      return state.slots[0]?.state.sample;
-    };
-    const plain: FightConfig = { ...CONFIG, loadout: ["reservoirSampling"] };
-    expect(sampleAfter({ ...plain, enchantments: { reservoirSampling: "seeded" } })).toEqual(sampleAfter(plain));
-  });
-
-  it("does not touch an unenchanted structure, and the enchantment shows to the player", () => {
-    let state = createFight("plain", { ...CONFIG, loadout: ["bloomFilter"] });
-    state = step(state, bloom(0)).state;
-    expect(hashSeedOf(state, 0)).toBeUndefined();
-    expect(observe(state).structures[0]?.enchantment).toBeUndefined();
-
-    let fancy = createFight("fancy", enchanted);
-    fancy = step(fancy, bloom(0)).state;
-    expect(observe(fancy).structures[0]?.enchantment).toBe("seeded");
-  });
-
-  it("survives a snapshot round trip: the structure comes back with its seed and its enchantment", () => {
-    let state = createFight("round", enchanted);
-    state = step(state, bloom(0)).state;
-    const revived = JSON.parse(JSON.stringify(state)) as FightState;
-    expect(revived).toEqual(state);
-    expect(observe(revived).structures[0]).toMatchObject({ kind: "bloomFilter", enchantment: "seeded" });
-    // And it keeps working: the stream arrives and the structure ingests it.
-    expect(() => step(revived, endDeploy)).not.toThrow();
+      let fancy = createFight("fancy", enchanted);
+      fancy = step(fancy, bloom(0)).state;
+      expect(observe(fancy).structures[0]?.enchantment).toBe("seeded");
+    }
+    // survives a snapshot round trip: the structure comes back with its seed and its enchantment
+    {
+      let state = createFight("round", enchanted);
+      state = step(state, bloom(0)).state;
+      const revived = JSON.parse(JSON.stringify(state)) as FightState;
+      expect(revived).toEqual(state);
+      expect(observe(revived).structures[0]).toMatchObject({ kind: "bloomFilter", enchantment: "seeded" });
+      // And it keeps working: the stream arrives and the structure ingests it.
+      expect(() => step(revived, endDeploy)).not.toThrow();
+    }
   });
 });
 
@@ -177,257 +180,278 @@ describe("damageMultiplier", () => {
 describe("starting a fight", () => {
   const obs = observe(createFight("start", CONFIG));
 
-  it("opens in the deploy phase on turn 1 with full resources", () => {
-    expect(obs).toMatchObject({
-      turn: 1,
-      phase: "deploy",
-      certainty: 100,
-      spaceFree: 8192,
-      slotsFree: 3,
-      enemyHp: 20,
-    });
-  });
-
-  it("shows trait levels but hides the weak point and has no challenge yet", () => {
-    expect(obs.traits).toEqual(CONFIG.enemy.traits);
-    expect(obs.weakPoint).toBeNull();
-    expect(obs.challenge).toBeNull();
-    expect(obs.structures).toEqual([]);
-  });
-
-  it("exposes only the documented fields, so hidden truth cannot leak", () => {
-    expect(Object.keys(obs).sort()).toEqual(
-      ["certainty", "challenge", "enemyHp", "phase", "slotsFree", "spaceFree", "structures", "traits", "turn", "weakPoint"].sort(),
-    );
+  it("opens in the deploy phase on turn 1 with full resources; shows trait levels but hides the weak point and has no challenge yet; exposes only the documented fields, so hidden truth cannot leak", () => {
+    // opens in the deploy phase on turn 1 with full resources
+    {
+      expect(obs).toMatchObject({
+        turn: 1,
+        phase: "deploy",
+        certainty: 100,
+        spaceFree: 8192,
+        slotsFree: 3,
+        enemyHp: 20,
+      });
+    }
+    // shows trait levels but hides the weak point and has no challenge yet
+    {
+      expect(obs.traits).toEqual(CONFIG.enemy.traits);
+      expect(obs.weakPoint).toBeNull();
+      expect(obs.challenge).toBeNull();
+      expect(obs.structures).toEqual([]);
+    }
+    // exposes only the documented fields, so hidden truth cannot leak
+    {
+      expect(Object.keys(obs).sort()).toEqual(
+        ["certainty", "challenge", "enemyHp", "phase", "slotsFree", "spaceFree", "structures", "traits", "turn", "weakPoint"].sort(),
+      );
+    }
   });
 });
 
 describe("deploy rules", () => {
   const fresh = () => createFight("deploy", CONFIG);
 
-  it("charges Space and uses a slot", () => {
-    const { state } = run(fresh(), [deployCms]);
-    expect(observe(state)).toMatchObject({ spaceFree: 8192 - 4096, slotsFree: 2 });
-    expect(observe(state).structures).toMatchObject([{ slot: 0, kind: "countMinSketch", spaceBits: 4096 }]);
-  });
-
-  it("refunds Space when a structure is removed", () => {
-    const { state } = run(fresh(), [deployCms, { type: "remove", slot: 0 }]);
-    expect(observe(state)).toMatchObject({ spaceFree: 8192, slotsFree: 3, structures: [] });
-  });
-
-  it("rejects illegal actions", () => {
-    expect(() => step(fresh(), { type: "deploy", slot: 0, kind: "countMinSketch", spaceBits: 9000 })).toThrow(); // over budget
-    expect(() => step(fresh(), { type: "deploy", slot: 3, kind: "countMinSketch", spaceBits: 1024 })).toThrow(); // no such slot
-    expect(() => step(fresh(), { type: "deploy", slot: 0, kind: "linearCounting", spaceBits: 1024 })).toThrow(); // not owned
-    expect(() => step(fresh(), { type: "remove", slot: 1 })).toThrow(); // nothing there
-    expect(() => step(fresh(), { type: "strikeValue", value: 5 })).toThrow(); // wrong phase
-    const { state } = run(fresh(), [deployCms]);
-    expect(() => step(state, deployCms)).toThrow(); // slot already taken
-  });
-
-  it("only lists actions that step accepts", () => {
-    for (const state of [fresh(), run(fresh(), [deployCms, endDeploy, endDeploy]).state]) {
-      const actions = legalActions(state);
-      expect(actions.length).toBeGreaterThan(0);
-      for (const action of actions) expect(() => step(state, action)).not.toThrow();
+  it("charges Space and uses a slot; refunds Space when a structure is removed; rejects illegal actions; and 1 more", () => {
+    // charges Space and uses a slot
+    {
+      const { state } = run(fresh(), [deployCms]);
+      expect(observe(state)).toMatchObject({ spaceFree: 8192 - 4096, slotsFree: 2 });
+      expect(observe(state).structures).toMatchObject([{ slot: 0, kind: "countMinSketch", spaceBits: 4096 }]);
+    }
+    // refunds Space when a structure is removed
+    {
+      const { state } = run(fresh(), [deployCms, { type: "remove", slot: 0 }]);
+      expect(observe(state)).toMatchObject({ spaceFree: 8192, slotsFree: 3, structures: [] });
+    }
+    // rejects illegal actions
+    {
+      expect(() => step(fresh(), { type: "deploy", slot: 0, kind: "countMinSketch", spaceBits: 9000 })).toThrow(); // over budget
+      expect(() => step(fresh(), { type: "deploy", slot: 3, kind: "countMinSketch", spaceBits: 1024 })).toThrow(); // no such slot
+      expect(() => step(fresh(), { type: "deploy", slot: 0, kind: "linearCounting", spaceBits: 1024 })).toThrow(); // not owned
+      expect(() => step(fresh(), { type: "remove", slot: 1 })).toThrow(); // nothing there
+      expect(() => step(fresh(), { type: "strikeValue", value: 5 })).toThrow(); // wrong phase
+      const { state } = run(fresh(), [deployCms]);
+      expect(() => step(state, deployCms)).toThrow(); // slot already taken
+    }
+    // only lists actions that step accepts
+    {
+      for (const state of [fresh(), run(fresh(), [deployCms, endDeploy, endDeploy]).state]) {
+        const actions = legalActions(state);
+        expect(actions.length).toBeGreaterThan(0);
+        for (const action of actions) expect(() => step(state, action)).not.toThrow();
+      }
     }
   });
 });
 
 describe("the turn loop", () => {
-  it("turn 1 ingests a burst, issues no challenge, and the enemy still attacks", () => {
-    const afterDeploy = run(createFight("loop", CONFIG), [deployCms]);
-    const turn1 = step(afterDeploy.state, endDeploy);
-    expect(types(turn1.events)).toEqual(["burstIngested", "enemyAttacked", "turnStarted"]);
-    expect(observe(turn1.state)).toMatchObject({ turn: 2, phase: "deploy", certainty: 97, challenge: null, weakPoint: null });
-  });
+  it("turn 1 ingests a burst, issues no challenge, and the enemy still attacks; from turn 2 the enemy issues a Frequency challenge that names the heaviest live value; answers the challenge from each deployed structure that can; and 1 more", () => {
+    // turn 1 ingests a burst, issues no challenge, and the enemy still attacks
+    {
+      const afterDeploy = run(createFight("loop", CONFIG), [deployCms]);
+      const turn1 = step(afterDeploy.state, endDeploy);
+      expect(types(turn1.events)).toEqual(["burstIngested", "enemyAttacked", "turnStarted"]);
+      expect(observe(turn1.state)).toMatchObject({ turn: 2, phase: "deploy", certainty: 97, challenge: null, weakPoint: null });
+    }
+    // from turn 2 the enemy issues a Frequency challenge that names the heaviest live value
+    {
+      const { state } = run(createFight("loop", CONFIG), [deployCms, endDeploy]);
+      const turn2 = step(state, endDeploy);
+      expect(types(turn2.events)).toEqual(["burstIngested", "challengeIssued"]);
 
-  it("from turn 2 the enemy issues a Frequency challenge that names the heaviest live value", () => {
-    const { state } = run(createFight("loop", CONFIG), [deployCms, endDeploy]);
-    const turn2 = step(state, endDeploy);
-    expect(types(turn2.events)).toEqual(["burstIngested", "challengeIssued"]);
-
-    const obs = observe(turn2.state);
-    expect(obs.phase).toBe("strike");
-    expect(obs.weakPoint).toBe("frequency");
-    expect(obs.challenge).toMatchObject({ kind: "frequency" });
-    // The named value is the real heaviest value, but the player is never shown its true count.
-    expect(obs.challenge).toEqual({ kind: "frequency", value: groundTruth(turn2.state).frequency?.value });
-    expect(Object.keys(obs.challenge ?? {}).sort()).toEqual(["kind", "value"]);
-    expect(legalActions(turn2.state).every((a) => a.type === "strikeValue")).toBe(true);
-  });
-
-  it("answers the challenge from each deployed structure that can", () => {
-    const { state } = run(createFight("loop", CONFIG), [
-      deployCms,
-      { type: "deploy", slot: 1, kind: "bloomFilter", spaceBits: 2048 },
-      endDeploy,
-      endDeploy,
-    ]);
-    const [cms, bloom] = observe(state).structures;
-    expect(cms?.answer).toMatchObject({ confidence: expect.any(Number) });
-    expect(bloom?.answer).toBeNull(); // a Bloom filter cannot answer Frequency
-  });
-
-  it("gives a structure deployed late no memory of earlier bursts", () => {
-    const { state } = run(createFight("late", CONFIG), [
-      deployCms,
-      endDeploy,
-      { type: "deploy", slot: 1, kind: "countMinSketch", spaceBits: 4096 },
-      endDeploy,
-    ]);
-    const [early, late] = observe(state).structures;
-    expect(early?.answer?.estimate).toBeGreaterThan(late?.answer?.estimate as number);
+      const obs = observe(turn2.state);
+      expect(obs.phase).toBe("strike");
+      expect(obs.weakPoint).toBe("frequency");
+      expect(obs.challenge).toMatchObject({ kind: "frequency" });
+      // The named value is the real heaviest value, but the player is never shown its true count.
+      expect(obs.challenge).toEqual({ kind: "frequency", value: groundTruth(turn2.state).frequency?.value });
+      expect(Object.keys(obs.challenge ?? {}).sort()).toEqual(["kind", "value"]);
+      expect(legalActions(turn2.state).every((a) => a.type === "strikeValue")).toBe(true);
+    }
+    // answers the challenge from each deployed structure that can
+    {
+      const { state } = run(createFight("loop", CONFIG), [
+        deployCms,
+        { type: "deploy", slot: 1, kind: "bloomFilter", spaceBits: 2048 },
+        endDeploy,
+        endDeploy,
+      ]);
+      const [cms, bloom] = observe(state).structures;
+      expect(cms?.answer).toMatchObject({ confidence: expect.any(Number) });
+      expect(bloom?.answer).toBeNull(); // a Bloom filter cannot answer Frequency
+    }
+    // gives a structure deployed late no memory of earlier bursts
+    {
+      const { state } = run(createFight("late", CONFIG), [
+        deployCms,
+        endDeploy,
+        { type: "deploy", slot: 1, kind: "countMinSketch", spaceBits: 4096 },
+        endDeploy,
+      ]);
+      const [early, late] = observe(state).structures;
+      expect(early?.answer?.estimate).toBeGreaterThan(late?.answer?.estimate as number);
+    }
   });
 });
 
 describe("strikes", () => {
   const atChallenge = () => run(createFight("strike", CONFIG), [deployCms, endDeploy, endDeploy]).state;
 
-  it("blocks a force below the true count and costs BLOCK_PENALTY", () => {
-    const before = atChallenge();
-    const after = step(before, { type: "strikeValue", value: 1 });
-    expect(after.events.find((e) => e.type === "strikeResolved")).toMatchObject({ outcome: "blocked", damage: 0 });
-    // Block penalty 3 plus the enemy's attack of 3, on top of turn 1's attack of 3.
-    expect(observe(after.state).certainty).toBe(97 - 3 - 3);
-    expect(observe(after.state).enemyHp).toBe(20);
-  });
+  it("blocks a force below the true count and costs BLOCK_PENALTY; deals BASE x (f / s)^OVERSHOOT_EXP when the force reaches the true count; wastes force when overshooting", () => {
+    // blocks a force below the true count and costs BLOCK_PENALTY
+    {
+      const before = atChallenge();
+      const after = step(before, { type: "strikeValue", value: 1 });
+      expect(after.events.find((e) => e.type === "strikeResolved")).toMatchObject({ outcome: "blocked", damage: 0 });
+      // Block penalty 3 plus the enemy's attack of 3, on top of turn 1's attack of 3.
+      expect(observe(after.state).certainty).toBe(97 - 3 - 3);
+      expect(observe(after.state).enemyHp).toBe(20);
+    }
+    // deals BASE x (f / s)^OVERSHOOT_EXP when the force reaches the true count
+    {
+      const before = atChallenge();
+      const f = groundTruth(before).frequency?.count as number;
+      const action = strikeAtCmsHigh(before);
+      const s = (action as { value: number }).value;
+      expect(s).toBeGreaterThanOrEqual(f);
 
-  it("deals BASE x (f / s)^OVERSHOOT_EXP when the force reaches the true count", () => {
-    const before = atChallenge();
-    const f = groundTruth(before).frequency?.count as number;
-    const action = strikeAtCmsHigh(before);
-    const s = (action as { value: number }).value;
-    expect(s).toBeGreaterThanOrEqual(f);
-
-    const after = step(before, action);
-    const resolved = after.events.find((e) => e.type === "strikeResolved");
-    const expected = 20 * (f / s) ** 2;
-    expect(resolved).toMatchObject({ outcome: "hit" });
-    expect((resolved as { damage: number }).damage).toBeCloseTo(expected, 3);
-    expect(observe(after.state).enemyHp).toBeCloseTo(Math.max(0, 20 - expected), 3);
-  });
-
-  it("wastes force when overshooting", () => {
-    const before = atChallenge();
-    const f = groundTruth(before).frequency?.count as number;
-    const exact = step(before, { type: "strikeValue", value: f }).events.find((e) => e.type === "strikeResolved");
-    const double = step(before, { type: "strikeValue", value: 2 * f }).events.find((e) => e.type === "strikeResolved");
-    expect((exact as { damage: number }).damage).toBeCloseTo(20, 3);
-    expect((double as { damage: number }).damage).toBeCloseTo(5, 3);
+      const after = step(before, action);
+      const resolved = after.events.find((e) => e.type === "strikeResolved");
+      const expected = 20 * (f / s) ** 2;
+      expect(resolved).toMatchObject({ outcome: "hit" });
+      expect((resolved as { damage: number }).damage).toBeCloseTo(expected, 3);
+      expect(observe(after.state).enemyHp).toBeCloseTo(Math.max(0, 20 - expected), 3);
+    }
+    // wastes force when overshooting
+    {
+      const before = atChallenge();
+      const f = groundTruth(before).frequency?.count as number;
+      const exact = step(before, { type: "strikeValue", value: f }).events.find((e) => e.type === "strikeResolved");
+      const double = step(before, { type: "strikeValue", value: 2 * f }).events.find((e) => e.type === "strikeResolved");
+      expect((exact as { damage: number }).damage).toBeCloseTo(20, 3);
+      expect((double as { damage: number }).damage).toBeCloseTo(5, 3);
+    }
   });
 });
 
 describe("ending a fight", () => {
-  it("is won when the enemy's HP reaches zero within the turn limit", () => {
-    const { state, events } = playGreedy("win");
-    expect(events.at(-1)?.type).toBe("fightWon");
-    const obs = observe(state);
-    expect(obs.enemyHp).toBe(0);
-    expect(obs.turn).toBeLessThanOrEqual(CONFIG.enemy.turnLimit);
-    expect(obs.certainty).toBeGreaterThan(0);
-    expect(obs.certainty).toBeLessThanOrEqual(100);
-  });
-
-  it("is lost at the turn limit with a Certainty penalty", () => {
-    let state = createFight("lose", CONFIG);
-    let last: { events: GameEvent[]; done: boolean } = { events: [], done: false };
-    const apply = (action: Action) => {
-      const result = step(state, action);
-      state = result.state;
-      last = result;
-    };
-    apply(endDeploy); // turn 1
-    for (let turn = 2; turn <= CONFIG.enemy.turnLimit; turn++) {
-      apply(endDeploy);
-      apply({ type: "strikeValue", value: 1 }); // always blocked
+  it("is won when the enemy's HP reaches zero within the turn limit; is lost at the turn limit with a Certainty penalty; rejects further actions once the fight is over", () => {
+    // is won when the enemy's HP reaches zero within the turn limit
+    {
+      const { state, events } = playGreedy("win");
+      expect(events.at(-1)?.type).toBe("fightWon");
+      const obs = observe(state);
+      expect(obs.enemyHp).toBe(0);
+      expect(obs.turn).toBeLessThanOrEqual(CONFIG.enemy.turnLimit);
+      expect(obs.certainty).toBeGreaterThan(0);
+      expect(obs.certainty).toBeLessThanOrEqual(100);
     }
-    expect(last.done).toBe(true);
-    expect(types(last.events)).toEqual(["strikeResolved", "enemyAttacked", "fightLost"]);
-    expect(last.events.at(-1)).toMatchObject({ type: "fightLost", reason: "turnLimit" });
-    // Four attacks (12), three blocked strikes (9) and the turn-limit penalty (20).
-    expect(observe(state).certainty).toBe(100 - 12 - 9 - 20);
-  });
-
-  it("rejects further actions once the fight is over", () => {
-    const { state } = playGreedy("over");
-    expect(() => step(state, endDeploy)).toThrow();
-    expect(legalActions(state)).toEqual([]);
+    // is lost at the turn limit with a Certainty penalty
+    {
+      let state = createFight("lose", CONFIG);
+      let last: { events: GameEvent[]; done: boolean } = { events: [], done: false };
+      const apply = (action: Action) => {
+        const result = step(state, action);
+        state = result.state;
+        last = result;
+      };
+      apply(endDeploy); // turn 1
+      for (let turn = 2; turn <= CONFIG.enemy.turnLimit; turn++) {
+        apply(endDeploy);
+        apply({ type: "strikeValue", value: 1 }); // always blocked
+      }
+      expect(last.done).toBe(true);
+      expect(types(last.events)).toEqual(["strikeResolved", "enemyAttacked", "fightLost"]);
+      expect(last.events.at(-1)).toMatchObject({ type: "fightLost", reason: "turnLimit" });
+      // Four attacks (12), three blocked strikes (9) and the turn-limit penalty (20).
+      expect(observe(state).certainty).toBe(100 - 12 - 9 - 20);
+    }
+    // rejects further actions once the fight is over
+    {
+      const { state } = playGreedy("over");
+      expect(() => step(state, endDeploy)).toThrow();
+      expect(legalActions(state)).toEqual([]);
+    }
   });
 });
 
 describe("groundTruth", () => {
-  it("gives the real answer to the open challenge, and nothing when there is none", () => {
-    const deploying = createFight("truth", CONFIG);
-    expect(groundTruth(deploying).answer).toBeNull();
+  it("gives the real answer to the open challenge, and nothing when there is none; says which Presence targets are real", () => {
+    // gives the real answer to the open challenge, and nothing when there is none
+    {
+      const deploying = createFight("truth", CONFIG);
+      expect(groundTruth(deploying).answer).toBeNull();
 
-    const striking = run(deploying, [deployCms, endDeploy, endDeploy]).state;
-    const truth = groundTruth(striking);
-    expect(truth.answer).toEqual({ kind: "frequency", count: truth.frequency?.count });
-  });
-
-  it("says which Presence targets are real", () => {
-    const presence: FightConfig = { ...CONFIG, enemy: { ...CONFIG.enemy, weakPoints: ["presence"] } };
-    const state = run(createFight("truth-presence", presence), [endDeploy, endDeploy]).state;
-    const answer = groundTruth(state).answer;
-    expect(answer?.kind).toBe("presence");
-    const real = answer?.kind === "presence" ? answer.real : [];
-    expect(real).toHaveLength(CONFIG.rules.presenceTargets);
-    expect(real.filter(Boolean).length).toBeGreaterThanOrEqual(5);
-    expect(real.filter(Boolean).length).toBeLessThanOrEqual(7);
+      const striking = run(deploying, [deployCms, endDeploy, endDeploy]).state;
+      const truth = groundTruth(striking);
+      expect(truth.answer).toEqual({ kind: "frequency", count: truth.frequency?.count });
+    }
+    // says which Presence targets are real
+    {
+      const presence: FightConfig = { ...CONFIG, enemy: { ...CONFIG.enemy, weakPoints: ["presence"] } };
+      const state = run(createFight("truth-presence", presence), [endDeploy, endDeploy]).state;
+      const answer = groundTruth(state).answer;
+      expect(answer?.kind).toBe("presence");
+      const real = answer?.kind === "presence" ? answer.real : [];
+      expect(real).toHaveLength(CONFIG.rules.presenceTargets);
+      expect(real.filter(Boolean).length).toBeGreaterThanOrEqual(5);
+      expect(real.filter(Boolean).length).toBeLessThanOrEqual(7);
+    }
   });
 });
 
 describe("determinism and purity", () => {
-  it("replays identically from the same seed", () => {
-    const a = playGreedy("replay");
-    const b = playGreedy("replay");
-    expect(a.events).toEqual(b.events);
-    expect(a.state).toEqual(b.state);
-  });
-
-  it("plays differently from different seeds", () => {
-    const named = ["s1", "s2", "s3", "s4", "s5"].map((seed) => {
-      const { state } = run(createFight(seed, CONFIG), [deployCms, endDeploy, endDeploy]);
-      return groundTruth(state).frequency?.value;
-    });
-    expect(new Set(named).size).toBeGreaterThan(1);
-  });
-
-  it("never mutates the state it is given", () => {
-    let state = createFight("pure", CONFIG);
-    // Each action is built when it is reached, because a strike can only be chosen once a challenge exists.
-    const script: Array<(s: FightState) => Action> = [() => deployCms, () => endDeploy, () => endDeploy, strikeAtCmsHigh];
-    for (const makeAction of script) {
-      const action = makeAction(state);
-      const before = JSON.stringify(state);
-      const result = step(state, action);
-      expect(JSON.stringify(state)).toBe(before); // the input is untouched
-      expect(JSON.stringify(result.state)).not.toBe(before); // and the step really changed something
-      state = result.state;
+  it("replays identically from the same seed; plays differently from different seeds; never mutates the state it is given; and 2 more", () => {
+    // replays identically from the same seed
+    {
+      const a = playGreedy("replay");
+      const b = playGreedy("replay");
+      expect(a.events).toEqual(b.events);
+      expect(a.state).toEqual(b.state);
     }
-  });
+    // plays differently from different seeds
+    {
+      const named = ["s1", "s2", "s3", "s4", "s5"].map((seed) => {
+        const { state } = run(createFight(seed, CONFIG), [deployCms, endDeploy, endDeploy]);
+        return groundTruth(state).frequency?.value;
+      });
+      expect(new Set(named).size).toBeGreaterThan(1);
+    }
+    // never mutates the state it is given
+    {
+      let state = createFight("pure", CONFIG);
+      // Each action is built when it is reached, because a strike can only be chosen once a challenge exists.
+      const script: Array<(s: FightState) => Action> = [() => deployCms, () => endDeploy, () => endDeploy, strikeAtCmsHigh];
+      for (const makeAction of script) {
+        const action = makeAction(state);
+        const before = JSON.stringify(state);
+        const result = step(state, action);
+        expect(JSON.stringify(state)).toBe(before); // the input is untouched
+        expect(JSON.stringify(result.state)).not.toBe(before); // and the step really changed something
+        state = result.state;
+      }
+    }
+    // round-trips through JSON and continues identically
+    {
+      const prefix = run(createFight("json", CONFIG), [deployCms, endDeploy, endDeploy]).state;
+      const restored: FightState = JSON.parse(JSON.stringify(prefix));
+      expect(restored).toEqual(prefix);
 
-  it("round-trips through JSON and continues identically", () => {
-    const prefix = run(createFight("json", CONFIG), [deployCms, endDeploy, endDeploy]).state;
-    const restored: FightState = JSON.parse(JSON.stringify(prefix));
-    expect(restored).toEqual(prefix);
-
-    const rest = (start: FightState) => {
-      const first = step(start, strikeAtCmsHigh(start));
-      if (first.done) return { events: first.events, state: first.state }; // the strike already won the fight
-      const second = step(first.state, endDeploy);
-      return { events: [...first.events, ...second.events], state: second.state };
-    };
-    const direct = rest(prefix);
-    const viaJson = rest(restored);
-    expect(viaJson.events).toEqual(direct.events);
-    expect(viaJson.state).toEqual(direct.state);
-  });
-
-  it("reports a numeric reward on every step", () => {
-    const result = step(createFight("reward", CONFIG), endDeploy);
-    expect(typeof result.reward).toBe("number");
+      const rest = (start: FightState) => {
+        const first = step(start, strikeAtCmsHigh(start));
+        if (first.done) return { events: first.events, state: first.state }; // the strike already won the fight
+        const second = step(first.state, endDeploy);
+        return { events: [...first.events, ...second.events], state: second.state };
+      };
+      const direct = rest(prefix);
+      const viaJson = rest(restored);
+      expect(viaJson.events).toEqual(direct.events);
+      expect(viaJson.state).toEqual(direct.state);
+    }
+    // reports a numeric reward on every step
+    {
+      const result = step(createFight("reward", CONFIG), endDeploy);
+      expect(typeof result.reward).toBe("number");
+    }
   });
 });

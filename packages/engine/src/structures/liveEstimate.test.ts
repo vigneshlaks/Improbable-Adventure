@@ -45,37 +45,40 @@ const logLog = () => new LogLog({ spaceBits: 5 * 64 }, TEST_CONSTANTS); // 64 re
 const reservoir = () => new ReservoirSampling({ spaceBits: 32 * 4096 }, TEST_CONSTANTS); // the sample holds the whole stream
 
 describe("the Count estimate aims at the live values", () => {
-  it("is within a few percent of the live count where most values appear once, at every churn", () => {
-    for (const [name, make] of [["Linear Counting", linearCounting], ["Reservoir Sampling", reservoir]] as const) {
-      for (const universe of [16384, 4194304]) {
-        for (const churn of [0.1, 0.3]) {
-          const { corrected, ever } = runMix({ universe, skew: 0.8, churn }, make, name);
-          expect(corrected, `${name}, ${universe} values, churn ${churn}`).toBeLessThan(0.08);
-          expect(corrected, `${name}, ${universe} values, churn ${churn}`).toBeLessThan(ever / 2);
+  it("is within a few percent of the live count where most values appear once, at every churn; is close to the live count when values repeat a lot, where few values vanish; still improves on the ever-inserted count when a few favorites dominate and most values appear once; and 2 more", () => {
+    // is within a few percent of the live count where most values appear once, at every churn
+    {
+      for (const [name, make] of [["Linear Counting", linearCounting], ["Reservoir Sampling", reservoir]] as const) {
+        for (const universe of [16384, 4194304]) {
+          for (const churn of [0.1, 0.3]) {
+            const { corrected, ever } = runMix({ universe, skew: 0.8, churn }, make, name);
+            expect(corrected, `${name}, ${universe} values, churn ${churn}`).toBeLessThan(0.08);
+            expect(corrected, `${name}, ${universe} values, churn ${churn}`).toBeLessThan(ever / 2);
+          }
         }
       }
     }
-  });
-
-  it("is close to the live count when values repeat a lot, where few values vanish", () => {
-    const { corrected, ever } = runMix({ universe: 256, skew: 0.8, churn: 0.3 }, linearCounting, "repeat");
-    expect(corrected).toBeLessThan(0.2);
-    expect(corrected).toBeLessThanOrEqual(ever);
-  });
-
-  it("still improves on the ever-inserted count when a few favorites dominate and most values appear once", () => {
-    const { corrected, ever } = runMix({ universe: 16384, skew: 1.2, churn: 0.3 }, linearCounting, "heavy");
-    expect(corrected).toBeLessThan(ever * 0.6);
-  });
-
-  it("changes nothing when there is no churn", () => {
-    const { corrected, ever } = runMix({ universe: 16384, skew: 0.8, churn: 0 }, linearCounting, "calm");
-    expect(corrected).toBeCloseTo(ever, 2);
-    expect(corrected).toBeLessThan(0.02);
-  });
-
-  it("also holds for LogLog on a stream big enough for it", () => {
-    const { corrected, ever } = runMix({ universe: 4194304, skew: 0.8, churn: 0.3 }, logLog, "loglog");
-    expect(corrected).toBeLessThan(ever / 2);
+    // is close to the live count when values repeat a lot, where few values vanish
+    {
+      const { corrected, ever } = runMix({ universe: 256, skew: 0.8, churn: 0.3 }, linearCounting, "repeat");
+      expect(corrected).toBeLessThan(0.2);
+      expect(corrected).toBeLessThanOrEqual(ever);
+    }
+    // still improves on the ever-inserted count when a few favorites dominate and most values appear once
+    {
+      const { corrected, ever } = runMix({ universe: 16384, skew: 1.2, churn: 0.3 }, linearCounting, "heavy");
+      expect(corrected).toBeLessThan(ever * 0.6);
+    }
+    // changes nothing when there is no churn
+    {
+      const { corrected, ever } = runMix({ universe: 16384, skew: 0.8, churn: 0 }, linearCounting, "calm");
+      expect(corrected).toBeCloseTo(ever, 2);
+      expect(corrected).toBeLessThan(0.02);
+    }
+    // also holds for LogLog on a stream big enough for it
+    {
+      const { corrected, ever } = runMix({ universe: 4194304, skew: 0.8, churn: 0.3 }, logLog, "loglog");
+      expect(corrected).toBeLessThan(ever / 2);
+    }
   });
 });

@@ -15,67 +15,70 @@ const steady = (spaceBits: number, hashSeed?: number) => new LogLog({ spaceBits,
 const steadyMatching = (bits: number, hashSeed?: number) => steady(Math.ceil(bits * STEADY_SPACE) + 1, hashSeed);
 
 describe("SuperLogLog (LogLog with Steady)", () => {
-  it("builds the same registers from 10 percent more Space, and fewer from the same Space", () => {
-    expect(plain(1280).params).toEqual({ registers: 256, indexBits: 8 });
-    expect(steadyMatching(1280).params).toEqual({ registers: 256, indexBits: 8 });
-    expect(steady(1280).params).toEqual({ registers: 128, indexBits: 7 }); // 1280 / 1.1 = 1163 bits, 232 registers, 128 as a power of two
-    expect(steady(1280).spaceBits()).toBeLessThanOrEqual(1280);
-    expect(steadyMatching(1280).spaceBits()).toBe(Math.ceil(1280 * STEADY_SPACE)); // 256 registers x 5 bits, plus the Steady cost
-    expect(plain(1280).spaceBits()).toBe(1280);
-    expect(() => steady(80)).toThrow(RangeError); // 80 bits is 16 registers, but 10 percent of them are lost to the cost
-  });
-
-  it("predicts a relative standard error of 1.05 / sqrt(m), against LogLog's 1.30", () => {
-    expect(steadyMatching(1280).standardError).toBeCloseTo(1.05 / 16, 12);
-    expect(plain(1280).standardError).toBeCloseTo(1.3 / 16, 12);
-  });
-
-  it("is a plain LogLog when the enchantment is anything else", () => {
-    const other = new LogLog({ spaceBits: 1280, hashSeed: 5, enchantment: "seeded" }, TEST_CONSTANTS);
-    const control = plain(1280, 5);
-    for (const value of distinctValues(trialRng("sll-other", 0), 3000)) {
-      other.ingest({ op: "insert", value });
-      control.ingest({ op: "insert", value });
+  it("builds the same registers from 10 percent more Space, and fewer from the same Space; predicts a relative standard error of 1.05 / sqrt(m), against LogLog's 1.30; is a plain LogLog when the enchantment is anything else; and 2 more", () => {
+    // builds the same registers from 10 percent more Space, and fewer from the same Space
+    {
+      expect(plain(1280).params).toEqual({ registers: 256, indexBits: 8 });
+      expect(steadyMatching(1280).params).toEqual({ registers: 256, indexBits: 8 });
+      expect(steady(1280).params).toEqual({ registers: 128, indexBits: 7 }); // 1280 / 1.1 = 1163 bits, 232 registers, 128 as a power of two
+      expect(steady(1280).spaceBits()).toBeLessThanOrEqual(1280);
+      expect(steadyMatching(1280).spaceBits()).toBe(Math.ceil(1280 * STEADY_SPACE)); // 256 registers x 5 bits, plus the Steady cost
+      expect(plain(1280).spaceBits()).toBe(1280);
+      expect(() => steady(80)).toThrow(RangeError); // 80 bits is 16 registers, but 10 percent of them are lost to the cost
     }
-    expect(other.estimate()).toBe(control.estimate());
-  });
-
-  it("discards the largest 30 percent of the registers, so one lucky register no longer moves the estimate much", () => {
-    const sample = (counter: LogLog) => {
-      for (const value of distinctValues(trialRng("sll-lucky", 0), 20000)) counter.ingest({ op: "insert", value });
-      return counter;
-    };
-    const normal = sample(steadyMatching(1280));
-    const withOutlier = sample(steadyMatching(1280));
-    const registers = (withOutlier.snapshot().state.registers as number[]).slice();
-    registers[0] = 31; // one register claims an impossibly rare pattern
-    const tampered = steadyMatching(1280);
-    (tampered as unknown as { registers: Uint8Array }).registers = Uint8Array.from(registers);
-    expect(Math.abs(tampered.estimate() - normal.estimate()) / normal.estimate()).toBeLessThan(0.02);
-    // LogLog averages all registers, so the same register shifts its estimate by 2^(26/256) - 1, about 7 percent.
-    const logLogNormal = sample(plain(1280));
-    const logLogTampered = plain(1280);
-    (logLogTampered as unknown as { registers: Uint8Array }).registers = Uint8Array.from(registers);
-    expect(Math.abs(logLogTampered.estimate() - logLogNormal.estimate()) / logLogNormal.estimate()).toBeGreaterThan(0.05);
-  });
-
-  it("clones, merges as a register-wise max, and ignores repeats and deletes like LogLog", () => {
-    const a = steady(1280, 9);
-    const b = steady(1280, 9);
-    const values = distinctValues(trialRng("sll-merge", 0), 6000);
-    for (const value of values.slice(0, 3000)) a.ingest({ op: "insert", value });
-    for (const value of values.slice(3000)) b.ingest({ op: "insert", value });
-    const union = steady(1280, 9);
-    for (const value of values) union.ingest({ op: "insert", value });
-    expect(a.merge(b).estimate()).toBe(union.estimate());
-    expect(() => a.merge(plain(640, 9))).not.toThrow(); // the same 128 registers: merging is by registers
-    const noisy = steady(1280, 9);
-    for (const value of values.slice(0, 3000)) {
-      noisy.ingest({ op: "insert", value });
-      noisy.ingest({ op: "insert", value });
-      noisy.ingest({ op: "delete", value });
+    // predicts a relative standard error of 1.05 / sqrt(m), against LogLog's 1.30
+    {
+      expect(steadyMatching(1280).standardError).toBeCloseTo(1.05 / 16, 12);
+      expect(plain(1280).standardError).toBeCloseTo(1.3 / 16, 12);
     }
-    expect(noisy.estimate()).toBe(a.estimate());
+    // is a plain LogLog when the enchantment is anything else
+    {
+      const other = new LogLog({ spaceBits: 1280, hashSeed: 5, enchantment: "seeded" }, TEST_CONSTANTS);
+      const control = plain(1280, 5);
+      for (const value of distinctValues(trialRng("sll-other", 0), 3000)) {
+        other.ingest({ op: "insert", value });
+        control.ingest({ op: "insert", value });
+      }
+      expect(other.estimate()).toBe(control.estimate());
+    }
+    // discards the largest 30 percent of the registers, so one lucky register no longer moves the estimate much
+    {
+      const sample = (counter: LogLog) => {
+        for (const value of distinctValues(trialRng("sll-lucky", 0), 20000)) counter.ingest({ op: "insert", value });
+        return counter;
+      };
+      const normal = sample(steadyMatching(1280));
+      const withOutlier = sample(steadyMatching(1280));
+      const registers = (withOutlier.snapshot().state.registers as number[]).slice();
+      registers[0] = 31; // one register claims an impossibly rare pattern
+      const tampered = steadyMatching(1280);
+      (tampered as unknown as { registers: Uint8Array }).registers = Uint8Array.from(registers);
+      expect(Math.abs(tampered.estimate() - normal.estimate()) / normal.estimate()).toBeLessThan(0.02);
+      // LogLog averages all registers, so the same register shifts its estimate by 2^(26/256) - 1, about 7 percent.
+      const logLogNormal = sample(plain(1280));
+      const logLogTampered = plain(1280);
+      (logLogTampered as unknown as { registers: Uint8Array }).registers = Uint8Array.from(registers);
+      expect(Math.abs(logLogTampered.estimate() - logLogNormal.estimate()) / logLogNormal.estimate()).toBeGreaterThan(0.05);
+    }
+    // clones, merges as a register-wise max, and ignores repeats and deletes like LogLog
+    {
+      const a = steady(1280, 9);
+      const b = steady(1280, 9);
+      const values = distinctValues(trialRng("sll-merge", 0), 6000);
+      for (const value of values.slice(0, 3000)) a.ingest({ op: "insert", value });
+      for (const value of values.slice(3000)) b.ingest({ op: "insert", value });
+      const union = steady(1280, 9);
+      for (const value of values) union.ingest({ op: "insert", value });
+      expect(a.merge(b).estimate()).toBe(union.estimate());
+      expect(() => a.merge(plain(640, 9))).not.toThrow(); // the same 128 registers: merging is by registers
+      const noisy = steady(1280, 9);
+      for (const value of values.slice(0, 3000)) {
+        noisy.ingest({ op: "insert", value });
+        noisy.ingest({ op: "insert", value });
+        noisy.ingest({ op: "delete", value });
+      }
+      expect(noisy.estimate()).toBe(a.estimate());
+    }
   });
 
   describe("deletes it cannot see", () => {

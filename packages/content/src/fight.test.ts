@@ -5,44 +5,47 @@ import { balance } from "./balance";
 import { buildFightConfig } from "./fight";
 
 describe("buildFightConfig", () => {
-  it("takes the fight rules from balance.json", () => {
-    const { rules, constants } = buildFightConfig({ seed: "rules", tier: "minion" });
-    expect(rules).toEqual({
-      startingSpace: balance.STARTING_SPACE,
-      startingCertainty: balance.STARTING_CERTAINTY,
-      startingSlots: balance.STARTING_SLOTS,
-      base: balance.BASE,
-      hitDamage: balance.HIT_DAMAGE,
-      decoyPenalty: balance.DECOY_PENALTY,
-      blockPenalty: balance.BLOCK_PENALTY,
-      missPenalty: balance.MISS_PENALTY,
-      overshootExp: balance.OVERSHOOT_EXP,
-      countTol: balance.COUNT_TOL,
-      presenceTargets: balance.PRESENCE_TARGETS,
-      expectedTurns: balance.EXPECTED_TURNS,
-      turnLimitPenalty: balance.TURN_LIMIT_PENALTY,
-    });
-    expect(constants.valueBits).toBe(balance.VALUE_BITS);
-  });
-
-  it("defaults to the starting loadout and accepts another", () => {
-    expect(buildFightConfig({ seed: "a", tier: "minion" }).loadout).toEqual(balance.STARTING_LOADOUT);
-    expect(buildFightConfig({ seed: "a", tier: "minion", loadout: [...STRUCTURE_KINDS] }).loadout).toEqual([...STRUCTURE_KINDS]);
-  });
-
-  it("builds the same enemy for the same seed and tier", () => {
-    expect(buildFightConfig({ seed: "x", tier: "elite" })).toEqual(buildFightConfig({ seed: "x", tier: "elite" }));
-    expect(buildFightConfig({ seed: "x", tier: "elite" }).enemy).toEqual(buildFightConfig({ seed: "x", tier: "elite" }).enemy);
-  });
-
-  it("starts a fight the engine accepts, with the spec's starting resources", () => {
-    const state = createFight("start", buildFightConfig({ seed: "start", tier: "minion" }));
-    expect(state).toMatchObject({ turn: 1, phase: "deploy", certainty: balance.STARTING_CERTAINTY, enemyHp: balance.TIERS.minion.hp });
-    expect(state.slots).toHaveLength(3);
-  });
-
-  it("does not allow an unknown tier", () => {
-    expect(() => buildFightConfig({ seed: "bad", tier: "king" as never })).toThrow(RangeError);
+  it("takes the fight rules from balance.json; defaults to the starting loadout and accepts another; builds the same enemy for the same seed and tier; and 2 more", () => {
+    // takes the fight rules from balance.json
+    {
+      const { rules, constants } = buildFightConfig({ seed: "rules", tier: "minion" });
+      expect(rules).toEqual({
+        startingSpace: balance.STARTING_SPACE,
+        startingCertainty: balance.STARTING_CERTAINTY,
+        startingSlots: balance.STARTING_SLOTS,
+        base: balance.BASE,
+        hitDamage: balance.HIT_DAMAGE,
+        decoyPenalty: balance.DECOY_PENALTY,
+        blockPenalty: balance.BLOCK_PENALTY,
+        missPenalty: balance.MISS_PENALTY,
+        overshootExp: balance.OVERSHOOT_EXP,
+        countTol: balance.COUNT_TOL,
+        presenceTargets: balance.PRESENCE_TARGETS,
+        expectedTurns: balance.EXPECTED_TURNS,
+        turnLimitPenalty: balance.TURN_LIMIT_PENALTY,
+      });
+      expect(constants.valueBits).toBe(balance.VALUE_BITS);
+    }
+    // defaults to the starting loadout and accepts another
+    {
+      expect(buildFightConfig({ seed: "a", tier: "minion" }).loadout).toEqual(balance.STARTING_LOADOUT);
+      expect(buildFightConfig({ seed: "a", tier: "minion", loadout: [...STRUCTURE_KINDS] }).loadout).toEqual([...STRUCTURE_KINDS]);
+    }
+    // builds the same enemy for the same seed and tier
+    {
+      expect(buildFightConfig({ seed: "x", tier: "elite" })).toEqual(buildFightConfig({ seed: "x", tier: "elite" }));
+      expect(buildFightConfig({ seed: "x", tier: "elite" }).enemy).toEqual(buildFightConfig({ seed: "x", tier: "elite" }).enemy);
+    }
+    // starts a fight the engine accepts, with the spec's starting resources
+    {
+      const state = createFight("start", buildFightConfig({ seed: "start", tier: "minion" }));
+      expect(state).toMatchObject({ turn: 1, phase: "deploy", certainty: balance.STARTING_CERTAINTY, enemyHp: balance.TIERS.minion.hp });
+      expect(state.slots).toHaveLength(3);
+    }
+    // does not allow an unknown tier
+    {
+      expect(() => buildFightConfig({ seed: "bad", tier: "king" as never })).toThrow(RangeError);
+    }
   });
 });
 
@@ -66,23 +69,26 @@ describe("fights from generated enemies", () => {
     return { state, steps, config };
   }
 
-  it("never breaks the engine under random play, in any tier", () => {
-    eachCase((["minion", "elite", "boss"] as const).map((tier) => [tier, tier] as const), (tier) => {
-      let finished = 0;
-      for (let i = 0; i < 12; i++) {
-        const { state, config } = playRandomly(`fuzz-${tier}-${i}`, tier);
-        expect(state.certainty).toBeGreaterThanOrEqual(0);
-        expect(state.certainty).toBeLessThanOrEqual(balance.STARTING_CERTAINTY);
-        expect(state.enemyHp).toBeGreaterThanOrEqual(0);
-        expect(state.enemyHp).toBeLessThanOrEqual(config.enemy.hp);
-        if (state.phase === "won" || state.phase === "lost") finished++;
-      }
-      expect(finished).toBeGreaterThan(0);
-    });
-  });
-
-  it("every generated fight can be saved as JSON mid-way and resumed", () => {
-    const { state } = playRandomly("json-fuzz", "elite");
-    expect(JSON.parse(JSON.stringify(state))).toEqual(state);
+  it("never breaks the engine under random play, in any tier; every generated fight can be saved as JSON mid-way and resumed", () => {
+    // never breaks the engine under random play, in any tier
+    {
+      eachCase((["minion", "elite", "boss"] as const).map((tier) => [tier, tier] as const), (tier) => {
+        let finished = 0;
+        for (let i = 0; i < 12; i++) {
+          const { state, config } = playRandomly(`fuzz-${tier}-${i}`, tier);
+          expect(state.certainty).toBeGreaterThanOrEqual(0);
+          expect(state.certainty).toBeLessThanOrEqual(balance.STARTING_CERTAINTY);
+          expect(state.enemyHp).toBeGreaterThanOrEqual(0);
+          expect(state.enemyHp).toBeLessThanOrEqual(config.enemy.hp);
+          if (state.phase === "won" || state.phase === "lost") finished++;
+        }
+        expect(finished).toBeGreaterThan(0);
+      });
+    }
+    // every generated fight can be saved as JSON mid-way and resumed
+    {
+      const { state } = playRandomly("json-fuzz", "elite");
+      expect(JSON.parse(JSON.stringify(state))).toEqual(state);
+    }
   });
 });
