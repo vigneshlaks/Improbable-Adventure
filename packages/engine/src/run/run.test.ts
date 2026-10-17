@@ -25,7 +25,7 @@ describe("createRun", () => {
     expect(run).toMatchObject({ phase: "fight", encounter: 0, certainty: 100, maxCertainty: 100 });
     expect(run.owned).toEqual(["exactMemory", "reservoirSampling", "bloomFilter", "linearCounting"]);
     expect(run.fight?.config.loadout).toEqual(run.owned);
-    expect(observeRun(run)).toMatchObject({ phase: "fight", encounter: 0, encounters: 4, certainty: 100 });
+    expect(observeRun(run)).toMatchObject({ phase: "fight", encounter: 0, encounters: 4, tier: "minion", certainty: 100 });
     expect(observeRun(run).fight).toMatchObject({ spaceFree: 8192, slotsFree: 3 });
   });
 
@@ -60,6 +60,13 @@ describe("a fight inside a run", () => {
     expect(a).toEqual(b);
     expect(observeRun(start("other")).fight?.weakPoint).toBe(null);
     expect(start("same").fight?.stream).not.toEqual(start("other").fight?.stream);
+  });
+
+  it("says which tier the encounter is, and how long the act is when each fight starts", () => {
+    const toElite = until(start("tiers"), "rest"); // two fights in, the rest stop comes before the Elite
+    expect(observeRun(toElite).tier).toBe("elite");
+    const { events } = play(toElite, { type: "leaveRest" });
+    expect(events).toContainEqual({ type: "fightStarted", encounter: 2, encounters: 4, tier: "elite" });
   });
 
   it("gives every encounter its own stream", () => {

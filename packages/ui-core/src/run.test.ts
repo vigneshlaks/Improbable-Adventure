@@ -1,0 +1,165 @@
+import { describe, expect, it } from "vitest";
+import type { FusionDef, RewardView, RunEvent } from "@pda/engine";
+import { eachCase } from "../../engine/src/testCases";
+import { narrateRunStep } from "./narrator";
+import { parseRunCommand, type RunParseResult } from "./parser";
+import { renderRest, renderRewards, renderRunStatus } from "./views";
+import { observation, runObservation } from "./testUtils";
+
+const offers: RewardView[] = [
+  { id: "structure:countMinSketch", kind: "structure", structure: "countMinSketch" },
+  { id: "upgrade:power", kind: "upgrade", upgrade: "power" },
+  { id: "structure:logLog", kind: "structure", structure: "logLog" },
+];
+const hyper: FusionDef = { id: "hyperLogLog", inputs: ["logLog", "linearCounting"], result: "hyperLogLog" };
+const reward = runObservation({ phase: "reward", fight: null, offers });
+const rest = runObservation({ phase: "rest", fight: null, fusions: [hyper], owned: ["exactMemory", "logLog", "linearCounting"] });
+const parse = (input: string, run = runObservation()): RunParseResult => parseRunCommand(input, run);
+const errorOf = (result: RunParseResult): string => (result.kind === "error" ? result.message : `not an error: ${JSON.stringify(result)}`);
+
+describe("parseRunCommand during a fight", () => {
+  it("reads the fight's own commands exactly as the fight parser does, using the structures the run owns", () => {
+    expect(parse("deploy bloom 2048")).toEqual({ kind: "action", action: { type: "deploy", slot: 0, kind: "bloomFilter", spaceBits: 2048 } });
+    expect(parse("ready")).toEqual({ kind: "action", action: { type: "endDeploy" } });
+    expect(errorOf(parse("deploy cms 1024"))).toMatch(/do not own/i); // Count-Min is not owned yet
+    expect(parse("deploy cms 1024", runObservation({ owned: ["countMinSketch"] })).kind).toBe("action");
+    expect(parse("status")).toEqual({ kind: "info", info: "status" });
+    expect(parse("quit")).toEqual({ kind: "quit" });
+  });
+
+  it("explains that the run commands have to wait", () => {
+    for (const word of ["choose 1", "fuse", "leave"]) expect(errorOf(parse(word))).toMatch(/not now|nothing to|no reward|no rest/i);
+  });
+});
+
+describe("parseRunCommand at the reward screen", () => {
+  it("takes a reward by number, from 1, with any of three words or just the number", () => {
+    eachCase(["choose 2", "take 2", "pick 2", "2", " CHOOSE   2 "].map((input) => [input, input] as const), (input) => {
+      expect(parse(input, reward)).toEqual({ kind: "runAction", action: { type: "chooseReward", index: 1 } });
+    });
+    expect(parse("choose 1", reward)).toEqual({ kind: "runAction", action: { type: "chooseReward", index: 0 } });
+    expect(parse("choose 3", reward)).toEqual({ kind: "runAction", action: { type: "chooseReward", index: 2 } });
+  });
+
+  it("refuses a number that is not on offer and a choice with no number", () => {
+    expect(errorOf(parse("choose 4", reward))).toMatch(/1 to 3/);
+    expect(errorOf(parse("choose 0", reward))).toMatch(/1 to 3/);
+    expect(errorOf(parse("choose", reward))).toMatch(/Usage: choose/);
+    expect(errorOf(parse("choose two", reward))).toMatch(/Usage: choose/);
+  });
+
+  it("asks for a reward before anything else, but still answers status, help and quit", () => {
+    for (const word of ["ready", "deploy bloom 1024", "strike 1", "leave", "fuse"]) expect(errorOf(parse(word, reward))).toMatch(/reward/i);
+    expect(parse("status", reward)).toEqual({ kind: "info", info: "status" });
+    expect(parse("help choose", reward)).toEqual({ kind: "info", info: "help", topic: "choose" });
+    expect(parse("quit", reward)).toEqual({ kind: "quit" });
+  });
+});
+
+describe("parseRunCommand at the rest stop", () => {
+  it("leaves with any of its words", () => {
+    for (const word of ["leave", "ready", "go", "done", "continue"]) {
+      expect(parse(word, rest)).toEqual({ kind: "runAction", action: { type: "leaveRest" } });
+    }
+  });
+
+  it("fuses a recipe by its id, its result's name or alias, or with no name when there is only one", () => {
+    const fuse = { kind: "runAction", action: { type: "fuse", recipeId: "hyperLogLog" } };
+    eachCase(["fuse hyperLogLog", "fuse hll", "fuse HyperLogLog", "fuse"].map((input) => [input, input] as const), (input) => {
+      expect(parse(input, rest)).toEqual(fuse);
+    });
+  });
+
+  it("explains a fusion that is not available, and names the ones that are", () => {
+    expect(errorOf(parse("fuse bloom", rest))).toMatch(/no fusion called "bloom".*hyperLogLog|HyperLogLog/);
+    const none = runObservation({ phase: "rest", fight: null, fusions: [] });
+    expect(errorOf(parse("fuse", none))).toMatch(/nothing to fuse/i);
+    const two = runObservation({ phase: "rest", fight: null, fusions: [hyper, { id: "other", inputs: ["bloomFilter", "countMinSketch"], result: "exactMemory" }] });
+    expect(errorOf(parse("fuse", two))).toMatch(/which/i);
+  });
+
+  it("asks to leave before fighting or choosing", () => {
+    expect(errorOf(parse("strike 1", rest))).toMatch(/rest/i);
+    expect(errorOf(parse("deploy bloom 1024", rest))).toMatch(/rest/i);
+    expect(errorOf(parse("choose 1", rest))).toMatch(/rest/i);
+  });
+});
+
+describe("parseRunCommand when the run is over", () => {
+  it("says so, except for quit", () => {
+    for (const phase of ["won", "lost"] as const) {
+      expect(errorOf(parse("ready", runObservation({ phase, fight: null })))).toMatch(/over/i);
+    }
+  });
+});
+
+describe("narrateRunStep", () => {
+  const run = (event: RunEvent) => narrateRunStep([event]).join(" ");
+
+  it("announces each fight with its place in the act", () => {
+    expect(run({ type: "fightStarted", encounter: 2, encounters: 7, tier: "minion" })).toMatch(/Fight 3 of 7/i);
+  });
+
+  it("describes a reward taken by name, a rest, a fusion and the ending", () => {
+    expect(run({ type: "rewardChosen", id: "structure:countMinSketch" })).toMatch(/Count-Min Sketch/);
+    expect(run({ type: "rewardChosen", id: "upgrade:power" })).toMatch(/Power/);
+    expect(run({ type: "restStarted", healed: 30 })).toMatch(/rest.*30/i);
+    expect(run({ type: "fused", recipeId: "hyperLogLog", inputs: ["logLog", "linearCounting"], result: "hyperLogLog" })).toMatch(/LogLog and Linear Counting.*HyperLogLog/);
+    expect(run({ type: "runWon", turns: 31, certaintyLeft: 88 })).toMatch(/31 turns.*88 Certainty/);
+    expect(run({ type: "runLost", encounter: 5 })).toMatch(/fight 6/i);
+  });
+
+  it("leaves a reward offer to the reward screen, and narrates fight events as the fight narrator does", () => {
+    expect(narrateRunStep([{ type: "rewardOffered", options: ["upgrade:power"] }]).join(" ")).toMatch(/won.*reward/i);
+    expect(narrateRunStep([{ type: "turnStarted", turn: 3 }])).toEqual(["Turn 3."]);
+  });
+});
+
+describe("renderRewards", () => {
+  const text = renderRewards(offers).join("\n");
+
+  it("numbers the offers from 1, with the name, what kind it is, and what it does", () => {
+    expect(text).toMatch(/1\) Count-Min Sketch \(new structure\)/);
+    expect(text).toMatch(/2\) Power \(upgrade\): Every strike deals more damage/);
+    expect(text).toMatch(/3\) LogLog \(new structure\)/);
+  });
+});
+
+describe("renderRest", () => {
+  it("lists the fusions available, with their inputs and result, and how to fuse or leave", () => {
+    const text = renderRest(rest).join("\n");
+    expect(text).toMatch(/HyperLogLog/);
+    expect(text).toMatch(/LogLog and Linear Counting/);
+    expect(text).toMatch(/fuse/);
+    expect(text).toMatch(/leave/);
+  });
+
+  it("says when there is nothing to fuse", () => {
+    expect(renderRest(runObservation({ phase: "rest", fight: null, fusions: [] })).join("\n")).toMatch(/nothing to fuse/i);
+  });
+});
+
+describe("renderRunStatus", () => {
+  it("shows where the player is in the act, the Certainty against its maximum, the owned structures and upgrades", () => {
+    const text = renderRunStatus(
+      runObservation({ encounter: 2, tier: "minion", certainty: 120, maxCertainty: 170, upgrades: { power: 2, slots: 1 }, owned: ["exactMemory", "hyperLogLog"] }),
+    ).join("\n");
+    expect(text).toMatch(/Fight 3 of 7 \(minion\)/);
+    expect(text).toMatch(/Certainty: 120 of 170/);
+    expect(text).toMatch(/Owned: Exact Memory, HyperLogLog/);
+    expect(text).toMatch(/Upgrades: Power x2, Slots$/m); // a single one has no count
+  });
+
+  it("shows the Certainty once, not again in the fight's status", () => {
+    expect(renderRunStatus(runObservation({ fight: observation({ turn: 2 }) })).filter((line) => line.startsWith("Certainty:"))).toHaveLength(1);
+  });
+
+  it("adds the fight's own status during a fight, and none between fights", () => {
+    expect(renderRunStatus(runObservation({ fight: observation({ turn: 4 }) })).join("\n")).toMatch(/Turn 4, deploy phase/);
+    expect(renderRunStatus(reward).join("\n")).not.toMatch(/deploy phase/);
+  });
+
+  it("says no upgrades yet when there are none", () => {
+    expect(renderRunStatus(runObservation()).join("\n")).toMatch(/Upgrades: none/);
+  });
+});

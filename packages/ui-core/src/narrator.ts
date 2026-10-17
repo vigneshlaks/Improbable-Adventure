@@ -1,5 +1,5 @@
-import { narration, structures, type EventTemplateKey } from "@pda/content";
-import type { Challenge, EnemyConfig, GameEvent } from "@pda/engine";
+import { narration, structures, upgrades, type EventTemplateKey } from "@pda/content";
+import type { Challenge, EnemyConfig, GameEvent, RunEvent, StructureKind } from "@pda/engine";
 
 /** Shows whole numbers plainly and rounds the rest to at most two decimals. */
 export function formatNumber(x: number): string {
@@ -91,6 +91,43 @@ export function narrateEvent(event: GameEvent, options: NarrateOptions = {}): st
 
 export function narrateEvents(events: readonly GameEvent[], options: NarrateOptions = {}): string[] {
   return events.flatMap((event) => narrateEvent(event, options));
+}
+
+const RUN_EVENT_TYPES = new Set(["fightStarted", "rewardOffered", "rewardChosen", "restStarted", "fused", "runWon", "runLost"]);
+
+/** The player-facing name of a reward id such as "structure:logLog" or "upgrade:power". */
+export function rewardName(id: string): string {
+  const [kind, name] = id.split(":") as [string, string];
+  return kind === "structure" ? (structures[name as StructureKind]?.name ?? name) : (upgrades[name]?.name ?? name);
+}
+
+const structureNames = (kinds: readonly StructureKind[]) => kinds.map((kind) => structures[kind].name).join(" and ");
+
+/** The text for one event of the run itself (a fight starting, a reward, a rest stop, the ending). */
+export function narrateRunEvent(event: RunEvent): string[] {
+  switch (event.type) {
+    case "fightStarted":
+      return [say("fightStarted", { number: event.encounter + 1, total: event.encounters })];
+    case "rewardOffered":
+      return [say("rewardOffered")];
+    case "rewardChosen":
+      return [say("rewardChosen", { name: rewardName(event.id) })];
+    case "restStarted":
+      return [say("restStarted", { healed: formatNumber(event.healed) })];
+    case "fused":
+      return [say("fused", { inputs: structureNames(event.inputs), result: structures[event.result].name })];
+    case "runWon":
+      return [say("runWon", { turns: event.turns, certaintyLeft: formatNumber(event.certaintyLeft) })];
+    case "runLost":
+      return [say("runLost", { number: event.encounter + 1 })];
+  }
+}
+
+/** Narrates the events of one step of a run: fight events as the fight narrator does, run events by their own templates. */
+export function narrateRunStep(events: ReadonlyArray<GameEvent | RunEvent>, options: NarrateOptions = {}): string[] {
+  return events.flatMap((event) =>
+    RUN_EVENT_TYPES.has(event.type) ? narrateRunEvent(event as RunEvent) : narrateEvent(event as GameEvent, options),
+  );
 }
 
 const TRAIT_NAMES = ["variety", "skew", "churn", "growth", "drift"] as const;

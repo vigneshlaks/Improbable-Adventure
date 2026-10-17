@@ -1,5 +1,5 @@
 import { findStructure, structures } from "@pda/content";
-import type { Action, Observation, StructureKind, StructureView } from "@pda/engine";
+import type { Action, Observation, RunAction, RunObservation, StructureKind, StructureView } from "@pda/engine";
 
 /** What a typed line means. Errors carry a message for the player; the parser never throws on bad input. */
 export type ParseResult =
@@ -259,4 +259,76 @@ export function parseCommand(input: string, context: ParseContext): ParseResult 
       return error(`I don't know the command "${word}". ${guess ? `Did you mean "${guess}"? ` : ""}Type "help" to see the commands.`);
     }
   }
+}
+
+
+/** What a typed line means during a run: everything the fight parser knows, plus the choices between fights. */
+export type RunParseResult = ParseResult | { kind: "runAction"; action: Extract<RunAction, { type: "chooseReward" | "fuse" | "leaveRest" }> };
+
+const CHOOSE_WORDS = ["choose", "take", "pick"];
+const LEAVE_WORDS = ["leave", "ready", "go", "done", "continue"];
+const FIGHT_WORDS = ["deploy", "remove", "strike"];
+const RUN_WORDS = [...CHOOSE_WORDS, "fuse", ...LEAVE_WORDS, ...FIGHT_WORDS];
+
+const normalize = (text: string) => text.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+function parseChoose(tokens: string[], offers: number): RunParseResult {
+  const usage = "Usage: choose <number>";
+  if (tokens.length !== 1 || !isWhole(tokens[0] as string)) return error(usage);
+  const number = Number(tokens[0]);
+  if (number < 1 || number > offers) return error(`Choose a reward from 1 to ${offers}.`);
+  return { kind: "runAction", action: { type: "chooseReward", index: number - 1 } };
+}
+
+function parseFuse(tokens: string[], run: RunObservation): RunParseResult {
+  const fusions = run.fusions ?? [];
+  const fuse = (recipeId: string): RunParseResult => ({ kind: "runAction", action: { type: "fuse", recipeId } });
+  const available = fusions.map((fusion) => fusion.id).join(", ");
+  if (tokens.length === 0) {
+    if (fusions.length === 0) return error("There is nothing to fuse.");
+    if (fusions.length > 1) return error(`Which fusion? Choose one of: ${available}.`);
+    return fuse((fusions[0] as NonNullable<typeof fusions[number]>).id);
+  }
+  const wanted = tokens.join(" ");
+  const kind = findStructure(wanted);
+  const match = fusions.find((fusion) => normalize(fusion.id) === normalize(wanted) || (kind !== null && fusion.result === kind));
+  if (match) return fuse(match.id);
+  return error(fusions.length === 0 ? "There is nothing to fuse." : `There is no fusion called "${wanted}". Choose one of: ${available}.`);
+}
+
+/** Turns one typed line into an action for the run, a request for information, or an explanation. Never throws. */
+export function parseRunCommand(input: string, run: RunObservation): RunParseResult {
+  const tokens = input.toLowerCase().trim().split(/\s+/).filter(Boolean);
+  const [word, ...rest] = tokens;
+  if (word === undefined) return { kind: "empty" };
+
+  // These work everywhere.
+  const common = (COMMANDS as Record<string, string>)[word];
+  if (common === "quit") return { kind: "quit" };
+  if (common === "status") return { kind: "info", info: "status" };
+  if (common === "query") return { kind: "info", info: "query" };
+  if (common === "help") return rest.length > 0 ? { kind: "info", info: "help", topic: rest.join(" ") } : { kind: "info", info: "help" };
+
+  if (run.phase === "won" || run.phase === "lost") return error("The run is over.");
+
+  if (run.phase === "fight") {
+    if (CHOOSE_WORDS.includes(word)) return error("There is no reward to choose right now.");
+    if (word === "fuse") return error("There is no rest stop to fuse at right now.");
+    if (word === "leave" || word === "continue") return error("There is no rest stop to leave right now.");
+    return parseCommand(input, { observation: run.fight as Observation, loadout: run.owned });
+  }
+
+  if (run.phase === "reward") {
+    const offers = run.offers?.length ?? 0;
+    if (CHOOSE_WORDS.includes(word)) return parseChoose(rest, offers);
+    if (isWhole(word) && rest.length === 0) return parseChoose([word], offers);
+    if (RUN_WORDS.includes(word)) return error('Choose a reward first, for example "choose 1".');
+  } else {
+    if (word === "fuse") return parseFuse(rest, run);
+    if (LEAVE_WORDS.includes(word)) return { kind: "runAction", action: { type: "leaveRest" } };
+    if (RUN_WORDS.includes(word) || isWhole(word)) return error('You are at a rest stop: "fuse" something, or "leave" to go on.');
+  }
+
+  const guess = closest(word, RUN_WORDS.filter((name) => name.length > 2));
+  return error(`I don't know the command "${word}". ${guess ? `Did you mean "${guess}"? ` : ""}Type "help" to see the commands.`);
 }

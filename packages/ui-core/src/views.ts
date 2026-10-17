@@ -1,5 +1,5 @@
-import { findStructure, narration, structures } from "@pda/content";
-import { STRUCTURE_KINDS, type Answer, type Observation, type StructureKind, type StructureView } from "@pda/engine";
+import { findStructure, fusions, narration, structures, upgrades } from "@pda/content";
+import { STRUCTURE_KINDS, type Answer, type Observation, type RewardView, type RunObservation, type StructureKind, type StructureView } from "@pda/engine";
 import { formatNumber, TRAIT_NAMES, title } from "./narrator";
 
 // The layouts of the status, query and help screens. Story text lives in content; these are the displays.
@@ -116,4 +116,45 @@ export function renderHelp(topic?: string, loadout?: readonly StructureKind[]): 
   const kind = findStructure(wanted);
   if (kind) return [...structureHelp(kind), ...(loadout && !loadout.includes(kind) ? ["You do not own this structure yet."] : [])];
   return [`No help for "${topic}". Type "help" to see everything.`];
+}
+
+
+/** The rewards on offer, numbered from 1 as the player types them. */
+export function renderRewards(offers: readonly RewardView[]): string[] {
+  return offers.map((offer, position) => {
+    const text =
+      offer.kind === "structure"
+        ? `${structures[offer.structure].name} (new structure): ${structures[offer.structure].summary}`
+        : `${upgrades[offer.upgrade]?.name ?? offer.upgrade} (upgrade): ${upgrades[offer.upgrade]?.summary ?? ""}`;
+    return `  ${position + 1}) ${text}`;
+  });
+}
+
+/** What can be done at a rest stop. */
+export function renderRest(run: RunObservation): string[] {
+  const available = run.fusions ?? [];
+  if (available.length === 0) return ['Nothing to fuse. Type "leave" to go on to the next fight.'];
+  return [
+    "Fusions you can do:",
+    ...available.map((fusion) => {
+      const info = fusions[fusion.id];
+      const inputs = fusion.inputs.map((kind) => structures[kind].name).join(" and ");
+      return `  ${info?.name ?? fusion.id}: ${inputs} become ${structures[fusion.result].name}. ${info?.summary ?? ""}`.trimEnd();
+    }),
+    'Type "fuse <name>" to fuse (the originals are used up), or "leave" to go on to the next fight.',
+  ];
+}
+
+/** Where the player is in the act, what they own, and (in a fight) the fight's own status. */
+export function renderRunStatus(run: RunObservation): string[] {
+  const taken = Object.entries(run.upgrades)
+    .filter(([, times]) => times > 0)
+    .map(([id, times]) => `${upgrades[id]?.name ?? id}${times > 1 ? ` x${times}` : ""}`);
+  return [
+    `Fight ${run.encounter + 1} of ${run.encounters} (${run.tier})`,
+    `Certainty: ${formatNumber(run.certainty)} of ${formatNumber(run.maxCertainty)}`,
+    `Owned: ${run.owned.map((kind) => structures[kind].name).join(", ")}`,
+    `Upgrades: ${taken.length > 0 ? taken.join(", ") : "none"}`,
+    ...(run.fight ? renderStatus(run.fight).filter((line) => !line.startsWith("Certainty:")) : []),
+  ];
 }

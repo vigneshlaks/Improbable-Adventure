@@ -23,7 +23,7 @@ describe("narration.json", () => {
       for (const level of ["low", "medium", "high"] as const) expect(narration.enemy.traits[trait][level].length).toBeGreaterThan(0);
     }
     for (const tier of ["minion", "elite", "boss"] as const) expect(narration.enemy.intro[tier].length).toBeGreaterThan(0);
-    for (const command of ["deploy", "remove", "ready", "query", "strike", "status", "help", "quit"] as const) {
+    for (const command of ["deploy", "remove", "ready", "query", "strike", "status", "help", "quit", "choose", "fuse", "leave"] as const) {
       expect(narration.commands[command].usage.startsWith(command)).toBe(true);
       expect(narration.commands[command].summary.length).toBeGreaterThan(5);
     }
@@ -32,6 +32,7 @@ describe("narration.json", () => {
   it("has the lines the terminal game opens and closes with", () => {
     expect(narration.game.welcome).toMatch(/help/);
     expect(narration.game.goodbye.length).toBeGreaterThan(0);
+    expect(narration.game.runWelcome).toMatch(/choose|reward/i);
   });
 
   it("rejects a template that uses an unknown variable", () => {

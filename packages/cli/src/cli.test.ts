@@ -5,14 +5,23 @@ describe("parseGameArgs", () => {
   const defaults = { defaultSeed: "clock" };
 
   it("uses Minion, the starting loadout and the given default seed", () => {
-    expect(parseGameArgs([], defaults)).toEqual({ ok: true, options: { seed: "clock", tier: "minion", loadout: "starting" } });
+    expect(parseGameArgs([], defaults)).toEqual({ ok: true, mode: "fight", options: { seed: "clock", tier: "minion", loadout: "starting" } });
   });
 
   it("reads --seed, --tier and --loadout in both spellings", () => {
     expect(parseGameArgs(["--seed", "abc", "--tier=boss", "--loadout", "full"], defaults)).toEqual({
       ok: true,
+      mode: "fight",
       options: { seed: "abc", tier: "boss", loadout: "full" },
     });
+  });
+
+  it("plays a whole run with --run, using the seed and nothing else", () => {
+    expect(parseGameArgs(["--run"], defaults)).toEqual({ ok: true, mode: "run", options: { seed: "clock" } });
+    expect(parseGameArgs(["--run", "--seed", "abc"], defaults)).toEqual({ ok: true, mode: "run", options: { seed: "abc" } });
+    expect(parseGameArgs(["--seed=abc", "--run"], defaults)).toEqual({ ok: true, mode: "run", options: { seed: "abc" } });
+    expect(parseGameArgs(["--run", "--tier", "boss"], defaults)).toMatchObject({ ok: false, message: expect.stringMatching(/--tier and --loadout are for single fights/) });
+    expect(parseGameArgs(["--run", "--loadout=full"], defaults)).toMatchObject({ ok: false });
   });
 
   it("explains a bad value or an unknown option", () => {
@@ -24,5 +33,6 @@ describe("parseGameArgs", () => {
 
   it("shows usage for --help", () => {
     expect(parseGameArgs(["--help"], defaults)).toMatchObject({ ok: false, message: expect.stringMatching(/Usage: pnpm cli/) });
+    expect(parseGameArgs(["--help"], defaults)).toMatchObject({ message: expect.stringMatching(/--run/) });
   });
 });

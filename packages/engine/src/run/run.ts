@@ -74,7 +74,7 @@ function startFight(state: RunState, encounter: number): { state: RunState; even
   const fight = createFight(`${state.seed}/fight/${encounter}`, fightConfig);
   return {
     state: { ...state, phase: "fight", encounter, fight, offers: null },
-    events: [{ type: "fightStarted", encounter, tier: fightConfig.enemy.tier }],
+    events: [{ type: "fightStarted", encounter, encounters: config.encounters.length, tier: fightConfig.enemy.tier }],
   };
 }
 
@@ -267,6 +267,7 @@ export function observeRun(state: RunState): RunObservation {
     phase: state.phase,
     encounter: state.encounter,
     encounters: state.config.encounters.length,
+    tier: (state.config.encounters[state.encounter] as FightConfig["enemy"]).tier,
     certainty: state.certainty,
     maxCertainty: state.maxCertainty,
     owned: [...state.owned],

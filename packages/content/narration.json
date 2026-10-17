@@ -17,9 +17,15 @@
     "turnStarted": "Turn {turn}.",
     "fightWon": "The enemy collapses. You win on turn {turn}.",
     "fightLostTurnLimit": "The stream overflows you. The fight is lost, and the overflow costs {certaintyLost} Certainty.",
-    "fightLostCertainty": "Your Certainty is gone. The run is over."
+    "fightLostCertainty": "Your Certainty is gone. The run is over.",
+    "fightStarted": "Fight {number} of {total}.",
+    "rewardOffered": "The fight is won. Choose a reward:",
+    "rewardChosen": "You take {name}.",
+    "restStarted": "You reach a rest stop and recover {healed} Certainty.",
+    "fused": "{inputs} fuse into {result}.",
+    "runWon": "The act is won in {turns} turns, with {certaintyLeft} Certainty left.",
+    "runLost": "The run ends in fight {number}."
   },
-
   "enemy": {
     "intro": {
       "minion": "A minion approaches.",
@@ -55,7 +61,6 @@
       }
     }
   },
-
   "commands": {
     "deploy": {
       "usage": "deploy <structure> <bits> [knob]",
@@ -88,10 +93,23 @@
     "quit": {
       "usage": "quit",
       "summary": "Leave the game."
+    },
+    "choose": {
+      "usage": "choose <number>",
+      "summary": "Take one of the rewards on offer after a fight."
+    },
+    "fuse": {
+      "usage": "fuse [name]",
+      "summary": "At a rest stop, fuse structures you own into a new one. The originals are used up."
+    },
+    "leave": {
+      "usage": "leave",
+      "summary": "Leave the rest stop and go on to the next fight."
     }
   },
   "game": {
     "welcome": "Deploy structures, then type \"ready\" to let the stream arrive. Type \"help\" for the commands.",
-    "goodbye": "You leave the field."
+    "goodbye": "You leave the field.",
+    "runWelcome": "An act lies ahead: a series of fights, with a reward after each and a rest stop before the Elite. Type \"help\" for the commands, and \"choose <number>\" when rewards are offered."
   }
 }

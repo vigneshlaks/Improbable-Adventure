@@ -1,4 +1,4 @@
-import type { Answer, Observation, StructureKind, StructureView } from "@pda/engine";
+import type { Answer, Observation, RunObservation, StructureKind, StructureView } from "@pda/engine";
 
 /** A plain observation at the start of a fight, with any field overridden. */
 export function observation(overrides: Partial<Observation> = {}): Observation {
@@ -27,4 +27,22 @@ export const answer = (estimate: number | number[], low: number, high: number, c
 /** A deployed structure as the player sees it. `slot` is the engine's 0-based slot. */
 export function view(slot: number, kind: StructureKind, theAnswer: Answer | null = null, spaceBits = 1024): StructureView {
   return { slot, kind, params: {}, spaceBits, answer: theAnswer };
+}
+
+/** A run observation in the middle of a fight, with any field overridden. */
+export function runObservation(overrides: Partial<RunObservation> = {}): RunObservation {
+  return {
+    phase: "fight",
+    encounter: 0,
+    encounters: 7,
+    tier: "minion",
+    certainty: 150,
+    maxCertainty: 150,
+    owned: ["exactMemory", "reservoirSampling", "bloomFilter", "linearCounting"],
+    upgrades: {},
+    fight: observation(),
+    offers: null,
+    fusions: null,
+    ...overrides,
+  };
 }

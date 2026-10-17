@@ -511,6 +511,9 @@ The CLI and web UI share one command parser and one narrator; both only translat
 | strike \<value> / estimate / high / low | strike high | strikeValue |
 | status | status | none |
 | help \[topic\] | help bloom | none |
+| choose \<number> | choose 2 | chooseReward (a reward is on offer; `take` and `pick` also work, and so does a bare number) |
+| fuse \[name] | fuse hll | fuse (at a rest stop; the name is the recipe id or the result's name or alias, and may be left out when only one fusion is available) |
+| leave | leave | leaveRest (also `ready`, `go`, `done`, `continue`) |
 
 **Narration** is generated from engine events using templates in content, never by hand inside UI code. Enemy flavor text comes from its traits.
 
@@ -529,7 +532,7 @@ The CLI and web UI share one command parser and one narrator; both only translat
 - A `Session` holds the fight and turns one typed line into lines of output with no I/O of its own, so a script of lines gives a transcript and the tests run whole fights. A thin loop feeds it lines from the terminal.
 - The prompt shows the turn, phase, Certainty, enemy HP and free Space. When a challenge arrives, the answers of the deployed structures (the `query` screen) are printed with it.
 - The welcome and goodbye lines are in `narration.json` under `game`.
-- A run is one fight for now; the run loop (rewards, rest stops, fusion) is Milestone 4.
+- **Run mode (decided 2026-10-17).** `pnpm cli --run [--seed <text>]` plays a whole act on the content `buildRunConfig` designs from the seed (`--tier` and `--loadout` are refused, since a run chooses its own enemies and structures; the default stays a single fight). A `RunSession` has the same interface as the fight `Session`, so the same play loop runs it. Each fight starts with "Fight n of N." and the enemy described. Winning a fight shows the rewards numbered from 1, each with its name, whether it is a new structure or an upgrade, and what it does; `choose <number>` takes one (anything else except `status`, `help` and `quit` is refused until one is taken). The rest stop lists the fusions that can be done, with their inputs and result, or says there is nothing to fuse; `fuse` does one and `leave` goes on. The prompt shows the fight, the turn, the phase, the Certainty against its maximum and the free Space (`[fight 2/7 turn 3 strike | Certainty 120/150 | Enemy HP 12 | 8192 bits free] >`, `[reward after fight 2/7 | ...] >`, `[rest stop | ...] >`). `status` shows the place in the act, the Certainty against its maximum, the structures owned and the upgrades taken, then the fight's own status. The parser and narrator for these (`parseRunCommand`, `narrateRunStep`, `renderRewards`, `renderRest`, `renderRunStatus`) are in `ui-core`, shared with the web UI.
 - **Strike feedback (decided 2026-10-14).** After a strike the game says what was true, so the player can learn how far off a range was: a Frequency strike reports the true count and the force used, a Count strike the true number of distinct values and the estimate used, a Presence strike how many of the targets were real. The truth is part of the `strikeResolved` event (`trueCount` and `force`, `trueDistinct` and `estimate`, `realTotal`); it appears only after the strike, never in an Observation. The first playtest found that without it a player cannot tell a good range from a bad one.
 - `help` lists only the structures in the loadout; asking about another one still explains it and says it is not owned. On a Presence challenge turn the targets are printed once, in the query screen with the structures' flags.
 

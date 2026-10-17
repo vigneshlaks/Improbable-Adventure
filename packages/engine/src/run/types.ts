@@ -78,7 +78,7 @@ export interface RunState {
 export type RunAction = Action | { type: "chooseReward"; index: number } | { type: "fuse"; recipeId: string } | { type: "leaveRest" };
 
 export type RunEvent =
-  | { type: "fightStarted"; encounter: number; tier: EnemyConfig["tier"] }
+  | { type: "fightStarted"; encounter: number; encounters: number; tier: EnemyConfig["tier"] }
   | { type: "rewardOffered"; options: string[] }
   | { type: "rewardChosen"; id: string }
   | { type: "restStarted"; healed: number }
@@ -103,6 +103,8 @@ export interface RunObservation {
   phase: RunPhase;
   encounter: number;
   encounters: number;
+  /** The tier of that encounter. */
+  tier: EnemyConfig["tier"];
   certainty: number;
   maxCertainty: number;
   owned: StructureKind[];

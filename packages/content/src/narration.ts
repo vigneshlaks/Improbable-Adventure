@@ -24,6 +24,13 @@ export const EVENT_TEMPLATES = {
   fightWon: ["turn"],
   fightLostTurnLimit: ["certaintyLost"],
   fightLostCertainty: [],
+  fightStarted: ["number", "total"],
+  rewardOffered: [],
+  rewardChosen: ["name"],
+  restStarted: ["healed"],
+  fused: ["inputs", "result"],
+  runWon: ["turns", "certaintyLeft"],
+  runLost: ["number"],
 } as const;
 
 export type EventTemplateKey = keyof typeof EVENT_TEMPLATES;
@@ -75,9 +82,12 @@ export const narrationSchema = z
         status: command,
         help: command,
         quit: command,
+        choose: command,
+        fuse: command,
+        leave: command,
       })
       .strict(),
-    game: z.object({ welcome: z.string().min(1), goodbye: z.string().min(1) }).strict(),
+    game: z.object({ welcome: z.string().min(1), goodbye: z.string().min(1), runWelcome: z.string().min(1) }).strict(),
   })
   .strict();
 

@@ -1,3 +1,3 @@
-export { describeEnemy, formatNumber, narrateEvent, narrateEvents, renderTemplate } from "./narrator";
-export { parseCommand, type ParseContext, type ParseResult } from "./parser";
-export { renderHelp, renderQuery, renderStatus } from "./views";
+export { describeEnemy, formatNumber, narrateEvent, narrateEvents, narrateRunEvent, narrateRunStep, renderTemplate, rewardName, type NarrateOptions } from "./narrator";
+export { parseCommand, parseRunCommand, type ParseContext, type ParseResult, type RunParseResult } from "./parser";
+export { renderHelp, renderQuery, renderRest, renderRewards, renderRunStatus, renderStatus } from "./views";

@@ -79,7 +79,7 @@ export function playRun({ config, seed, bot, maxSteps = DEFAULT_MAX_STEPS }: Pla
   let playerFor = state.encounter; // a new fight-level player is made for each fight
 
   // `createRun` returns only the state, so the first fight's start is recorded here.
-  const events: Array<GameEvent | RunEvent> = [{ type: "fightStarted", encounter: 0, tier: config.encounters[0]?.tier ?? "minion" }];
+  const events: Array<GameEvent | RunEvent> = [{ type: "fightStarted", encounter: 0, encounters: config.encounters.length, tier: config.encounters[0]?.tier ?? "minion" }];
   let steps = 0;
   while (state.phase !== "won" && state.phase !== "lost" && steps < maxSteps) {
     let action: RunAction;
