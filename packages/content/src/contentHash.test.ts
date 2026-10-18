@@ -18,5 +18,8 @@ describe("contentHash", () => {
     expect(contentHash()).toMatch(/^[0-9a-f]{16}$/);
     expect(contentHash()).toBe(contentHash());
     expect(contentHash({ balance: { ...balanceJson, BASE: balanceJson.BASE + 1 } })).not.toBe(contentHash());
+    // The exporter's settings are not rules: a recorded run stays valid when they change.
+    const rules = Object.fromEntries(Object.entries(balanceJson).filter(([key]) => !key.startsWith("EXPORT_")));
+    expect(contentHash({ balance: rules })).toBe(contentHash());
   });
 });

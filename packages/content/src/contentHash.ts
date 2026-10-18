@@ -25,13 +25,16 @@ export function hashContent(files: Record<string, unknown>): string {
   return part(0x9747b28c) + part(0x1b873593);
 }
 
+/** The balance numbers that set the rules: everything except the exporter's own settings (`EXPORT_*`), which no run depends on. */
+const rulesBalance = (): Record<string, unknown> => Object.fromEntries(Object.entries(balanceJson).filter(([key]) => !key.startsWith("EXPORT_")));
+
 /**
- * A hash of the content that sets the rules: the balance numbers, the stream traits, and the fusions, enchantments and
+ * A hash of the content that sets the rules: the balance numbers (without the exporter's settings), the stream traits, and the fusions, enchantments and
  * upgrades. The text of structures and narration is left out, so rewording a help line does not invalidate a recorded run.
  */
 export function contentHash(overrides: Record<string, unknown> = {}): string {
   return hashContent({
-    balance: balanceJson,
+    balance: rulesBalance(),
     traits: traitsJson,
     fusions: fusionsJson,
     enchantments: enchantmentsJson,
