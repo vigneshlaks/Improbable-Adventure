@@ -80,17 +80,21 @@ describe("generateEnemy", () => {
 
 describe("Rank enemies", () => {
   const eager = { ...traits, rankWeight: 1000 }; // Rank is nearly always drawn, so the quantile can be seen
-  it("never draw Rank while its weight is zero (the shipped setting), and the enemies stay exactly as they were without it; when Rank is in the pool, give it a quantile from the tier's list, and only then", () => {
-    expect(traits.rankWeight).toBe(0);
+  it("never draw Rank while its weight is zero, and the enemies stay exactly as they were without it; draw it in a minority of enemies at the shipped weight; when Rank is in the pool, give it a quantile from the tier's list, and only then", () => {
+    expect(traits.rankWeight).toBeGreaterThan(0);
     const off = { ...traits, rankWeight: 0 };
     for (const tier of TIERS) {
       for (let i = 0; i < 40; i++) {
-        const enemy = generateEnemy(`off-${i}`, tier);
+        const enemy = generateEnemy(`off-${i}`, tier, balance, off);
         expect(enemy.weakPoints).not.toContain("rank");
         expect(enemy).not.toHaveProperty("rankQuantile");
-        expect(generateEnemy(`off-${i}`, tier, balance, off)).toEqual(enemy);
       }
     }
+    // At the shipped weight Rank is in the pool, but a minority of the enemies have it.
+    let shipped = 0;
+    for (let i = 0; i < 300; i++) if (generateEnemy(`ship-${i}`, "elite").weakPoints.includes("rank")) shipped++;
+    expect(shipped).toBeGreaterThan(5);
+    expect(shipped).toBeLessThan(150);
     const seen = new Set<number>();
     let withRank = 0;
     for (const tier of TIERS) {

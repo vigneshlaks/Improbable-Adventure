@@ -23,6 +23,8 @@ const TASTE = [
   "structure:countMinSketch",
   "structure:countSketch",
   "structure:logLog",
+  "structure:tDigest",
+  "structure:kllSketch",
   "enchantment:steady",
   "upgrade:power",
   "upgrade:resolve",

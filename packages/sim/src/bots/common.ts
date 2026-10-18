@@ -10,7 +10,7 @@ const WEAK_POINTS: WeakPoint[] = ["presence", "frequency", "count", "rank"];
 const MIN_BITS = 256;
 
 /** Structures that cannot be built in even that: a Top-K Tracker needs room for a Count-Min grid and a candidate list (a quarter of its Space, 96 bits an entry). */
-const MIN_BITS_OF: Partial<Record<StructureKind, number>> = { topKTracker: 384, tDigest: 512 };
+const MIN_BITS_OF: Partial<Record<StructureKind, number>> = { topKTracker: 384, tDigest: 512, kllSketch: 1536 };
 const minBitsOf = (kind: StructureKind): number => Math.max(MIN_BITS, MIN_BITS_OF[kind] ?? 0);
 
 /** Structures that suit each weak point, best first. Exact Memory and Reservoir Sampling answer anything. */

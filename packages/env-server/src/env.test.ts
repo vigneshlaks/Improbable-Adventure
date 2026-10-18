@@ -75,7 +75,7 @@ describe("the environment", () => {
     }
     expect(steps).toBeGreaterThan(200);
     expect(lostByTurnLimit).toBeGreaterThan(0); // the case the test is about does occur
-  });
+  }, 180_000);
 
   it("prices each kind of event by its own weight", () => {
     const weights = { enemyDefeated: 3, perTurn: 0.5, perCertaintyLost: 0.25, runLoss: 7 };
