@@ -14,7 +14,7 @@
   "EXPORT_DEFAULT_ERROR": 0.01,
   "RL_REWARD": { "enemyDefeated": 1, "perTurn": 0.01, "perCertaintyLost": 0.005, "runLoss": 1 },
   "RL_MAX_SLOTS": 6,
-  "RL_MAX_STEPS": 1500,
+  "RL_MAX_STEPS": 400,
 
   "STARTING_SPACE": 8192,
   "STARTING_CERTAINTY": 150,

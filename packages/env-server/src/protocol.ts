@@ -1,3 +1,4 @@
+import type { Replay } from "@pda/engine";
 import { Env, type EnvOptions, type EnvStep } from "./env";
 
 /**
@@ -37,6 +38,13 @@ export class Batch {
     });
   }
 
+  /** One finished game as a replay that `pnpm sim replay verify` accepts. */
+  replay(index: number): Replay {
+    const replay = this.envs[index]?.replay();
+    if (!replay) throw new RangeError(`Game ${index} has not ended in a win or a loss`);
+    return replay;
+  }
+
   step(actions: number[]): EnvStep[] {
     if (actions.length !== this.envs.length) throw new RangeError(`Expected ${this.envs.length} actions, got ${actions.length}`);
     // A game that has ended, or been cut off, ignores its action and repeats its last reply (with no reward) until it is reset.
@@ -62,7 +70,7 @@ const pack = (steps: EnvStep[]) => ({
 /** One line in, one line out. A bad request or an action the game refuses gives `{"error": "..."}` instead of ending the program. */
 export function handleLine(batch: Batch, line: string): string {
   try {
-    const request = JSON.parse(line) as { cmd?: string; seeds?: unknown; indices?: unknown; actions?: unknown };
+    const request = JSON.parse(line) as { cmd?: string; seeds?: unknown; indices?: unknown; actions?: unknown; index?: unknown };
     switch (request.cmd) {
       case "info":
         return JSON.stringify(batch.info());
@@ -72,6 +80,11 @@ export function handleLine(batch: Batch, line: string): string {
         const indices = request.indices;
         if (indices !== undefined && !(Array.isArray(indices) && indices.every((i) => Number.isInteger(i)))) throw new TypeError('"indices" must be a list of whole numbers');
         return JSON.stringify(pack(batch.reset(seeds as string[], indices as number[] | undefined)));
+      }
+      case "replay": {
+        const index = (request as { index?: unknown }).index;
+        if (!Number.isInteger(index)) throw new TypeError('"index" must be a whole number');
+        return JSON.stringify({ replay: batch.replay(index as number) });
       }
       case "step": {
         const actions = request.actions;

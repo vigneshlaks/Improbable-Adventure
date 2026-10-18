@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { contentHash } from "@pda/content";
+import { verifyReplay } from "@pda/engine";
 import { Batch, handleLine } from "./protocol";
 
 const send = (batch: Batch, request: object) => JSON.parse(handleLine(batch, JSON.stringify(request)));
@@ -40,6 +42,18 @@ describe("the protocol", () => {
     expect(again.obs).toEqual(two.obs);
     expect(again.rewards).toEqual([0, 0]);
     expect(again.truncated).toEqual([true, true]);
+
+    // A finished game can be asked for as a replay that the engine's own verifier accepts, and that says what the environment said.
+    const play = new Batch();
+    let out = JSON.parse(handleLine(play, JSON.stringify({ cmd: "reset", seeds: ["r1"] })));
+    expect(send(play, { cmd: "replay", index: 0 }).error).toMatch(/not ended/);
+    for (let i = 0; i < 3000 && !out.dones[0]; i++) {
+      const on = out.masks[0].flatMap((m: boolean, k: number) => (m ? [k] : []));
+      out = JSON.parse(handleLine(play, JSON.stringify({ cmd: "step", actions: [on[(i * 7) % on.length]] })));
+    }
+    expect(out.dones[0]).toBe(true);
+    const { replay } = send(play, { cmd: "replay", index: 0 });
+    expect(verifyReplay(replay, { contentHash: contentHash() })).toEqual({ ok: true, result: { won: out.won[0], turns: out.turns[0], certaintyLeft: out.certaintyLeft[0] } });
 
     // Bad requests give an error and leave the batch usable.
     for (const request of [{ cmd: "nope" }, { cmd: "reset", seeds: [1] }, { cmd: "step", actions: [0.5] }, { cmd: "step", actions: [0] }, { cmd: "reset", seeds: ["x"], indices: [9] }]) {

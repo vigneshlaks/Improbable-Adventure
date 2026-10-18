@@ -1,5 +1,5 @@
-import { balance, buildRunConfig } from "@pda/content";
-import { createRun, IllegalActionError, stepRun, turnsTaken, type RunConfig, type RunState } from "@pda/engine";
+import { balance, buildRunConfig, contentHash } from "@pda/content";
+import { IllegalActionError, RunRecorder, turnsTaken, type Replay, type RunConfig, type RunState } from "@pda/engine";
 import { actionMask, decodeAction } from "./actions";
 import { buildLayout, type Layout } from "./layout";
 import { encodeObservation } from "./observation";
@@ -31,7 +31,7 @@ export interface EnvStep {
 /** One game for a learning agent: reset with a seed, then step with action indices. */
 export class Env {
   readonly layout: Layout;
-  private state: RunState | null = null;
+  private recorder: RunRecorder | null = null;
   private steps = 0;
   private readonly makeConfig: (seed: string) => RunConfig;
   private readonly weights: RewardWeights;
@@ -42,6 +42,16 @@ export class Env {
     this.weights = options.weights ?? balance.RL_REWARD;
     this.maxSteps = options.maxSteps ?? balance.RL_MAX_STEPS;
     this.layout = layout ?? buildLayout(this.makeConfig("layout"), options.maxSlots ?? balance.RL_MAX_SLOTS);
+  }
+
+  private get state(): RunState | null {
+    return this.recorder?.state ?? null;
+  }
+
+  /** The game so far as a replay, once it has ended with a win or a loss (null otherwise, including when it was cut off). */
+  replay(): Replay | null {
+    const state = this.state;
+    return state && (state.phase === "won" || state.phase === "lost") ? (this.recorder as RunRecorder).toReplay() : null;
   }
 
   private view(reward: number, truncated: boolean): EnvStep {
@@ -60,7 +70,7 @@ export class Env {
   }
 
   reset(seed: string): EnvStep {
-    this.state = createRun(seed, this.makeConfig(seed));
+    this.recorder = new RunRecorder(seed, this.makeConfig(seed), contentHash());
     this.steps = 0;
     return this.view(0, false);
   }
@@ -69,9 +79,10 @@ export class Env {
     if (!this.state || this.state.phase === "won" || this.state.phase === "lost") throw new Error("Reset the environment before stepping it");
     const action = decodeAction(this.state, this.layout, index);
     if (action === null) throw new IllegalActionError(`Action ${index} (${this.layout.labels[index] ?? "unknown"}) does not apply now`);
-    const result = stepRun(this.state, action);
-    this.state = result.state;
+    const result = (this.recorder as RunRecorder).step(action);
     this.steps++;
-    return this.view(shapeReward(result.events, this.weights), this.steps >= this.maxSteps);
+    const cutOff = this.steps >= this.maxSteps && result.state.phase !== "won" && result.state.phase !== "lost";
+    // Running out of steps is a failed run, charged as one: otherwise stalling would cost nothing and be better than risking a loss.
+    return this.view(shapeReward(result.events, this.weights) - (cutOff ? this.weights.runLoss : 0), cutOff);
   }
 }

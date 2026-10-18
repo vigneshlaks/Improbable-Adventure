@@ -97,6 +97,10 @@ class EnvServer:
         """One action index per game. A game that has ended repeats its last reply until it is reset."""
         return _result(self._call({"cmd": "step", "actions": [int(a) for a in actions]}))
 
+    def replay(self, index: int) -> dict:
+        """A finished game as a replay (plain data) that `pnpm sim replay verify` accepts."""
+        return self._call({"cmd": "replay", "index": int(index)})["replay"]
+
     def close(self) -> None:
         if self._process.poll() is None:
             assert self._process.stdin is not None

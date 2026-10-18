@@ -164,6 +164,7 @@ describe("the environment", () => {
     for (let i = 0; i < 3; i++) step = env.step(step.mask.findIndex(Boolean));
     expect(step.truncated).toBe(true);
     expect(step.done).toBe(false);
+    expect(step.reward).toBeLessThanOrEqual(-1 + 1e-9); // the cut-off is charged as a lost run (the first actions cost nothing else here)
     const full = randomGame("end", () => undefined);
     expect(full.done || full.truncated).toBe(true);
     const finished = new Env();

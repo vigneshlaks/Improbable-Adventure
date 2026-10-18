@@ -4,6 +4,7 @@ The policy is any function from (observations, masks) to one action index per ga
 repeats their last reply) while the others finish, so the whole set is played in one batch.
 """
 import json
+import os
 from dataclasses import dataclass
 from typing import Callable, List, Optional, Sequence
 
@@ -33,7 +34,7 @@ class Evaluation:
         return self.wins / self.games
 
 
-def evaluate(policy: Policy, seeds: Sequence[str], server: Optional[EnvServer] = None, max_steps: int = 5000) -> Evaluation:
+def evaluate(policy: Policy, seeds: Sequence[str], server: Optional[EnvServer] = None, max_steps: int = 5000, replay_dir: Optional[str] = None) -> Evaluation:
     own = server is None
     server = server or EnvServer()
     try:
@@ -43,6 +44,13 @@ def evaluate(policy: Policy, seeds: Sequence[str], server: Optional[EnvServer] =
                 break
             actions = policy(np.asarray(result.obs, dtype=np.float32), np.asarray(result.masks, dtype=bool))
             result = server.step(list(actions))
+        if replay_dir:
+            # Every game that ended is saved as a replay, so it can be re-played and checked by the game's own verifier.
+            os.makedirs(replay_dir, exist_ok=True)
+            for i, seed in enumerate(seeds):
+                if result.dones[i]:
+                    with open(os.path.join(replay_dir, "agent-%s-%s.json" % (seed, "won" if result.won[i] else "lost")), "w", encoding="utf-8") as handle:
+                        json.dump(server.replay(i), handle)
         wins = [i for i, w in enumerate(result.won) if w]
         stalled = sum(1 for d in result.dones if not d)
         turns = [result.turns[i] for i in wins]
