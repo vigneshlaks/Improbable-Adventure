@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { balance, buildRunConfig } from "@pda/content";
-import type { RunConfig } from "@pda/engine";
-import { createRunSession } from "./runSession";
+import { balance, buildRunConfig, contentHash } from "@pda/content";
+import { verifyReplay, type RunConfig } from "@pda/engine";
+import { createRunSession, type RunSession } from "./runSession";
 import type { Session } from "./session";
 
 const text = (lines: string[]) => lines.join("\n");
@@ -11,7 +11,7 @@ function easyConfig(seed: string, overrides: Partial<RunConfig> = {}): RunConfig
   const base = buildRunConfig({ seed });
   return { ...base, encounters: base.encounters.map((enemy) => ({ ...enemy, hp: 0.000001, weakPoints: ["frequency" as const] })), ...overrides };
 }
-const start = (seed = "r1", overrides: Partial<RunConfig> = {}): Session => createRunSession({ seed, config: easyConfig(seed, overrides) });
+const start = (seed = "r1", overrides: Partial<RunConfig> = {}): RunSession => createRunSession({ seed, config: easyConfig(seed, overrides) });
 
 /** Wins the fight in progress: the first stream arrives, then the second brings the challenge, which a huge force beats. */
 function winFight(session: Session): string {
@@ -259,6 +259,27 @@ describe("the end of a run", () => {
     {
       expect(playOut(start("same"))).toBe(playOut(start("same")));
       expect(playOut(start("other"))).not.toBe(playOut(start("same")));
+    }
+    // keeps a replay of a run that finished, which verifies, and none of one that was left
+    {
+      const won = start("replay-win");
+      expect(won.replay()).toBeNull(); // nothing to claim yet
+      playOut(won);
+      const replay = won.replay()!;
+      expect(replay.claimed.won).toBe(true);
+      expect(verifyReplay(JSON.parse(JSON.stringify(replay)))).toEqual({ ok: true, result: replay.claimed });
+      expect(replay.contentHash).toBe(contentHash());
+
+      const deadly = easyConfig("replay-lose");
+      const lost = createRunSession({ seed: "replay-lose", config: { ...deadly, encounters: deadly.encounters.map((enemy) => ({ ...enemy, attack: 10_000 })) } });
+      lost.handle("ready");
+      expect(lost.replay()?.claimed.won).toBe(false);
+      expect(verifyReplay(lost.replay())).toMatchObject({ ok: true });
+
+      const left = start("replay-quit");
+      winFight(left);
+      left.handle("quit");
+      expect(left.replay()).toBeNull(); // a run that was left has no result
     }
     // ends on quit, from any screen
     {

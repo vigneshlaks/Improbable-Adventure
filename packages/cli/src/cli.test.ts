@@ -22,6 +22,9 @@ describe("parseGameArgs", () => {
       expect(parseGameArgs(["--run"], defaults)).toEqual({ ok: true, mode: "run", options: { seed: "clock" } });
       expect(parseGameArgs(["--run", "--seed", "abc"], defaults)).toEqual({ ok: true, mode: "run", options: { seed: "abc" } });
       expect(parseGameArgs(["--seed=abc", "--run"], defaults)).toEqual({ ok: true, mode: "run", options: { seed: "abc" } });
+      expect(parseGameArgs(["--run", "--record", "out.json"], defaults)).toEqual({ ok: true, mode: "run", options: { seed: "clock", record: "out.json" } });
+      expect(parseGameArgs(["--record=out.json", "--run", "--seed", "abc"], defaults)).toEqual({ ok: true, mode: "run", options: { seed: "abc", record: "out.json" } });
+      expect(parseGameArgs(["--record", "out.json"], defaults)).toMatchObject({ ok: false, message: expect.stringMatching(/--record is for whole runs/) });
       expect(parseGameArgs(["--run", "--tier", "boss"], defaults)).toMatchObject({ ok: false, message: expect.stringMatching(/--tier and --loadout are for single fights/) });
       expect(parseGameArgs(["--run", "--loadout=full"], defaults)).toMatchObject({ ok: false });
     }

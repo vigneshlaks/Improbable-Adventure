@@ -1,5 +1,5 @@
-import { buildRunConfig, narration } from "@pda/content";
-import { createRun, IllegalActionError, observeRun, stepRun, type RunConfig, type RunEvent, type RunState } from "@pda/engine";
+import { buildRunConfig, contentHash, narration } from "@pda/content";
+import { IllegalActionError, observeRun, RunRecorder, type Replay, type RunConfig, type RunEvent, type RunState } from "@pda/engine";
 import {
   describeEnemy,
   formatNumber,
@@ -19,9 +19,16 @@ export interface RunSessionOptions {
   config?: RunConfig;
 }
 
+/** A run session also keeps what it needs to make a replay of the run once it has ended. */
+export interface RunSession extends Session {
+  /** The run as a replay, or null while it is still going or if the player left before the end. */
+  replay(): Replay | null;
+}
+
 /** A whole act played by typing lines. Like `Session` it holds no I/O, so a script of lines gives a transcript. */
-export function createRunSession({ seed, config = buildRunConfig({ seed }) }: RunSessionOptions): Session {
-  let state: RunState = createRun(seed, config);
+export function createRunSession({ seed, config = buildRunConfig({ seed }) }: RunSessionOptions): RunSession {
+  const recorder = new RunRecorder(seed, config, contentHash());
+  let state: RunState = recorder.state;
   let quit = false;
   const over = () => quit || state.phase === "won" || state.phase === "lost";
 
@@ -47,6 +54,8 @@ export function createRunSession({ seed, config = buildRunConfig({ seed }) }: Ru
   }
 
   return {
+    replay: () => (state.phase === "won" || state.phase === "lost" ? recorder.toReplay() : null),
+
     opening: () => [
       `Seed: ${seed}`,
       narration.game.runWelcome,
@@ -88,7 +97,7 @@ export function createRunSession({ seed, config = buildRunConfig({ seed }) }: Ru
         case "action":
         case "runAction": {
           try {
-            const result = stepRun(state, parsed.action);
+            const result = recorder.step(parsed.action);
             state = result.state;
             // On a challenge turn the query screen lists the Presence targets with the structures' flags, so the story does not.
             const lines = [...(parsed.kind === "action" && parsed.note ? [parsed.note] : []), ...narrate(result.events, state.fight?.phase !== "strike")];

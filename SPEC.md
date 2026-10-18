@@ -413,6 +413,17 @@ interface Replay {
 - **Categories:** Fixed Seed (everyone plays the same published seed) and Random Seed (fresh seed per attempt, best of many).
 - Replays double as imitation-learning data for the RL agent and as regression tests: a folder of recorded replays must still verify after every change unless the engine version is bumped.
 
+**Replays, Milestone 5 (decided 2026-10-17).** The spec left these open:
+
+- **The record.** `Replay.actions` are run actions (`RunAction`: the fight actions plus `chooseReward`, `fuse`, `enchant`, `leaveRest`). The config is stored in the replay, so a replay verifies whatever the balance numbers are today; only a change to a *rule* in the engine can break one. A replay is plain JSON of 5 to 8 KB.
+- **Recording.** `RunRecorder` plays a run and keeps the actions; it does not keep an action the run refuses, and it will not make a replay of a run that has not finished (no result to claim). The sim records a bot's run (`recordReplay`), and the terminal game records a human's (`pnpm cli --run --record <file>`, written when the run ends; a run that was left has no replay).
+- **Verifying.** `verifyReplay(replay, { contentHash? })` never throws. It re-plays the run and answers `ok` with the result, or rejects with a reason: `malformed` (not a replay, or a config that cannot start a run), `version` (recorded under another `ENGINE_VERSION`), `content` (only if the caller asks for a content hash and it differs), `illegal` (an action the run refuses, with its position, which includes any action after the run has ended), `incomplete` (the actions stop before the run ends), `mismatch` (the claimed win, turns or Certainty left is not what the run gives). Changing the seed, the config, an action or the claim is caught.
+- **Versions.** `ENGINE_VERSION` is "1". It is bumped by hand on any change to a rule; an old replay then reports `version` instead of looking forged, and verifies only with the engine that recorded it.
+- **Content hash.** `contentHash()` is 64 bits (two Murmur3 passes) of the canonical JSON of the files that set the rules: `balance.json`, `traits.json`, `fusions.json`, `enchantments.json` and `upgrades.json`. The text of structures and narration is left out so rewording a help line does not stale a replay. It identifies the content; it is not a security measure. The engine cannot compute it, so the caller passes the one it wants.
+- **Speedrun metric.** Only won runs rank: fewer total turns first, then more Certainty left; runs that tie keep the order they were given in (`compareSpeedruns`, `rankSpeedruns`). A ranking of replays that share one seed is the Fixed Seed category; otherwise it is Random Seed.
+- **Tools.** `pnpm sim replay record --bot <name> --seed <text> --out <file>`, `replay verify <file...>` (exit code 1 if any is rejected; a note when the content has changed since the recording) and `replay rank <file...>` (verifies, ranks the wins, lists what was left out and why).
+- **The regression folder.** `replays/` holds five recorded runs (Oracle, Greedy and Prober wins; Cautious and Random losses), and a test requires every one to verify. If it fails, a rule has changed: bump `ENGINE_VERSION` and re-record the folder with `sim replay record`; do not edit the files.
+
 ## Simulation and balance
 
 Balance is tuned by running thousands of seeded fights with scripted bots before any RL work. The `sim` package is a Node CLI.

@@ -1,4 +1,5 @@
 export * from "./balance";
+export * from "./contentHash";
 export * from "./enchantments";
 export * from "./enemies";
 export * from "./fight";

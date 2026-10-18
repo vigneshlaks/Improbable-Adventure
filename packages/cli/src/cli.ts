@@ -10,6 +10,7 @@ Plays one fight, or with --run a whole act: five fights, a rest stop, an Elite a
 
 Options:
   --run                          Play a whole act instead of a single fight
+  --record <file>                With --run, save a replay of the run to this file when it ends
   --seed <text>                  Seed for the fight; the same seed gives the same enemy and stream (default: random)
   --tier minion|elite|boss       Enemy tier of a single fight (default minion)
   --loadout starting|full        Structures you own in a single fight (default starting)
@@ -17,7 +18,7 @@ Options:
 
 export type ParsedGameArgs =
   | { ok: true; mode: "fight"; options: SessionOptions }
-  | { ok: true; mode: "run"; options: { seed: string } }
+  | { ok: true; mode: "run"; options: { seed: string; record?: string } }
   | { ok: false; message: string };
 
 /** Reads the command line. `defaultSeed` is only used when no seed is given, so callers choose where it comes from. */
@@ -35,7 +36,7 @@ export function parseGameArgs(argv: string[], { defaultSeed }: { defaultSeed: st
       run = true;
       continue;
     }
-    if (!["seed", "tier", "loadout"].includes(name)) return fail(`Unknown option --${name}.\n\n${USAGE}`);
+    if (!["seed", "tier", "loadout", "record"].includes(name)) return fail(`Unknown option --${name}.\n\n${USAGE}`);
     const value = inline ?? argv[++i];
     if (value === undefined || value.startsWith("--")) return fail(`--${name} needs a value.`);
     values[name] = value;
@@ -43,8 +44,9 @@ export function parseGameArgs(argv: string[], { defaultSeed }: { defaultSeed: st
 
   if (run) {
     if (values.tier !== undefined || values.loadout !== undefined) return fail("--tier and --loadout are for single fights. A run chooses its own enemies and structures.");
-    return { ok: true, mode: "run", options: { seed: values.seed ?? defaultSeed } };
+    return { ok: true, mode: "run", options: { seed: values.seed ?? defaultSeed, ...(values.record !== undefined ? { record: values.record } : {}) } };
   }
+  if (values.record !== undefined) return fail("--record is for whole runs. Use it with --run.");
 
   const tier = values.tier ?? "minion";
   if (!(TIERS as string[]).includes(tier)) return fail(`--tier must be one of ${TIERS.join(", ")}.`);

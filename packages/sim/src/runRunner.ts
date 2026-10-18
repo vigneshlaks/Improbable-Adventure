@@ -7,6 +7,7 @@ import {
   observeRun,
   Rng,
   stepRun,
+  type RunRecorder,
   type GameEvent,
   type RunAction,
   type RunConfig,
@@ -58,6 +59,8 @@ export interface PlayRunOptions {
   bot: Bot;
   /** Gives up on a run that has not ended after this many actions. */
   maxSteps?: number;
+  /** When given, the run is played through it, so its actions are kept for a replay. It must be for this seed and config. */
+  recorder?: RunRecorder;
 }
 
 const DEFAULT_MAX_STEPS = 20000;
@@ -74,7 +77,7 @@ function fightView(state: RunState, bot: Bot): BotView {
 }
 
 /** Plays one whole run with a bot and summarizes what happened. */
-export function playRun({ config, seed, bot, maxSteps = DEFAULT_MAX_STEPS }: PlayRunOptions): RunRecord {
+export function playRun({ config, seed, bot, maxSteps = DEFAULT_MAX_STEPS, recorder }: PlayRunOptions): RunRecord {
   const policy = bot.runPolicy ?? sensiblePolicy;
   const rng = Rng.fromSeed(`${seed}/bot/${bot.name}`);
   let state = createRun(seed, config);
@@ -98,7 +101,7 @@ export function playRun({ config, seed, bot, maxSteps = DEFAULT_MAX_STEPS }: Pla
       action = policy.rest(legalRunActions(state), rng);
     }
     try {
-      const result = stepRun(state, action);
+      const result = recorder ? recorder.step(action) : stepRun(state, action);
       state = result.state;
       events.push(...result.events);
     } catch (error) {

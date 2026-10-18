@@ -9,11 +9,13 @@ describe("parseArgs", () => {
       expect(parseArgs(["fights", "--bot", "greedy", "--n=5", "--json"])).toEqual({
         command: "fights",
         options: { bot: "greedy", n: "5", json: true },
+        positional: [],
       });
     }
     // treats no arguments as a request for help
     {
-      expect(parseArgs([])).toEqual({ command: "help", options: {} });
+      expect(parseArgs([])).toEqual({ command: "help", options: {}, positional: [] });
+      expect(parseArgs(["replay", "verify", "a.json", "b.json", "--bot", "x"])).toEqual({ command: "replay", options: { bot: "x" }, positional: ["verify", "a.json", "b.json"] });
     }
   });
 });
