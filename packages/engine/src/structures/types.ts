@@ -14,6 +14,8 @@ export const STRUCTURE_KINDS = [
   "topKTracker",
   "cuckooFilter",
   "kMinimumValues",
+  "kllSketch",
+  "tDigest",
 ] as const;
 
 export type StructureKind = (typeof STRUCTURE_KINDS)[number];
@@ -81,6 +83,10 @@ export interface StructureConstants {
   cuckooFingerprintBits: number;
   /** How many fingerprints an insert may push aside before the Cuckoo Filter gives up and drops one. */
   cuckooMaxKicks: number;
+  /** A KLL sketch's rank error, as a share of the units, is this divided by its k (calibrated by simulation). */
+  kllRankError: number;
+  /** A t-digest's rank error at quantile q, as a share of the units, is this times sqrt(q (1 - q)) over its compression (calibrated by simulation). */
+  tdigestRankError: number;
 }
 
 /** Anything that survives JSON.stringify and JSON.parse unchanged. */

@@ -1,4 +1,4 @@
-import { BloomFilter, CountMinSketch, CountSketch, CuckooFilter, HyperLogLog, KMinimumValues, LogLog, restoreStructure, TopKTracker, type Json, type StructureConstants, type StructureSnapshot } from "@pda/engine";
+import { BloomFilter, CountMinSketch, CountSketch, CuckooFilter, HyperLogLog, KllSketch, KMinimumValues, LogLog, restoreStructure, TDigest, TopKTracker, type Json, type StructureConstants, type StructureSnapshot } from "@pda/engine";
 import { structureLabel } from "./views";
 
 /** The most cells a visual draws; a bigger structure is shown averaged down to this many. */
@@ -90,6 +90,18 @@ export function structureVisual(snapshot: StructureSnapshot, slot: number, const
   if (live instanceof KMinimumValues) {
     const k = live.params.k as number;
     return { ...base, shape: "bars", cells: downsample(live.hashes.map((h) => h / 2 ** 32)), columns: 0, caption: `the ${live.size} smallest of ${k} possible hashes (taller = larger)`, readout: live.size < k ? `${live.size} of ${k} kept: an exact count so far` : `error about ±${percent(live.standardError)}` };
+  }
+  if (live instanceof KllSketch) {
+    const items = live.items;
+    const top = Math.max(1, ...items.map((item) => item.weight));
+    // Each bar is a stored item: how tall is how many units it stands for (taller = more), in the order of the values.
+    return { ...base, shape: "bars", cells: downsample(items.map((item) => item.weight / top)), columns: 0, caption: `${items.length} stored values, each as tall as the units it stands for`, readout: `rank error about ±${percent(live.rankError)}` };
+  }
+  if (live instanceof TDigest) {
+    const centroids = live.summary;
+    const top = Math.max(1, ...centroids.map((c) => c.weight));
+    // Each bar is a centroid: how tall is how many units it stands for. They are small at both ends and large in the middle.
+    return { ...base, shape: "bars", cells: downsample(centroids.map((c) => c.weight / top)), columns: 0, caption: `${centroids.length} centroids, each as tall as the units it stands for`, readout: `rank error about ±${percent(live.rankError(0.5))} in the middle, ±${percent(live.rankError(0.99))} at the 99th percentile` };
   }
   if (live instanceof LogLog || live instanceof HyperLogLog) {
     const registers = numbers(state, "registers");

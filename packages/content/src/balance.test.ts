@@ -94,6 +94,8 @@ describe("balance.json", () => {
         cuckooBucketSize: 4,
         cuckooFingerprintBits: 8,
         cuckooMaxKicks: 500,
+        kllRankError: 1.6,
+        tdigestRankError: 4,
       });
     }
     // matches the stand-in constants used by the engine's tests

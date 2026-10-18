@@ -10,7 +10,7 @@ const WEAK_POINTS: WeakPoint[] = ["presence", "frequency", "count", "rank"];
 const MIN_BITS = 256;
 
 /** Structures that cannot be built in even that: a Top-K Tracker needs room for a Count-Min grid and a candidate list (a quarter of its Space, 96 bits an entry). */
-const MIN_BITS_OF: Partial<Record<StructureKind, number>> = { topKTracker: 384 };
+const MIN_BITS_OF: Partial<Record<StructureKind, number>> = { topKTracker: 384, tDigest: 512 };
 const minBitsOf = (kind: StructureKind): number => Math.max(MIN_BITS, MIN_BITS_OF[kind] ?? 0);
 
 /** Structures that suit each weak point, best first. Exact Memory and Reservoir Sampling answer anything. */
@@ -25,8 +25,8 @@ export function preferredKinds(weakPoint: WeakPoint, traits: StreamTraits): Stru
         ? ["countMinSketch", "exactMemory", "reservoirSampling"]
         : ["topKTracker", "countMinSketch", "exactMemory", "reservoirSampling"];
     case "rank":
-      // Exact Memory is exact while its table has room; a sample gives a distribution-free range, whatever the size of the stream.
-      return ["reservoirSampling", "exactMemory"];
+      // Both are far sharper than a sample of the same Space. A t-digest wins at the extreme quantiles the tougher enemies ask for.
+      return ["tDigest", "kllSketch", "reservoirSampling", "exactMemory"];
     case "count":
       // LogLog suits huge streams. Linear Counting is more precise while its bitmap has room.
       // HyperLogLog (made by fusing the two) is the best of both.

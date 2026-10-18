@@ -22,6 +22,8 @@ export const TEST_CONSTANTS: StructureConstants = {
   cuckooBucketSize: 4,
   cuckooFingerprintBits: 8,
   cuckooMaxKicks: 500,
+  kllRankError: 1.6,
+  tdigestRankError: 4,
 };
 
 /** Every structure's statistical test runs this many seeded trials. */

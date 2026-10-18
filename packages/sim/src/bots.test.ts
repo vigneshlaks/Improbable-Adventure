@@ -302,10 +302,10 @@ describe("Rank for the bots", () => {
     truth: null,
   });
 
-  it("strikes armor at the upper end of the range, because a value that ranks below the armor is blocked and an estimate is as likely to fall below it as above; takes the estimate when there is no upper end; prefers a sample or a table for Rank; and the Oracle strikes the value that reaches it", () => {
+  it("strikes armor at the upper end of the range, because a value that ranks below the armor is blocked and an estimate is as likely to fall below it as above; takes the estimate when there is no upper end; prefers a t-digest, then a KLL sketch, for Rank; and the Oracle strikes the value that reaches it", () => {
     expect(strikeOnEstimate(rankView({ estimate: 5000, low: 4000, high: 6000.4 }))).toEqual({ type: "strikeValue", value: 6001 });
     expect(strikeOnEstimate(rankView({ estimate: 5000, low: 4000, high: Number.POSITIVE_INFINITY }))).toEqual({ type: "strikeValue", value: 5000 });
-    expect(preferredKinds("rank", { variety: "low", skew: "low", churn: "low", growth: "low", drift: "low" })[0]).toBe("reservoirSampling");
+    expect(preferredKinds("rank", { variety: "low", skew: "low", churn: "low", growth: "low", drift: "low" }).slice(0, 2)).toEqual(["tDigest", "kllSketch"]);
 
     const oracle = getBot("oracle").create();
     const truth = { frequency: null, distinct: 0, answer: { kind: "rank" as const, quantile: 0.9, value: 4242 } };

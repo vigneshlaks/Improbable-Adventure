@@ -191,5 +191,34 @@
     "summary": "Estimates how many distinct values appeared, from the k smallest hashes.",
     "help": "Keeps the k smallest hashes of the distinct values it has seen. While it has fewer than k it counts them exactly. Past that, the k-th smallest hash says how crowded the values are: the estimate is k minus 1 over that hash as a share of the range, with an error of about 1 over the square root of k minus 2. It ignores deletes, like LogLog, so a deleted value still counts until the range allows for it, and two sketches merge into the sketch of both streams.",
     "flavor": "Counts the crowd by how close its nearest strangers stand."
+  },
+  "kllSketch": {
+    "name": "KLL Sketch",
+    "phase": 2,
+    "aliases": [
+      "kll"
+    ],
+    "answers": [
+      "rank"
+    ],
+    "knob": null,
+    "summary": "Estimates where a value ranks among everything that appeared, to within a couple of percent.",
+    "help": "Keeps a few dozen sorted samples in levels. When a level fills, it keeps every second item and promotes them to the level above, where each one stands for twice as many units. The rank it reports is off by about 1.6 over its k, the same at every quantile, and it knows how far off it can be. It ignores deletes, which remove units at random and so only add noise. Ask it for a quantile, then strike with its upper end to be sure of reaching the armor.",
+    "flavor": "Keeps one voice in two, and lets each stand for the crowd it left behind."
+  },
+  "tDigest": {
+    "name": "t-digest",
+    "phase": 2,
+    "aliases": [
+      "tdigest",
+      "digest"
+    ],
+    "answers": [
+      "rank"
+    ],
+    "knob": null,
+    "summary": "Estimates where a value ranks, sharpest at the extremes: the 1st and 99th percentiles.",
+    "help": "Keeps weighted centroids, each the mean of the values it stands for. A centroid may cover many units in the middle of the distribution but only a few at either end, so the tails are tracked closely and the middle more coarsely. The smallest and largest values are kept exactly. It ignores deletes, which remove units at random and so only add noise. For a 99th percentile armor it beats a KLL Sketch of the same Space; for the median they are close.",
+    "flavor": "Averages the crowd into a few voices, and keeps the loudest and quietest exactly."
   }
 }

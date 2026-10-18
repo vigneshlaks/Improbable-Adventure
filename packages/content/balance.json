@@ -16,6 +16,8 @@
   "CUCKOO_BUCKET_SIZE": 4,
   "CUCKOO_FINGERPRINT_BITS": 8,
   "CUCKOO_MAX_KICKS": 500,
+  "KLL_RANK_ERROR": 1.6,
+  "TDIGEST_RANK_ERROR": 4,
   "EXPORT_DEFAULT_ERROR": 0.01,
   "RL_REWARD": { "enemyDefeated": 1, "perTurn": 0.01, "perCertaintyLost": 0.005, "runLoss": 1 },
   "RL_MAX_SLOTS": 6,
