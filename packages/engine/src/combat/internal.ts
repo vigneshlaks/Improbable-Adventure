@@ -32,6 +32,11 @@ export function spaceFree(state: FightState): number {
   return state.config.rules.startingSpace - state.slots.reduce((sum, slot) => sum + (slot?.spaceBits ?? 0), 0);
 }
 
+/** Deploys and removals this turn still allows. */
+export function changesLeft(state: FightState): number {
+  return state.config.rules.changesPerSlot * state.slots.length - state.changes;
+}
+
 export function slotsFree(state: FightState): number {
   return state.slots.filter((slot) => slot === null).length;
 }
@@ -64,6 +69,7 @@ export function buildStructure(state: FightState, action: DeployAction): Structu
 /** Why a deploy action is not allowed, or null if it is. `step` and `legalActions` share this check. */
 export function deployProblem(state: FightState, action: DeployAction): string | null {
   if (state.phase !== "deploy") return "Structures can only be deployed during the deploy phase";
+  if (changesLeft(state) <= 0) return CHANGES_USED_UP;
   if (!Number.isInteger(action.slot) || action.slot < 0 || action.slot >= state.slots.length) return `There is no slot ${action.slot}`;
   if (state.slots[action.slot] !== null) return `Slot ${action.slot} is already in use`;
   if (!state.config.loadout.includes(action.kind)) return `You do not own a ${action.kind}`;
@@ -77,6 +83,9 @@ export function deployProblem(state: FightState, action: DeployAction): string |
   }
   return null;
 }
+
+/** Said when a deploy or removal is refused because the turn's changes are used up. */
+export const CHANGES_USED_UP = "No more changes this turn: end the deploy phase";
 
 export function assertDeploy(state: FightState, action: DeployAction): void {
   const problem = deployProblem(state, action);

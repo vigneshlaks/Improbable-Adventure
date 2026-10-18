@@ -52,6 +52,11 @@ export interface RunConfig {
   restHeal: number;
   /** How many rewards are offered after a fight. */
   rewardChoices: number;
+  /**
+   * How many times at one rest stop enchantments may be attached or moved. Moving one is free, so without a limit a player
+   * could shuffle them for ever without leaving the rest stop.
+   */
+  restEnchantLimit: number;
   rewards: RewardDef[];
   fusions: FusionDef[];
   enchantments: EnchantmentDef[];
@@ -85,6 +90,8 @@ export interface RunState {
   rewardRng: RngState;
   /** Turns used in the fights already finished. */
   turnsDone: number;
+  /** Enchantments attached or moved at the current rest stop; back to zero when the next fight begins. */
+  restEnchants: number;
 }
 
 export type RunAction =

@@ -35,6 +35,7 @@ function validate(config: RunConfig): void {
   need(config.encounters.length >= 1, "a run needs at least one encounter");
   need(Number.isInteger(config.rewardChoices) && config.rewardChoices >= 1, "rewardChoices must be a whole number >= 1");
   need(config.restHeal >= 0, "restHeal cannot be negative");
+  need(Number.isInteger(config.restEnchantLimit) && config.restEnchantLimit >= 0, "restEnchantLimit must be a whole number >= 0");
   for (const index of config.restBefore) {
     need(Number.isInteger(index) && index >= 1 && index < config.encounters.length, `a rest stop cannot come before encounter ${index}`);
   }
@@ -105,6 +106,7 @@ export function createRun(seed: string, config: RunConfig): RunState {
     offers: null,
     rewardRng: Rng.fromSeed(`${seed}/rewards`).getState(),
     turnsDone: 0,
+    restEnchants: 0,
   };
   return startFight(base, 0).state;
 }
@@ -133,7 +135,7 @@ function advance(state: RunState): { state: RunState; events: RunEvent[] } {
   if (state.config.restBefore.includes(next)) {
     const certainty = Math.min(state.maxCertainty, state.certainty + state.config.restHeal);
     return {
-      state: { ...state, phase: "rest", encounter: next, fight: null, offers: null, certainty },
+      state: { ...state, phase: "rest", encounter: next, fight: null, offers: null, certainty, restEnchants: 0 },
       events: [{ type: "restStarted", healed: certainty - state.certainty }],
     };
   }
@@ -225,6 +227,7 @@ function heldEnchantments(state: RunState): string[] {
 /** The attachments that can be made now: a held enchantment onto an owned structure it fits and does not already sit on. */
 function availableEnchantments(state: RunState): Array<{ enchantmentId: string; kind: StructureKind }> {
   const options: Array<{ enchantmentId: string; kind: StructureKind }> = [];
+  if (state.restEnchants >= state.config.restEnchantLimit) return options; // the rest stop's changes are used up
   for (const enchantmentId of heldEnchantments(state)) {
     const def = state.config.enchantments.find((candidate) => candidate.id === enchantmentId);
     if (!def) continue;
@@ -236,6 +239,7 @@ function availableEnchantments(state: RunState): Array<{ enchantmentId: string; 
 }
 
 function enchant(state: RunState, enchantmentId: string, kind: StructureKind, events: Array<GameEvent | RunEvent>): RunState {
+  if (state.restEnchants >= state.config.restEnchantLimit) throw new IllegalActionError("No more enchanting at this rest stop: leave it");
   const allowed = availableEnchantments(state).some((option) => option.enchantmentId === enchantmentId && option.kind === kind);
   if (!allowed) throw new IllegalActionError(`${enchantmentId} cannot be attached to ${kind} now`);
 
@@ -253,7 +257,7 @@ function enchant(state: RunState, enchantmentId: string, kind: StructureKind, ev
   if (replaced !== null) inventory.push(replaced);
   attached[kind] = enchantmentId;
   events.push({ type: "enchanted", enchantmentId, kind, replaced });
-  return { ...state, enchantments: inventory, attached };
+  return { ...state, enchantments: inventory, attached, restEnchants: state.restEnchants + 1 };
 }
 
 /** Applies one action and returns the new state plus what happened. The input state is not modified. */
@@ -296,7 +300,7 @@ export function step(state: RunState, action: RunAction): RunStepResult {
         break;
       }
       if (action.type !== "leaveRest") throw new IllegalActionError("The rest stop ends with leaveRest");
-      const started = startFight({ ...state }, state.encounter);
+      const started = startFight({ ...state, restEnchants: 0 }, state.encounter);
       events.push(...started.events);
       next = started.state;
       break;

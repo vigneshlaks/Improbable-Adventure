@@ -44,6 +44,7 @@ export function runConfig(overrides: Partial<RunConfig> = {}): RunConfig {
       presenceTargets: 12,
       expectedTurns: 5,
       turnLimitPenalty: 20,
+      changesPerSlot: 2,
     },
     traitTables: {
       variety: { low: 256, medium: 16384, high: 4194304 },
@@ -61,6 +62,7 @@ export function runConfig(overrides: Partial<RunConfig> = {}): RunConfig {
     restBefore: [2],
     restHeal: 30,
     rewardChoices: 3,
+    restEnchantLimit: 6,
     rewards: REWARDS,
     fusions: [{ id: "hyperLogLog", inputs: ["logLog", "linearCounting"], result: "hyperLogLog" }],
     enchantments: [

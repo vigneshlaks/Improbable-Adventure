@@ -1,6 +1,7 @@
 import type { Answer, Challenge } from "../structures/types";
 import { trueAnswer } from "./challenges";
 import {
+  changesLeft,
   liveSetOf,
   loadStructures,
   slotsFree,
@@ -35,6 +36,7 @@ export function observe(state: FightState): Observation {
     enemyHp: state.enemyHp,
     spaceFree: spaceFree(state),
     slotsFree: slotsFree(state),
+    changesLeft: changesLeft(state),
     traits: state.config.enemy.traits,
     weakPoint: state.weakPoint,
     challenge,
@@ -60,7 +62,7 @@ function deployOptions(state: FightState): Action[] {
   const free = spaceFree(state);
   state.slots.forEach((snapshot, slot) => {
     if (snapshot) {
-      options.push({ type: "remove", slot });
+      if (changesLeft(state) > 0) options.push({ type: "remove", slot });
       return;
     }
     for (const kind of state.config.loadout) {

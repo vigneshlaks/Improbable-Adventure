@@ -28,6 +28,7 @@ export function fightRules(tuning: Balance = balance): FightRules {
     presenceTargets: tuning.PRESENCE_TARGETS,
     expectedTurns: tuning.EXPECTED_TURNS,
     turnLimitPenalty: tuning.TURN_LIMIT_PENALTY,
+    changesPerSlot: tuning.DEPLOY_CHANGES_PER_SLOT,
   };
 }
 

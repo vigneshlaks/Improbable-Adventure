@@ -6,7 +6,7 @@ import type { RunAction, RunConfig, RunState, RunStepResult } from "../run/types
  * The version of the rules. Bump it on any change to a rule, so a replay recorded under the old rules is not mistaken for a
  * forgery by the new ones: such a replay is reported as `version`, and verifies only against the engine that recorded it.
  */
-export const ENGINE_VERSION = "1";
+export const ENGINE_VERSION = "2";
 
 /** What a replay says happened. The verifier re-plays the run and checks every part of it. */
 export interface ReplayClaim {

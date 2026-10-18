@@ -58,6 +58,8 @@ export function encodeObservation(state: RunState, layout: Layout): number[] {
   const totalSpace = fight ? fight.spaceFree + fight.structures.reduce((sum, view) => sum + view.spaceBits, 0) : 0;
   out.push(fight?.phase === "strike" ? 1 : 0, fight && enemy ? fight.turn / Math.max(1, enemy.turnLimit) : 0, fight && enemy ? fight.enemyHp / Math.max(1e-9, enemy.hp) : 0);
   out.push(squash(totalSpace, 100_000), fight ? fight.spaceFree / Math.max(1, totalSpace) : 0, fight && state.fight ? fight.slotsFree / Math.max(1, state.fight.slots.length) : 0);
+  // How many of this turn's deploys and removals are left, as a share of what a turn allows: the agent can see its budget run out.
+  out.push(fight && state.fight ? fight.changesLeft / Math.max(1, state.config.rules.changesPerSlot * state.fight.slots.length) : 0);
   out.push(...TRAITS.map((trait) => (fight ? LEVEL[fight.traits[trait]] : 0)));
   out.push(...oneHot([...WEAK_POINTS, "unknown"] as const, fight ? (fight.weakPoint ?? "unknown") : null));
   out.push(...oneHot(WEAK_POINTS, fight?.challenge?.kind));

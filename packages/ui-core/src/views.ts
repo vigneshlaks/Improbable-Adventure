@@ -24,7 +24,7 @@ export function renderStatus(observation: Observation): string[] {
     `Turn ${observation.turn}, ${PHASES[observation.phase]}`,
     `Certainty: ${formatNumber(observation.certainty)}`,
     `Enemy HP: ${formatNumber(observation.enemyHp)}`,
-    `Space: ${observation.spaceFree} bits free. Slots: ${observation.slotsFree} free.`,
+    `Space: ${observation.spaceFree} bits free. Slots: ${observation.slotsFree} free. Changes left this turn: ${observation.changesLeft}.`,
     `Weak point: ${observation.weakPoint ?? "unknown"}`,
     ...(traits.length > 0 ? ["Enemy stream:", ...traits] : []),
     ...(observation.structures.length > 0

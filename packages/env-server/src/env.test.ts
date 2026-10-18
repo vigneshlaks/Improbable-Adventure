@@ -160,6 +160,25 @@ describe("the environment", () => {
     expect(encodeObservation((first as unknown as { state: RunState }).state, first.layout)).toEqual(a.obs);
   });
 
+  it("ends a game in which the player deploys and removes whenever the mask allows it, instead of running into the step limit (the loop that stalled the first learned player)", () => {
+    for (const seed of ["stall-a", "stall-b", "stall-c"]) {
+      const env = new Env(); // the default step limit, 400
+      let step = env.reset(seed);
+      let free = 0;
+      while (!step.done && !step.truncated) {
+        const labels = env.layout.labels;
+        const onIndices = step.mask.flatMap((m, i) => (m ? [i] : []));
+        const turnFree = onIndices.filter((i) => /^(deploy|remove|attach)/.test(labels[i] as string));
+        const pick = turnFree[0] ?? onIndices.find((i) => labels[i] === "end deploy") ?? (onIndices[0] as number);
+        if (turnFree.length > 0) free++;
+        step = env.step(pick);
+      }
+      expect(step.truncated, seed).toBe(false); // the game ended by itself
+      expect(step.done, seed).toBe(true);
+      expect(free, seed).toBeGreaterThan(5); // and the player did spend actions on free changes
+    }
+  });
+
   it("cuts an episode off at the step limit and refuses to step a finished one", () => {
     const env = new Env({ maxSteps: 3 });
     let step = env.reset("cut");

@@ -26,6 +26,8 @@
   "RUN_ENCOUNTERS": ["minion", "minion", "minion", "minion", "minion", "elite", "boss"],
   "REST_BEFORE": [5],
   "REWARD_CHOICES": 3,
+  "DEPLOY_CHANGES_PER_SLOT": 2,
+  "REST_ENCHANT_LIMIT": 6,
   "REWARD_WEIGHTS": { "structure": 3, "upgrade": 2, "enchantment": 2 },
 
   "BASE": 20,

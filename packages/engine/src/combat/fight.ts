@@ -6,6 +6,8 @@ import { settle } from "./damage";
 import {
   assertDeploy,
   buildStructure,
+  changesLeft,
+  CHANGES_USED_UP,
   DEFAULT_REWARDS,
   liveSetOf,
   loadStructures,
@@ -32,6 +34,7 @@ function validateConfig(config: FightConfig): void {
   need(rules.startingSpace >= 1, "startingSpace must be positive");
   need(rules.startingCertainty > 0, "startingCertainty must be positive");
   need(rules.expectedTurns >= 1, "expectedTurns must be >= 1");
+  need(Number.isInteger(rules.changesPerSlot) && rules.changesPerSlot >= 1, "changesPerSlot must be a whole number >= 1");
   need(enemy.hp > 0, "enemy hp must be positive");
   need(enemy.turnLimit >= 1 && Number.isInteger(enemy.turnLimit), "turnLimit must be a whole number >= 1");
   need(enemy.weakPoints.length >= 1, "an enemy needs at least one weak point");
@@ -54,6 +57,7 @@ export function createFight(seed: string, config: FightConfig): FightState {
     challengeRng: Rng.fromSeed(`${seed}/challenge`).getState(),
     challenge: null,
     weakPoint: null,
+    changes: 0,
   };
 }
 
@@ -100,6 +104,7 @@ function finishTurn(state: FightState, events: GameEvent[], tally: Tally): void 
 
   state.turn += 1;
   state.phase = "deploy";
+  state.changes = 0;
   events.push({ type: "turnStarted", turn: state.turn });
 }
 
@@ -193,6 +198,7 @@ export function step(state: FightState, action: Action): StepResult {
       assertDeploy(next, action);
       const structure = buildStructure(next, action);
       next.slots[action.slot] = structure.snapshot();
+      next.changes += 1;
       events.push({ type: "structureDeployed", slot: action.slot, kind: action.kind, spaceBits: action.spaceBits });
       break;
     }
@@ -200,6 +206,8 @@ export function step(state: FightState, action: Action): StepResult {
       if (next.phase !== "deploy") throw new IllegalActionError("Structures can only be removed during the deploy phase");
       const existing = next.slots[action.slot];
       if (!existing) throw new IllegalActionError(`Slot ${action.slot} is empty`);
+      if (changesLeft(next) <= 0) throw new IllegalActionError(CHANGES_USED_UP);
+      next.changes += 1;
       next.slots[action.slot] = null; // its Space is refunded and what it learned is discarded
       events.push({ type: "structureRemoved", slot: action.slot, kind: existing.kind, spaceBits: existing.spaceBits });
       break;

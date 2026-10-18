@@ -61,6 +61,10 @@ export const balanceSchema = z.object({
   REST_BEFORE: z.array(z.number().int().min(1)),
   /** How many rewards are offered after a fight. */
   REWARD_CHOICES: z.number().int().positive(),
+  /** Deploys and removals allowed in a turn, per slot: both are free, so without a limit a fight could go on for ever. */
+  DEPLOY_CHANGES_PER_SLOT: z.number().int().positive(),
+  /** Enchantments that may be attached or moved at one rest stop, for the same reason. */
+  REST_ENCHANT_LIMIT: z.number().int().nonnegative(),
   /** How likely each kind of reward is to be drawn, relative to the others. */
   REWARD_WEIGHTS: z.object({ structure: z.number().nonnegative(), upgrade: z.number().nonnegative(), enchantment: z.number().nonnegative() }).strict(),
 

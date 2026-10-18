@@ -22,6 +22,12 @@ export interface FightRules extends DamageRules {
   expectedTurns: number;
   /** Certainty lost when the fight reaches its turn limit. */
   turnLimitPenalty: number;
+  /**
+   * How many times a turn the player may change the deployed structures (a deploy or a removal), per slot. Both are free,
+   * and a removal refunds all its Space, so without a limit a player could deploy and remove for ever without the fight
+   * moving on. With it, a turn takes at most this many changes per slot and then must end its deploy phase.
+   */
+  changesPerSlot: number;
   /** Multiplies the damage of every strike. A run sets it from the Power upgrade; a plain fight leaves it at 1. */
   damageMultiplier?: number;
 }
@@ -81,6 +87,8 @@ export interface FightState {
   challenge: Challenge | null;
   /** The weak point, once the first challenge has revealed it. */
   weakPoint: WeakPoint | null;
+  /** Deploys and removals made so far this turn; back to zero when the next turn begins. */
+  changes: number;
 }
 
 export type Action =
@@ -130,6 +138,8 @@ export interface Observation {
   enemyHp: number;
   spaceFree: number;
   slotsFree: number;
+  /** How many more deploys and removals this turn allows. */
+  changesLeft: number;
   traits: StreamTraits;
   weakPoint: WeakPoint | null;
   challenge: Challenge | null;

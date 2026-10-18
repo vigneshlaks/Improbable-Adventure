@@ -41,6 +41,7 @@ export function buildRunConfig({ seed, tuning = balance, traitData = defaultTrai
     restBefore: [...tuning.REST_BEFORE],
     restHeal: tuning.REST_HEAL,
     rewardChoices: tuning.REWARD_CHOICES,
+    restEnchantLimit: tuning.REST_ENCHANT_LIMIT,
     rewards,
     fusions: Object.entries(fusionData).map(([id, fusion]) => ({ id, inputs: [...fusion.inputs], result: fusion.result })),
     enchantments: Object.entries(enchantmentData).map(([id, info]) => ({ id, valid: [...info.valid] })),

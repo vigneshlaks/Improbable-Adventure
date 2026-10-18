@@ -9,6 +9,7 @@ export function observation(overrides: Partial<Observation> = {}): Observation {
     enemyHp: 40,
     spaceFree: 8192,
     slotsFree: 3,
+    changesLeft: 6,
     traits: { variety: "low", skew: "low", churn: "low", growth: "low", drift: "low" },
     weakPoint: null,
     challenge: null,

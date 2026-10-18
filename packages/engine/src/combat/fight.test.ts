@@ -30,6 +30,7 @@ const CONFIG: FightConfig = {
     presenceTargets: 12,
     expectedTurns: 5,
     turnLimitPenalty: 20,
+    changesPerSlot: 2,
   },
   loadout: ["exactMemory", "reservoirSampling", "bloomFilter", "countMinSketch"],
   enemy: {
@@ -202,7 +203,7 @@ describe("starting a fight", () => {
     // exposes only the documented fields, so hidden truth cannot leak
     {
       expect(Object.keys(obs).sort()).toEqual(
-        ["certainty", "challenge", "enemyHp", "phase", "slotsFree", "spaceFree", "structures", "traits", "turn", "weakPoint"].sort(),
+        ["certainty", "challenge", "changesLeft", "enemyHp", "phase", "slotsFree", "spaceFree", "structures", "traits", "turn", "weakPoint"].sort(),
       );
     }
   });
@@ -241,6 +242,37 @@ describe("deploy rules", () => {
         for (const action of actions) expect(() => step(state, action)).not.toThrow();
       }
     }
+  });
+});
+
+describe("changes in a turn", () => {
+  it("allows changesPerSlot deploys and removals per slot in a turn, then offers only endDeploy; counts removals as well as deploys, not refused actions; and gives the changes back when the next turn begins", () => {
+    const cap = CONFIG.rules.changesPerSlot * CONFIG.rules.startingSlots; // 6
+    const fresh = createFight("changes", CONFIG);
+    expect(observe(fresh).changesLeft).toBe(cap);
+
+    // Deploy and remove in slot 0, then fill slot 1, until the turn's changes are used up: both kinds count.
+    let state = fresh;
+    for (let i = 0; i < cap - 1; i++) {
+      state = step(state, i % 2 === 0 ? { ...deployCms, spaceBits: 512 } : { type: "remove", slot: 0 }).state;
+      expect(observe(state).changesLeft).toBe(cap - i - 1);
+    }
+    state = step(state, { ...deployCms, slot: 1, spaceBits: 512 }).state; // the last change; slots 0 and 1 are now both in use
+    expect(observe(state).changesLeft).toBe(0);
+    expect(() => step(state, { ...deployCms, slot: 2, spaceBits: 512 })).toThrow(/No more changes this turn/);
+    expect(() => step(state, { type: "remove", slot: 0 })).toThrow(/No more changes this turn/);
+    expect(legalActions(state)).toEqual([endDeploy]); // nothing but the way forward is offered
+    expect(observe(state).changesLeft).toBe(0); // a refused action used nothing
+
+    // The next turn starts with all of them back, and ending the deploy phase did not need one.
+    const next = run(state, [endDeploy]).state; // turn 1 has no challenge, so ending the deploy phase ends the turn
+    expect(next.turn).toBe(2);
+    expect(observe(next).changesLeft).toBe(cap);
+    expect(legalActions(next).some((a) => a.type === "deploy")).toBe(true);
+
+    // More slots allow more changes, and the rule must be a whole number of at least one.
+    expect(observe(createFight("changes", { ...CONFIG, rules: { ...CONFIG.rules, startingSlots: 5 } })).changesLeft).toBe(10);
+    expect(() => createFight("changes", { ...CONFIG, rules: { ...CONFIG.rules, changesPerSlot: 0 } })).toThrow(RangeError);
   });
 });
 

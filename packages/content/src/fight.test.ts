@@ -23,6 +23,7 @@ describe("buildFightConfig", () => {
         presenceTargets: balance.PRESENCE_TARGETS,
         expectedTurns: balance.EXPECTED_TURNS,
         turnLimitPenalty: balance.TURN_LIMIT_PENALTY,
+        changesPerSlot: balance.DEPLOY_CHANGES_PER_SLOT,
       });
       expect(constants.valueBits).toBe(balance.VALUE_BITS);
     }

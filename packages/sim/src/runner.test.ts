@@ -41,14 +41,13 @@ describe("playFight", () => {
       });
       expect(playFight({ config: minion("dep", "frequency"), seed: "dep", bot: deployer }).deployed).toEqual(["bloomFilter"]);
     }
-    // stops a fight that never ends and calls it stalled
+    // stops a fight that has not ended within the step limit and calls it stalled
     {
-      const dawdler = scripted("dawdler", () => (view): Action => {
-        const remove = view.observation.structures[0];
-        return remove ? { type: "remove", slot: remove.slot } : { type: "deploy", slot: 0, kind: "bloomFilter", spaceBits: 512 };
-      });
-      const record = playFight({ config: minion("stall", "count"), seed: "stall", bot: dawdler, maxSteps: 50 });
-      expect(record).toMatchObject({ outcome: "stalled", steps: 50, reason: null });
+      // Deploying and removing for ever is no longer possible (the engine limits the changes in a turn), so this player only
+      // takes the cheapest legal way forward; the fight is cut off because the step limit is tiny, not because it loops.
+      const slow = scripted("slow", () => (view): Action => (view.observation.phase === "deploy" ? { type: "endDeploy" } : { type: "strikeValue", value: 1 }));
+      const record = playFight({ config: minion("stall", "count"), seed: "stall", bot: slow, maxSteps: 4 });
+      expect(record).toMatchObject({ outcome: "stalled", steps: 4, reason: null });
     }
     // keeps the events only when asked
     {
