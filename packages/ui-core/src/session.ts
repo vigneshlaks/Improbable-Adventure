@@ -7,7 +7,9 @@ import {
   STRUCTURE_KINDS,
   type FightState,
 } from "@pda/engine";
-import { describeEnemy, formatNumber, narrateEvents, parseCommand, renderHelp, renderQuery, renderStatus } from "@pda/ui-core";
+import { describeEnemy, formatNumber, narrateEvents } from "./narrator";
+import { parseCommand } from "./parser";
+import { renderHelp, renderQuery, renderStatus } from "./views";
 
 export type LoadoutName = "starting" | "full";
 

@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Probabilistic Data Adventure</title>
+  </head>
+  <body>
+    <header>
+      <h1>Probabilistic Data Adventure</h1>
+      <span id="seed"></span>
+      <button id="new-run" type="button">New run</button>
+      <button id="theme" type="button" aria-label="Switch light and dark theme"></button>
+    </header>
+    <main>
+      <section id="game" aria-label="Game">
+        <div id="transcript" role="log" aria-live="polite"></div>
+        <div id="chips"></div>
+        <form id="entry" autocomplete="off">
+          <label id="prompt" for="line"></label>
+          <input id="line" type="text" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="send" />
+        </form>
+        <div id="ended" hidden>
+          <button id="download" type="button">Download replay</button>
+        </div>
+      </section>
+      <details id="panel-box" open>
+        <summary>Structures</summary>
+        <aside id="panel" aria-label="Structures"></aside>
+      </details>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

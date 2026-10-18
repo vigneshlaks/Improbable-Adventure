@@ -1,5 +1,5 @@
 import type { TierName } from "@pda/content";
-import type { LoadoutName, SessionOptions } from "./session";
+import type { LoadoutName, SessionOptions } from "@pda/ui-core";
 
 const TIERS: TierName[] = ["minion", "elite", "boss"];
 const LOADOUTS: LoadoutName[] = ["starting", "full"];

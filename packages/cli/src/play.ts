@@ -1,4 +1,4 @@
-import type { Session } from "./session";
+import type { Session } from "@pda/ui-core";
 
 /**
  * Runs a session against a source of typed lines. Each reply is written as it is produced, and the loop ends when

@@ -1,17 +1,10 @@
-import { buildRunConfig, contentHash, narration } from "@pda/content";
+import { buildRunConfig, contentHash, narration, structureConstants } from "@pda/content";
 import { IllegalActionError, observeRun, RunRecorder, type Replay, type RunConfig, type RunEvent, type RunState } from "@pda/engine";
-import {
-  describeEnemy,
-  formatNumber,
-  narrateRunStep,
-  parseRunCommand,
-  renderHelp,
-  renderQuery,
-  renderRest,
-  renderRewards,
-  renderRunStatus,
-} from "@pda/ui-core";
+import { describeEnemy, formatNumber, narrateRunStep } from "./narrator";
+import { parseRunCommand } from "./parser";
+import { renderHelp, renderQuery, renderRest, renderRewards, renderRunStatus } from "./views";
 import type { Session } from "./session";
+import { structureVisual, type StructureVisual } from "./visuals";
 
 export interface RunSessionOptions {
   seed: string;
@@ -23,6 +16,10 @@ export interface RunSessionOptions {
 export interface RunSession extends Session {
   /** The run as a replay, or null while it is still going or if the player left before the end. */
   replay(): Replay | null;
+  /** What the side panel draws: one visual per deployed structure, empty outside a fight. */
+  structures(): StructureVisual[];
+  /** Commands that make sense right now, for buttons. */
+  suggestions(): string[];
 }
 
 /** A whole act played by typing lines. Like `Session` it holds no I/O, so a script of lines gives a transcript. */
@@ -55,6 +52,19 @@ export function createRunSession({ seed, config = buildRunConfig({ seed }) }: Ru
 
   return {
     replay: () => (state.phase === "won" || state.phase === "lost" ? recorder.toReplay() : null),
+
+    structures() {
+      const constants = structureConstants();
+      return (state.fight?.slots ?? []).flatMap((snapshot, slot) => (snapshot ? [structureVisual(snapshot, slot, constants)] : []));
+    },
+
+    suggestions() {
+      const run = observeRun(state);
+      if (over()) return [];
+      if (run.phase === "reward") return (run.offers ?? []).map((_, i) => `choose ${i + 1}`);
+      if (run.phase === "rest") return ["leave", "status", "help"];
+      return run.fight?.phase === "strike" ? ["query", "status", "help"] : ["status", "help"];
+    },
 
     opening: () => [
       `Seed: ${seed}`,

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { play } from "./play";
-import { createSession } from "./session";
+import { createSession } from "@pda/ui-core";
 
 async function* feed(...lines: string[]) {
   for (const line of lines) yield line;

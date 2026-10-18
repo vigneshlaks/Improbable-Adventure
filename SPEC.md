@@ -571,6 +571,13 @@ The CLI and web UI share one command parser and one narrator; both only translat
 
 **Web extras:** a side panel with live visuals of each deployed structure (bit array fill, counter heatmap, register bars), an error-rate readout that updates as the stream grows, and a light/dark theme. Every visual is optional; the game must be fully playable as text.
 
+**Web UI (decided 2026-10-17, M6).** `pnpm dev` serves `packages/web`, a Vite and plain TypeScript page (no framework) that plays a whole run:
+
+- The sessions (`createSession`, `createRunSession`) moved from `cli` to `ui-core`, so the terminal and the page run the same code. A `RunSession` also offers `structures()` (one visual per deployed structure) and `suggestions()` (the commands that make sense now, shown as buttons; typing still works for everything).
+- `structureVisual(snapshot, slot, constants)` in `ui-core` is pure and tested: it turns a structure's snapshot into cells between 0 and 1 and a shape. Bloom Filter, Linear Counting, Stable Bloom, Exact Memory and Reservoir are strips (at most 256 cells, averaged down if bigger), Count-Min is a heatmap (a row per hash, a column per counter), LogLog and HyperLogLog are bars (one per register). Each has a caption and a readout in words: fill and false-positive rate, the Count-Min overshoot band over the live count, the register error (plus or minus a share), entries or slots used. The readout is the error-rate display and updates after every command.
+- The page: transcript, prompt line, input with arrow-key history, a Structures panel (a side column on wide screens, a fold-out below the text at 720 px or narrower, where it starts closed), a new-run button, `?seed=` in the address to replay a seed (the seed is kept in the address; a fresh run picks a random one), a download button for the replay once a run has ended, and a light/dark theme that follows the system and can be switched (the choice is remembered when storage is allowed). Visuals are hidden from screen readers, since their caption and readout carry the same information.
+- `packages/web` has its own tsconfig (with the DOM types); the root one leaves it out and `pnpm lint` checks both. The engine and `ui-core` still use no DOM.
+
 ## Milestones
 
 Build in this order; each milestone must pass its acceptance criteria before the next starts. M3 is the go/no-go point for whether the game is fun.

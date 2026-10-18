@@ -5,9 +5,11 @@
   "packageManager": "pnpm@10.34.6",
   "scripts": {
     "test": "vitest run",
-    "lint": "eslint . && tsc --noEmit",
+    "lint": "eslint . && tsc --noEmit && tsc -p packages/web --noEmit",
     "sim": "tsx packages/sim/src/bin.ts",
-    "cli": "tsx packages/cli/src/bin.ts"
+    "cli": "tsx packages/cli/src/bin.ts",
+    "dev": "pnpm --filter @pda/web dev",
+    "build": "pnpm --filter @pda/web build"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

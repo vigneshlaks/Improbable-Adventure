@@ -2,8 +2,7 @@ import { writeFileSync } from "node:fs";
 import { createInterface } from "node:readline";
 import { parseGameArgs } from "./cli";
 import { play } from "./play";
-import { createRunSession, type RunSession } from "./runSession";
-import { createSession } from "./session";
+import { createRunSession, createSession, type RunSession } from "@pda/ui-core";
 
 const parsed = parseGameArgs(process.argv.slice(2), { defaultSeed: String(Date.now()) });
 if (!parsed.ok) {
