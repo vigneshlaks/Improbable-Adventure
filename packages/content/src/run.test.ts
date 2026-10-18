@@ -180,7 +180,7 @@ describe("a whole act on the real content", () => {
     const answer = groundTruth(state.fight as NonNullable<RunState["fight"]>).answer;
     if (!answer) throw new Error("no challenge is open");
     if (answer.kind === "presence") return { type: "strikeSubset", targets: answer.real.flatMap((real, position) => (real ? [position] : [])) };
-    return { type: "strikeValue", value: answer.kind === "frequency" ? answer.count : answer.distinct };
+    return { type: "strikeValue", value: answer.kind === "frequency" ? answer.count : answer.kind === "count" ? answer.distinct : answer.value };
   }
 
   it("can be won start to finish, passing through rewards and the rest stop", () => {

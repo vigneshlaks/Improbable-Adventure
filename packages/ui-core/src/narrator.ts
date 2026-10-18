@@ -36,6 +36,8 @@ function challengeLines(challenge: Challenge, { listTargets = true }: NarrateOpt
       return [say("challengeFrequency", { value: challenge.value })];
     case "count":
       return [say("challengeCount")];
+    case "rank":
+      return [say("challengeRank", { percent: formatNumber(challenge.quantile * 100) })];
   }
 }
 
@@ -69,6 +71,10 @@ export function narrateEvent(event: GameEvent, options: NarrateOptions = {}): st
               ? say("strikeCountHit", { damage, trueDistinct: event.trueDistinct, estimate: formatNumber(event.estimate) })
               : say("strikeCountMiss", { certaintyLost, trueDistinct: event.trueDistinct, estimate: formatNumber(event.estimate) }),
           ];
+        case "rank": {
+          const variables = { rankPercent: formatNumber(event.rank * 100), percent: formatNumber(event.quantile * 100), value: formatNumber(event.force) };
+          return [event.outcome === "hit" ? say("strikeRankHit", { damage, ...variables }) : say("strikeRankBlocked", { certaintyLost, ...variables })];
+        }
         case "presence":
           return [say("strikePresence", { realHits: event.realHits, decoyHits: event.decoyHits, damage, certaintyLost, realTotal: event.realTotal })];
       }

@@ -41,6 +41,7 @@ export function runConfig(overrides: Partial<RunConfig> = {}): RunConfig {
       missPenalty: 3,
       overshootExp: 1,
       countTol: 0.25,
+      rankTol: 0.1,
       presenceTargets: 12,
       expectedTurns: 5,
       turnLimitPenalty: 20,

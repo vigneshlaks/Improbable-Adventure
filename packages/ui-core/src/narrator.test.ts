@@ -207,6 +207,28 @@ describe("renderQuery", () => {
   });
 });
 
+describe("Rank in the story and the query screen", () => {
+  it("tells the armor's percentile on the challenge, says how a strike ranked against it whether it hit or was blocked, and leaves no template variable unfilled; the query screen asks the question and shows each structure's value and range", () => {
+    const challenge = narrateEvent({ type: "challengeIssued", turn: 2, weakPoint: "rank", challenge: { kind: "rank", quantile: 0.9 }, firstReveal: true });
+    expect(challenge.join(" ")).toMatch(/rank/i);
+    expect(challenge.join(" ")).toMatch(/rank 90 percent/);
+    expect(unresolved(challenge)).toBe(false);
+
+    const hit = narrateEvent({ type: "strikeResolved", turn: 2, kind: "rank", outcome: "hit", damage: 12, certaintyLost: 0, force: 4200, rank: 0.93, quantile: 0.9 });
+    expect(hit.join(" ")).toMatch(/ranks at 93 percent.*armor at 90 percent/);
+    expect(hit.join(" ")).toMatch(/12 damage/);
+    const blocked = narrateEvent({ type: "strikeResolved", turn: 2, kind: "rank", outcome: "blocked", damage: 0, certaintyLost: 3, force: 12, rank: 0.4, quantile: 0.9 });
+    expect(blocked.join(" ")).toMatch(/ranks at only 40 percent.*below the armor at 90 percent/);
+    expect(blocked.join(" ")).toMatch(/lose 3 Certainty/);
+    expect(unresolved([...hit, ...blocked])).toBe(false);
+
+    const text = renderQuery(observation({ phase: "strike", challenge: { kind: "rank", quantile: 0.99 }, structures: [view(0, "reservoirSampling", answer(5000, 4000, 6000))] })).join("\n");
+    expect(text).toMatch(/rank 99 percent/);
+    expect(text).toMatch(/\[1\] Reservoir Sampling:/);
+    expect(text).toMatch(/5000/);
+  });
+});
+
 describe("renderHelp", () => {
   it("lists every command and structure when no topic is given; explains a command; lists only the structures the player owns when given a loadout; and 3 more", () => {
     // lists every command and structure when no topic is given

@@ -9,7 +9,8 @@
     "answers": [
       "presence",
       "frequency",
-      "count"
+      "count",
+      "rank"
     ],
     "knob": null,
     "summary": "A perfect ledger of every value and how often it appeared.",
@@ -26,7 +27,8 @@
     "answers": [
       "presence",
       "frequency",
-      "count"
+      "count",
+      "rank"
     ],
     "knob": null,
     "summary": "A fair random sample of the stream, shown as raw values.",

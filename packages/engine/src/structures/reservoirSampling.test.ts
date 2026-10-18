@@ -3,6 +3,7 @@ import { eachCase } from "../testCases";
 import { LiveSet } from "../enemies/liveSet";
 import { createStream, nextBurst, type StreamParams } from "../enemies/stream";
 import { Rng } from "../rng/rng";
+import { orderStatisticRange, thinningShift } from "./quantiles";
 import { ReservoirSampling } from "./reservoirSampling";
 import type { Answer } from "./types";
 import { churnStream, coverageFloor, distinctValues, presenceTargets, TEST_CONSTANTS, TRIALS, trialRng } from "./testUtils";
@@ -363,6 +364,63 @@ describe("ReservoirSampling", () => {
         if (a && a.low <= distinct && distinct <= a.high) covered++;
       }
       expect(covered / TRIALS).toBeGreaterThanOrEqual(coverageFloor(TEST_CONSTANTS.confidence, TRIALS));
+    });
+  });
+});
+
+describe("ReservoirSampling rank", () => {
+  const rank = (r: ReservoirSampling, quantile: number) => r.query({ kind: "rank", quantile });
+
+  it("is exact while the sample holds every unit and nothing was deleted; otherwise estimates the quantile from the sample with a range that opens when the stream is bigger and when units were deleted", () => {
+    const small = make(32 * 100);
+    for (let v = 1; v <= 50; v++) small.ingest({ op: "insert", value: v * 10 });
+    expect(rank(small, 0.5)).toMatchObject({ estimate: 250, low: 250, high: 250 });
+    expect(rank(small, 0.9)).toMatchObject({ estimate: 450, low: 450, high: 450 });
+
+    const big = make(32 * 100);
+    for (let v = 1; v <= 5000; v++) big.ingest({ op: "insert", value: v });
+    const a = rank(big, 0.5) as Answer;
+    expect(a.low).toBeLessThan(a.estimate as number);
+    expect(a.high).toBeGreaterThan(a.estimate as number);
+    expect(a.estimate as number).toBeGreaterThan(2000); // a sample of the stream's middle
+    expect(a.estimate as number).toBeLessThan(3000);
+
+    // Deletes only add noise (they remove units at random), so the range gets wider, not shifted.
+    const deleted = make(32 * 100);
+    for (let v = 1; v <= 5000; v++) deleted.ingest({ op: "insert", value: v });
+    for (let i = 0; i < 2000; i++) deleted.ingest({ op: "delete", value: i + 1 });
+    const b = rank(deleted, 0.5) as Answer;
+    expect((b.high as number) - (b.low as number)).toBeGreaterThan((a.high as number) - (a.low as number));
+    expect(b.estimate).toBe(a.estimate);
+    expect(rank(make(32 * 100), 0.5)).toMatchObject({ estimate: 0, high: Number.POSITIVE_INFINITY }); // nothing sampled
+
+    // The ranges are exactly the order-statistic ranges: at the stated confidence with no deletes, and with deletes at half the chance of a miss
+    // plus the thinning allowance (the live units are a random subset of those inserted).
+    const sorted = [...big.values].sort((x, y) => x - y);
+    expect(a).toMatchObject(orderStatisticRange(sorted, 0.5, TEST_CONSTANTS.confidence));
+    const sortedDeleted = [...deleted.values].sort((x, y) => x - y);
+    const halved = 1 - (1 - TEST_CONSTANTS.confidence) / 2;
+    expect(b).toMatchObject(orderStatisticRange(sortedDeleted, 0.5, halved, thinningShift(5000 - 2000, 0.5, halved)));
+  });
+
+  describe(`statistical rank (${TRIALS} seeded trials)`, () => {
+    it("reports a range that contains the true quantile value at the stated confidence, with no deletes and with Churn", () => {
+      for (const churn of [0, 0.1, 0.3]) {
+        for (const quantile of [0.5, 0.9]) {
+          let covered = 0;
+          for (let t = 0; t < TRIALS; t++) {
+            const rng = trialRng(`reservoir-rank-${churn}-${quantile}`, t);
+            const values = distinctValues(rng, 600);
+            const { events, live } = churnStream(rng, values, 4000, churn, { skewed: true });
+            const r = make(32 * 128, `rank-${churn}-${quantile}-${t}`);
+            for (const e of events) r.ingest(e);
+            const truth = live.quantileValue(quantile) as number;
+            const a = r.query({ kind: "rank", quantile });
+            if (a && a.low <= truth && truth <= a.high) covered++;
+          }
+          expect(covered / TRIALS, `churn ${churn}, quantile ${quantile}`).toBeGreaterThanOrEqual(coverageFloor(0.95, TRIALS));
+        }
+      }
     });
   });
 });

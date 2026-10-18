@@ -38,6 +38,9 @@ function validateConfig(config: FightConfig): void {
   need(enemy.hp > 0, "enemy hp must be positive");
   need(enemy.turnLimit >= 1 && Number.isInteger(enemy.turnLimit), "turnLimit must be a whole number >= 1");
   need(enemy.weakPoints.length >= 1, "an enemy needs at least one weak point");
+  if (enemy.weakPoints.includes("rank")) {
+    need(enemy.rankQuantile !== undefined && enemy.rankQuantile > 0 && enemy.rankQuantile < 1, "an enemy with the Rank weak point needs a rankQuantile between 0 and 1");
+  }
   need(loadout.length >= 1, "the loadout cannot be empty");
 }
 
@@ -113,6 +116,7 @@ function challengeContext(state: FightState, params: StreamParams): ChallengeCon
   return {
     presenceTargets: state.config.rules.presenceTargets,
     drawOutsideValue: (rng) => outsideValue(params, state.seed, rng.int(range)),
+    rankQuantile: state.config.enemy.rankQuantile ?? 0.5,
   };
 }
 

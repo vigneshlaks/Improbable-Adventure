@@ -27,6 +27,7 @@ const CONFIG: FightConfig = {
     missPenalty: 3,
     overshootExp: 2,
     countTol: 0.25,
+    rankTol: 0.1,
     presenceTargets: 12,
     expectedTurns: 5,
     turnLimitPenalty: 20,
@@ -404,6 +405,44 @@ describe("ending a fight", () => {
       expect(() => step(state, endDeploy)).toThrow();
       expect(legalActions(state)).toEqual([]);
     }
+  });
+});
+
+describe("a Rank fight", () => {
+  const rankConfig = (rankQuantile?: number): FightConfig => ({
+    ...CONFIG,
+    enemy: { ...CONFIG.enemy, weakPoints: ["rank"], ...(rankQuantile === undefined ? {} : { rankQuantile }) },
+  });
+
+  it("needs an enemy with the Rank weak point to name its quantile; issues the armor from turn 2, naming a rank; wins to a strike of the value that reaches it, and blocks a value below it", () => {
+    expect(() => createFight("rank", rankConfig())).toThrow(RangeError); // no quantile
+    expect(() => createFight("rank", rankConfig(1.5))).toThrow(RangeError);
+
+    const atChallenge = () => run(createFight("rank-fight", rankConfig(0.9)), [endDeploy, endDeploy]).state;
+    const state = atChallenge();
+    expect(state.phase).toBe("strike");
+    expect(state.challenge).toMatchObject({ kind: "rank" });
+    const challenge = state.challenge as { kind: "rank"; quantile: number };
+    expect(challenge.quantile).toBeGreaterThanOrEqual(0.9);
+    expect(observe(state).challenge).toEqual(state.challenge); // the player is told the armor
+    expect(observe(state)).not.toHaveProperty("rankValue"); // and not the value that reaches it
+
+    const truth = groundTruth(state).answer;
+    if (truth?.kind !== "rank") throw new Error("expected a rank answer");
+    expect(truth.quantile).toBe(challenge.quantile);
+
+    // The value that reaches the armor is a perfect hit: BASE damage kills the 20 HP enemy.
+    const won = step(state, { type: "strikeValue", value: truth.value });
+    expect(won.events.find((e) => e.type === "strikeResolved")).toMatchObject({ kind: "rank", outcome: "hit", damage: 20, certaintyLost: 0 });
+    expect(won.state.phase).toBe("won");
+
+    // A value below it is blocked: no damage, and the block penalty.
+    const blocked = step(atChallenge(), { type: "strikeValue", value: 0 });
+    expect(blocked.events.find((e) => e.type === "strikeResolved")).toMatchObject({ kind: "rank", outcome: "blocked", damage: 0, certaintyLost: 3 });
+    expect(blocked.state.phase).toBe("deploy"); // the fight goes on to the next turn
+
+    // A strike of the wrong kind is refused, as for the other numeric challenges.
+    expect(() => step(atChallenge(), { type: "strikeSubset", targets: [0] })).toThrow(/answered with a value/);
   });
 });
 

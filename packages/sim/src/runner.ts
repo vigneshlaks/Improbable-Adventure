@@ -80,7 +80,8 @@ function tallyAnswers(observation: Observation, state: FightState, accuracy: Fig
   const truth = groundTruth(state).answer;
   if (!truth) return;
   // For Presence, the structures bound how many of the targets are real.
-  const actual = truth.kind === "presence" ? truth.real.filter(Boolean).length : truth.kind === "frequency" ? truth.count : truth.distinct;
+  const actual =
+    truth.kind === "presence" ? truth.real.filter(Boolean).length : truth.kind === "frequency" ? truth.count : truth.kind === "count" ? truth.distinct : truth.value;
 
   for (const structure of observation.structures) {
     const answer = structure.answer;
@@ -89,7 +90,8 @@ function tallyAnswers(observation: Observation, state: FightState, accuracy: Fig
     tally.answers++;
     tally.confidenceSum += answer.confidence;
     if (answer.low <= actual && actual <= answer.high) tally.covered++;
-    if (typeof answer.estimate === "number" && actual > 0) {
+    // A value's distance from the armor is a matter of rank, not of the raw number, so Rank answers have no relative error here.
+    if (typeof answer.estimate === "number" && actual > 0 && truth.kind !== "rank") {
       tally.relativeErrorSum += Math.abs(answer.estimate - actual) / actual;
       tally.relativeErrorCount++;
     }

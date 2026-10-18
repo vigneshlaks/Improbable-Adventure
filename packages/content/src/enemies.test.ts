@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { eachCase } from "../../engine/src/testCases";
 import { balance } from "./balance";
 import { generateEnemy, type TierName } from "./enemies";
+import { traits } from "./traits";
 
 const TIERS: TierName[] = ["minion", "elite", "boss"];
 const nonLow = (traits: object) => Object.values(traits).filter((level) => level !== "low").length;
@@ -74,5 +75,35 @@ describe("generateEnemy", () => {
       const sigma = Math.sqrt(matching * (2 / 3) * (1 / 3));
       expect(Math.abs(frequency - matching * (2 / 3))).toBeLessThan(4 * sigma);
     }
+  });
+});
+
+describe("Rank enemies", () => {
+  const eager = { ...traits, rankWeight: 1000 }; // Rank is nearly always drawn, so the quantile can be seen
+  it("never draw Rank while its weight is zero (the shipped setting), and the enemies stay exactly as they were without it; when Rank is in the pool, give it a quantile from the tier's list, and only then", () => {
+    expect(traits.rankWeight).toBe(0);
+    const off = { ...traits, rankWeight: 0 };
+    for (const tier of TIERS) {
+      for (let i = 0; i < 40; i++) {
+        const enemy = generateEnemy(`off-${i}`, tier);
+        expect(enemy.weakPoints).not.toContain("rank");
+        expect(enemy).not.toHaveProperty("rankQuantile");
+        expect(generateEnemy(`off-${i}`, tier, balance, off)).toEqual(enemy);
+      }
+    }
+    const seen = new Set<number>();
+    let withRank = 0;
+    for (const tier of TIERS) {
+      for (let i = 0; i < 60; i++) {
+        const enemy = generateEnemy(`on-${i}`, tier, balance, eager);
+        if (enemy.weakPoints.includes("rank")) {
+          withRank++;
+          expect(balance.RANK_QUANTILES[tier]).toContain(enemy.rankQuantile);
+          if (tier === "boss") seen.add(enemy.rankQuantile as number);
+        } else expect(enemy).not.toHaveProperty("rankQuantile");
+      }
+    }
+    expect(withRank).toBeGreaterThan(150); // 180 enemies, almost all with Rank
+    expect([...seen].sort()).toEqual([...balance.RANK_QUANTILES.boss].sort()); // every quantile of the list is used
   });
 });

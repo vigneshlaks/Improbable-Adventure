@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { countStrike, frequencyStrike, presenceStrike, type DamageRules } from "./damage";
+import { countStrike, frequencyStrike, presenceStrike, rankStrike, type DamageRules } from "./damage";
 
 const RULES: DamageRules = {
   base: 20,
@@ -9,6 +9,7 @@ const RULES: DamageRules = {
   missPenalty: 3,
   overshootExp: 2,
   countTol: 0.25,
+  rankTol: 0.1,
 };
 
 describe("frequencyStrike", () => {
@@ -115,5 +116,30 @@ describe("presenceStrike", () => {
       expect(() => presenceStrike(RULES, real, [-1])).toThrow(RangeError);
       expect(() => presenceStrike(RULES, real, [1.5])).toThrow(RangeError);
     }
+  });
+});
+
+describe("rankStrike", () => {
+  it("blocks a value that ranks below the armor and charges the block penalty; deals full BASE at the armor's own rank and less as the rank rises, nothing RANK_TOL above it; and rejects a bad value", () => {
+    // blocked below the armor, whatever the gap
+    expect(rankStrike(RULES, 0.9, 0.89, 123)).toEqual({ kind: "rank", outcome: "blocked", damage: 0, certaintyLost: 3, force: 123, rank: 0.89, quantile: 0.9 });
+    expect(rankStrike(RULES, 0.9, 0, 1)).toMatchObject({ outcome: "blocked", certaintyLost: 3 });
+    // full damage exactly at the armor, falling linearly to nothing at RANK_TOL above it (0.1 here)
+    expect(rankStrike(RULES, 0.5, 0.5, 7)).toEqual({ kind: "rank", outcome: "hit", damage: 20, certaintyLost: 0, force: 7, rank: 0.5, quantile: 0.5 });
+    expect(rankStrike(RULES, 0.5, 0.55, 7).damage).toBeCloseTo(10, 5); // half way to the tolerance
+    expect(rankStrike(RULES, 0.5, 0.58, 7).damage).toBeCloseTo(20 * 0.2, 5);
+    expect(rankStrike(RULES, 0.5, 0.6, 7)).toMatchObject({ outcome: "hit", damage: 0, certaintyLost: 0 }); // far above: wasted, not punished
+    expect(rankStrike(RULES, 0.5, 0.95, 7)).toMatchObject({ outcome: "hit", damage: 0, certaintyLost: 0 });
+    // the tolerance is a rule, not a constant
+    expect(rankStrike({ ...RULES, rankTol: 0.2 }, 0.5, 0.6, 7).damage).toBeCloseTo(10, 5);
+    // never increases damage as the rank grows past the armor
+    let previous = Infinity;
+    for (let rank = 0.5; rank <= 0.7; rank += 0.01) {
+      const { damage } = rankStrike(RULES, 0.5, rank, 1);
+      expect(damage).toBeLessThanOrEqual(previous);
+      previous = damage;
+    }
+    expect(() => rankStrike(RULES, 0.5, 0.5, -1)).toThrow(RangeError);
+    expect(() => rankStrike(RULES, 0.5, 0.5, Number.NaN)).toThrow(RangeError);
   });
 });

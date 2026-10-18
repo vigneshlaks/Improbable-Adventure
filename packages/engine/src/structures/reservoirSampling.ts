@@ -1,6 +1,7 @@
 import { Rng } from "../rng/rng";
 import { binomialUpper, clamp, clopperPearson } from "../stats/stats";
 import { expectedGhostShare } from "./ghosts";
+import { orderStatisticRange, quantileOfSorted, thinningShift } from "./quantiles";
 import { expectKind, optionsFromSnapshot, readCounts, readNumber, readRngState, snapshotHeader } from "./snapshot";
 import {
   assertSpace,
@@ -101,6 +102,8 @@ export class ReservoirSampling implements Structure {
         return this.frequency(challenge.value, confidence);
       case "count":
         return this.distinct(confidence);
+      case "rank":
+        return this.rank(challenge.quantile, confidence);
     }
   }
 
@@ -138,6 +141,26 @@ export class ReservoirSampling implements Structure {
     const low = Math.max(0, ever.low - binomialUpper(Math.ceil(ever.low), q, 1 - tail));
     const high = Math.max(low, ever.high - binomialUpper(Math.floor(ever.high), q, tail));
     return { estimate: clamp(ever.estimate * (1 - q), low, high), low, high, confidence };
+  }
+
+  /**
+   * The value at the armor's quantile, from the sample, with a distribution-free range from order statistics. Deletes remove
+   * units at random, so they leave the quantile where it was in expectation and only add noise: the live units are a thinned
+   * copy of those inserted, which moves the quantile by about a proportion's standard deviation over the units left. That is
+   * added in quantile terms, and the sample's own range is taken at half the chance of a miss when it is needed.
+   */
+  private rank(quantile: number, confidence: number): Answer {
+    const sorted = [...this.sample].sort((a, b) => a - b);
+    if (sorted.length === 0) return { estimate: 0, low: 0, high: Number.POSITIVE_INFINITY, confidence };
+    if (this.seen <= this.slots && this.deleteCount === 0) {
+      const exact = quantileOfSorted(sorted, quantile);
+      return { estimate: exact, low: exact, high: exact, confidence };
+    }
+    const live = Math.max(1, this.seen - this.deleteCount);
+    const budget = this.deleteCount === 0 ? confidence : 1 - (1 - confidence) / 2;
+    const shift = this.deleteCount === 0 ? 0 : thinningShift(live, quantile, 1 - (1 - confidence) / 2);
+    const range = orderStatisticRange(sorted, quantile, budget, shift);
+    return { ...range, confidence };
   }
 
   private distinct(confidence: number): Answer {

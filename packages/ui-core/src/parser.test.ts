@@ -161,6 +161,18 @@ describe("strike: Frequency and Count", () => {
     ],
   });
 
+  it("strikes a Rank challenge as it strikes any number: with the structure's estimate, or its upper end, which is the safe one against armor", () => {
+    const rank = observation({
+      phase: "strike",
+      challenge: { kind: "rank", quantile: 0.9 },
+      structures: [view(0, "reservoirSampling", answer(5000, 4000, 6000.2))],
+    });
+    expect(parse("strike estimate", rank)).toMatchObject({ kind: "action", action: { type: "strikeValue", value: 5000 } });
+    expect(parse("strike high", rank)).toMatchObject({ kind: "action", action: { type: "strikeValue", value: 6001 } }); // rounded up, so it still reaches the armor
+    expect(parse("strike low", rank)).toMatchObject({ action: { value: 4000 } });
+    expect(parse("strike 4321", rank)).toMatchObject({ action: { value: 4321 } });
+  });
+
   it("strikes with a number; strikes at a structure's estimate, upper bound or lower bound, rounded sensibly; uses the first structure that has an answer, and says which; and 5 more", () => {
     // strikes with a number
     {

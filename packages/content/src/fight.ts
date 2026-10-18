@@ -25,6 +25,7 @@ export function fightRules(tuning: Balance = balance): FightRules {
     missPenalty: tuning.MISS_PENALTY,
     overshootExp: tuning.OVERSHOOT_EXP,
     countTol: tuning.COUNT_TOL,
+    rankTol: tuning.RANK_TOL,
     presenceTargets: tuning.PRESENCE_TARGETS,
     expectedTurns: tuning.EXPECTED_TURNS,
     turnLimitPenalty: tuning.TURN_LIMIT_PENALTY,

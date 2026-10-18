@@ -73,6 +73,8 @@ export function renderQuery(observation: Observation): string[] {
     });
   } else if (challenge.kind === "frequency") {
     lines.push(`Shield on the value ${challenge.value}: how many times has it appeared?`);
+  } else if (challenge.kind === "rank") {
+    lines.push(`Armor at rank ${formatNumber(challenge.quantile * 100)} percent: what value do that share of the stream's values sit at or below? Lower is blocked; far above it, little damage.`);
   } else {
     lines.push("Estimate how many distinct values are in the stream right now.");
   }

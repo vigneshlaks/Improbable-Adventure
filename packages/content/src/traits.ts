@@ -6,7 +6,7 @@ const perLevel = <T extends z.ZodType>(schema: T) => z.object({ low: schema, med
 
 const weight = z.number().positive();
 /** Extra weight a trait level gives to each weak point. */
-const hintSchema = z.object({ presence: weight.optional(), frequency: weight.optional(), count: weight.optional() }).strict();
+const hintSchema = z.object({ presence: weight.optional(), frequency: weight.optional(), count: weight.optional(), rank: weight.optional() }).strict();
 const traitHints = z.object({ medium: hintSchema.optional(), high: hintSchema.optional() }).strict();
 
 export const traitsSchema = z
@@ -23,6 +23,8 @@ export const traitsSchema = z
       .strict(),
     /** Every weak point starts with this weight when an enemy picks one. */
     weakPointBaseWeight: weight,
+    /** Rank starts with this weight instead (0 keeps it out of the pool): it is the newest challenge and its structures are Phase 2. */
+    rankWeight: z.number().nonnegative(),
     /** Traits nudge the choice: certain trait levels make certain weak points likelier. */
     weakPointHints: z
       .object({ variety: traitHints, skew: traitHints, churn: traitHints, growth: traitHints, drift: traitHints })
@@ -42,14 +44,14 @@ export const traits: Traits = parseTraits(traitsJson);
 /** The level tables in the shape the engine's stream generator takes. */
 export const traitTables: TraitTables = traits.levels;
 
-const WEAK_POINTS: WeakPoint[] = ["presence", "frequency", "count"];
+const WEAK_POINTS: WeakPoint[] = ["presence", "frequency", "count", "rank"];
 const TRAIT_NAMES = ["variety", "skew", "churn", "growth", "drift"] as const;
 
 /** How likely each weak point is for an enemy with these trait levels: a base weight plus the traits' hints. */
 export function weakPointWeights(levels: StreamTraits, source: Traits = traits): Record<WeakPoint, number> {
-  const weights: Record<WeakPoint, number> = { presence: 0, frequency: 0, count: 0 };
+  const weights: Record<WeakPoint, number> = { presence: 0, frequency: 0, count: 0, rank: 0 };
   for (const point of WEAK_POINTS) {
-    weights[point] = source.weakPointBaseWeight;
+    weights[point] = point === "rank" ? source.rankWeight : source.weakPointBaseWeight;
     for (const trait of TRAIT_NAMES) {
       const level = levels[trait];
       if (level === "low") continue;

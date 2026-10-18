@@ -18,7 +18,11 @@ export function strikeOnEstimate(view: BotView): Action {
     return best ? { type: "strikeSubset", targets: best.positions } : blindStrike(observation);
   }
   const answer = bestNumericAnswer(observation);
-  return answer ? { type: "strikeValue", value: whole(answer.estimate) } : blindStrike(observation);
+  if (!answer) return blindStrike(observation);
+  // A value that ranks below the armor is blocked, and the estimate of a quantile is as likely to fall below it as above, so
+  // against armor it strikes at the upper end of the range instead (when it has one), and takes the estimate otherwise.
+  if (observation.challenge?.kind === "rank" && Number.isFinite(answer.high)) return { type: "strikeValue", value: whole(answer.high, "ceil") };
+  return { type: "strikeValue", value: whole(answer.estimate) };
 }
 
 export const greedy: Bot = {

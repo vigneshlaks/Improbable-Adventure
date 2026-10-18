@@ -5,7 +5,7 @@ import { traits as defaultTraits, weakPointWeights, type Traits } from "./traits
 export type TierName = keyof Balance["TIERS"];
 
 const TRAIT_NAMES = ["variety", "skew", "churn", "growth", "drift"] as const;
-const WEAK_POINTS: WeakPoint[] = ["presence", "frequency", "count"];
+const WEAK_POINTS: WeakPoint[] = ["presence", "frequency", "count", "rank"];
 
 /** A whole number from `min` to `max`, inclusive. */
 function between(rng: Rng, range: { min: number; max: number }): number {
@@ -35,7 +35,7 @@ export function generateEnemy(
 
   // Weak points are drawn in proportion to their weights, without repeats.
   const weights = weakPointWeights(levels, traitData);
-  const remaining = [...WEAK_POINTS];
+  const remaining = WEAK_POINTS.filter((point) => weights[point] > 0); // a weak point with no weight is never drawn
   const weakPoints: WeakPoint[] = [];
   for (let i = Math.min(between(rng, spec.weakPointCount), remaining.length); i > 0; i--) {
     const total = remaining.reduce((sum, point) => sum + weights[point], 0);
@@ -45,5 +45,8 @@ export function generateEnemy(
     weakPoints.push(remaining.splice(index, 1)[0] as WeakPoint);
   }
 
-  return { tier, size: spec.size, hp: spec.hp, attack: spec.attack, turnLimit: spec.turnLimit, traits: levels, weakPoints };
+  // A Rank enemy has an armor at a quantile of its own, drawn from the tiers' list (harder to hit the further up it is).
+  const quantiles = tuning.RANK_QUANTILES[tier];
+  const rankQuantile = weakPoints.includes("rank") ? (quantiles[rng.int(quantiles.length)] as number) : undefined;
+  return { tier, size: spec.size, hp: spec.hp, attack: spec.attack, turnLimit: spec.turnLimit, traits: levels, weakPoints, ...(rankQuantile === undefined ? {} : { rankQuantile }) };
 }

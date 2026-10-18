@@ -3,7 +3,7 @@ import { SLOT_FEATURES, type Layout } from "./layout";
 
 const LEVEL: Record<TraitLevel, number> = { low: 0, medium: 0.5, high: 1 };
 const TRAITS = ["variety", "skew", "churn", "growth", "drift"] as const;
-const WEAK_POINTS = ["presence", "frequency", "count"] as const;
+const WEAK_POINTS = ["presence", "frequency", "count", "rank"] as const;
 const TIERS = ["minion", "elite", "boss"] as const;
 const PHASES = ["fight", "reward", "rest"] as const;
 
@@ -65,6 +65,7 @@ export function encodeObservation(state: RunState, layout: Layout): number[] {
   out.push(...oneHot(WEAK_POINTS, fight?.challenge?.kind));
   const targets = fight?.challenge?.kind === "presence" ? fight.challenge.targets : [];
   out.push(targets.length / Math.max(1, config.rules.presenceTargets), fight?.challenge?.kind === "frequency" ? 1 : 0, fight?.challenge?.kind === "count" ? 1 : 0);
+  out.push(fight?.challenge?.kind === "rank" ? fight.challenge.quantile : 0); // how high the armor is, as a share
   for (let slot = 0; slot < layout.slots; slot++) out.push(...slotFeatures(fight?.structures.find((view) => view.slot === slot), totalSpace, targets));
 
   // The rewards on offer.

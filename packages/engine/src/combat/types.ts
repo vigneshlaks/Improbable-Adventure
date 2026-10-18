@@ -42,6 +42,8 @@ export interface EnemyConfig {
   turnLimit: number;
   traits: StreamTraits;
   weakPoints: WeakPoint[];
+  /** The quantile of live values its Rank challenge asks about (the armor's), needed if Rank is one of its weak points. */
+  rankQuantile?: number;
 }
 
 /** How a step is scored for reinforcement learning. Ignored by the game itself. */

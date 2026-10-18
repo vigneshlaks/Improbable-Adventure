@@ -4,10 +4,14 @@ import type { BotView } from "./types";
 
 // Building blocks shared by the bots that deploy structures and strike on their answers.
 
-const WEAK_POINTS: WeakPoint[] = ["presence", "frequency", "count"];
+const WEAK_POINTS: WeakPoint[] = ["presence", "frequency", "count", "rank"];
 
 /** The smallest Space worth giving a structure. */
 const MIN_BITS = 256;
+
+/** Structures that cannot be built in even that: a Top-K Tracker needs room for a Count-Min grid and a candidate list (a quarter of its Space, 96 bits an entry). */
+const MIN_BITS_OF: Partial<Record<StructureKind, number>> = { topKTracker: 384 };
+const minBitsOf = (kind: StructureKind): number => Math.max(MIN_BITS, MIN_BITS_OF[kind] ?? 0);
 
 /** Structures that suit each weak point, best first. Exact Memory and Reservoir Sampling answer anything. */
 export function preferredKinds(weakPoint: WeakPoint, traits: StreamTraits): StructureKind[] {
@@ -20,6 +24,9 @@ export function preferredKinds(weakPoint: WeakPoint, traits: StreamTraits): Stru
       return traits.skew === "low"
         ? ["countMinSketch", "exactMemory", "reservoirSampling"]
         : ["topKTracker", "countMinSketch", "exactMemory", "reservoirSampling"];
+    case "rank":
+      // Exact Memory is exact while its table has room; a sample gives a distribution-free range, whatever the size of the stream.
+      return ["reservoirSampling", "exactMemory"];
     case "count":
       // LogLog suits huge streams. Linear Counting is more precise while its bitmap has room.
       // HyperLogLog (made by fusing the two) is the best of both.
@@ -73,9 +80,10 @@ export function nextDeployAction(view: BotView, wanted: StructureKind[]): Action
   if (missing.length === 0) return END_DEPLOY;
 
   const slot = firstFreeSlot(observation);
-  if (slot !== null && observation.spaceFree >= MIN_BITS) {
-    const share = Math.max(MIN_BITS, Math.floor(observation.spaceFree / missing.length));
-    return { type: "deploy", slot, kind: missing[0] as StructureKind, spaceBits: Math.min(share, observation.spaceFree) };
+  const next = missing[0] as StructureKind;
+  if (slot !== null && observation.spaceFree >= minBitsOf(next)) {
+    const share = Math.max(minBitsOf(next), Math.floor(observation.spaceFree / missing.length));
+    return { type: "deploy", slot, kind: next, spaceBits: Math.min(share, observation.spaceFree) };
   }
   const unwanted = observation.structures.find((structure) => !wanted.includes(structure.kind));
   return unwanted ? { type: "remove", slot: unwanted.slot } : END_DEPLOY;

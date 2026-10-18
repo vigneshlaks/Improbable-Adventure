@@ -85,3 +85,32 @@ describe("ExactMemory", () => {
     expect(wrong).toBe(0);
   });
 });
+
+describe("ExactMemory rank", () => {
+  const rank = (m: ExactMemory, quantile: number) => m.query({ kind: "rank", quantile });
+  it("answers a Rank challenge exactly from its table, counting every unit of a repeated value; widens the range by the share of units it refused when full; and follows deletes", () => {
+    const m = make(64 * 20);
+    // ten units: 10 x5, 20 x3, 30 x2
+    for (const [value, count] of [[10, 5], [20, 3], [30, 2]] as const) for (let i = 0; i < count; i++) m.ingest({ op: "insert", value });
+    expect(rank(m, 0.5)).toMatchObject({ estimate: 10, low: 10, high: 10 });
+    expect(rank(m, 0.8)).toMatchObject({ estimate: 20, low: 20, high: 20 });
+    expect(rank(m, 1)).toMatchObject({ estimate: 30, low: 30, high: 30 });
+    m.ingest({ op: "delete", value: 10 });
+    m.ingest({ op: "delete", value: 10 });
+    expect(rank(m, 0.5)).toMatchObject({ estimate: 20 }); // eight units now: 10 x3, 20 x3, 30 x2, and 4 of 8 reach the 0.5 quantile at 20
+    expect(rank(m, 0.9)).toMatchObject({ estimate: 30 });
+
+    // A table that is full refuses new values; each is an unknown unit that may lie either side, so the range opens by their share.
+    const full = make(64 * 4);
+    for (const value of [1, 2, 3, 4]) full.ingest({ op: "insert", value }); // four units, all kept
+    for (const value of [100, 200]) full.ingest({ op: "insert", value }); // two refused: a share of 2 / 6
+    const answer = rank(full, 0.5);
+    expect(answer?.estimate).toBe(2);
+    expect(answer?.low).toBe(1); // the 0.5 - 1/3 quantile of the kept values
+    expect(answer?.high).toBe(4); // the 0.5 + 1/3 quantile
+    expect(rank(full, 0.95)?.high).toBe(4);
+
+    // nothing stored: no answer to give
+    expect(rank(make(64 * 4), 0.5)).toMatchObject({ estimate: 0, high: Number.POSITIVE_INFINITY });
+  });
+});

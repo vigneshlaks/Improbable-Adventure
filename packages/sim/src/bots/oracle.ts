@@ -15,6 +15,8 @@ export const oracle: Bot = {
         return { type: "strikeValue", value: answer.count };
       case "count":
         return { type: "strikeValue", value: answer.distinct };
+      case "rank":
+        return { type: "strikeValue", value: answer.value }; // the smallest value that reaches the armor's quantile
       default:
         throw new Error("The Oracle needs the true answers, but the runner did not provide them");
     }

@@ -40,7 +40,7 @@ export interface Layout {
 export const SLOT_FEATURES = 1 + STRUCTURE_KINDS.length + 1 + 6;
 
 /** Floats that do not depend on the vocabulary: run, tier, owned and attached structures, traits, weak point, challenge. */
-const FIXED_FEATURES = 3 + 3 + 3 + STRUCTURE_KINDS.length * 2 + 3 + 3 + 1 + 5 + 4 + 3 + 3;
+const FIXED_FEATURES = 3 + 3 + 3 + STRUCTURE_KINDS.length * 2 + 3 + 3 + 1 + 5 + 5 + 4 + 3 + 1;
 
 function actionLabel(spec: ActionSpec): string {
   switch (spec.type) {

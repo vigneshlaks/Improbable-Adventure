@@ -1,15 +1,17 @@
 import type { LiveSet } from "../enemies/liveSet";
 import type { Rng } from "../rng/rng";
 import type { Challenge } from "../structures/types";
-import { countStrike, frequencyStrike, presenceStrike, type DamageRules, type StrikeResult } from "./damage";
+import { countStrike, frequencyStrike, presenceStrike, rankStrike, type DamageRules, type StrikeResult } from "./damage";
 
-export type WeakPoint = "presence" | "frequency" | "count";
+export type WeakPoint = "presence" | "frequency" | "count" | "rank";
 
 export interface ChallengeContext {
   /** How many targets a Presence challenge shows (PRESENCE_TARGETS). */
   presenceTargets: number;
   /** A value the enemy can never emit, used as a never-inserted decoy. */
   drawOutsideValue: (rng: Rng) => number;
+  /** The quantile of live values a Rank challenge asks about: the enemy's own. */
+  rankQuantile: number;
 }
 
 /** What the player commits: a subset of Presence targets by position, or a number (a force or an estimate). */
@@ -19,7 +21,9 @@ export type StrikeInput = { targets: number[] } | { value: number };
 export type TrueAnswer =
   | { kind: "presence"; real: boolean[] }
   | { kind: "frequency"; count: number }
-  | { kind: "count"; distinct: number };
+  | { kind: "count"; distinct: number }
+  /** The armor's quantile, and the smallest live value that reaches it (the best possible strike). */
+  | { kind: "rank"; quantile: number; value: number };
 
 const MAX_OUTSIDE_ATTEMPTS = 1000;
 
@@ -82,6 +86,13 @@ export function issueChallenge(kind: WeakPoint, live: LiveSet, rng: Rng, context
       return { kind: "count" };
     case "presence":
       return issuePresence(live, rng, context);
+    case "rank": {
+      // A heavy value can span more of the ranks than RANK_TOL, so no value would land close to an armor set exactly at the enemy's
+      // quantile. The armor is therefore set at the rank of the smallest live value that reaches it: that value is a perfect strike,
+      // every lower value is blocked. The quantile named in the challenge is that rank, a little above the enemy's nominal one.
+      const best = live.quantileValue(context.rankQuantile);
+      return best === null ? null : { kind: "rank", quantile: live.rankOf(best) };
+    }
   }
 }
 
@@ -94,6 +105,8 @@ export function trueAnswer(challenge: Challenge, live: LiveSet): TrueAnswer {
       return { kind: "frequency", count: live.count(challenge.value) };
     case "count":
       return { kind: "count", distinct: live.distinct };
+    case "rank":
+      return { kind: "rank", quantile: challenge.quantile, value: live.quantileValue(challenge.quantile) ?? 0 };
   }
 }
 
@@ -110,5 +123,8 @@ export function gradeStrike(challenge: Challenge, live: LiveSet, strike: StrikeI
     case "count":
       if (!("value" in strike)) throw new RangeError("A Count challenge is answered with an estimate");
       return countStrike(rules, answer.distinct, strike.value);
+    case "rank":
+      if (!("value" in strike)) throw new RangeError("A Rank challenge is answered with a value");
+      return rankStrike(rules, answer.quantile, live.rankOf(strike.value), strike.value);
   }
 }

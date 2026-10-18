@@ -58,6 +58,12 @@ describe("strike notes", () => {
     expect(presence(4, 0).good).toBe(true); // leaving some real targets alone is caution, not a mistake
     expect(presence(4, 0).text).toContain("leaving 2 real ones unstruck");
     expect(presence(4, 1).good).toBe(false);
+    const rank = (outcome: "hit" | "blocked", rankValue: number) => describeStrike({ type: "strikeResolved", turn: 1, kind: "rank", outcome, damage: 0, certaintyLost: 0, force: 5, rank: rankValue, quantile: 0.9 });
+    expect(rank("blocked", 0.8)).toMatchObject({ good: false, text: expect.stringContaining("too low") });
+    expect(rank("hit", 0.92).good).toBe(true);
+    expect(rank("hit", 0.94).good).toBe(true);
+    expect(rank("hit", 0.96).good).toBe(false); // so far above the armor that most of the damage is lost
+    expect(rank("hit", 0.92).text).toContain("ranked at 92 percent against armor at 90 percent");
     const count = (outcome: "hit" | "miss") => describeStrike({ type: "strikeResolved", turn: 1, kind: "count", outcome, accuracy: 0, damage: 0, certaintyLost: 0, estimate: 150, trueDistinct: 100 });
     expect(count("hit")).toMatchObject({ good: true, text: expect.stringContaining("50% off") });
     expect(count("miss").good).toBe(false);

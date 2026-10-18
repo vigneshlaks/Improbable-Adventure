@@ -20,6 +20,7 @@ describe("buildFightConfig", () => {
         missPenalty: balance.MISS_PENALTY,
         overshootExp: balance.OVERSHOOT_EXP,
         countTol: balance.COUNT_TOL,
+        rankTol: balance.RANK_TOL,
         presenceTargets: balance.PRESENCE_TARGETS,
         expectedTurns: balance.EXPECTED_TURNS,
         turnLimitPenalty: balance.TURN_LIMIT_PENALTY,

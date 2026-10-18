@@ -5,10 +5,11 @@ import type { Challenge } from "../structures/types";
 import { gradeStrike, issueChallenge, trueAnswer, type ChallengeContext } from "./challenges";
 import type { DamageRules } from "./damage";
 
-const RULES: DamageRules = { base: 20, hitDamage: 5, decoyPenalty: 4, blockPenalty: 3, missPenalty: 3, overshootExp: 2, countTol: 0.25 };
+const RULES: DamageRules = { base: 20, hitDamage: 5, decoyPenalty: 4, blockPenalty: 3, missPenalty: 3, overshootExp: 2, countTol: 0.25, rankTol: 0.1 };
 
 // Outside values are far from the live values used below, so they can never be mistaken for real ones.
-const CTX: ChallengeContext = { presenceTargets: 12, drawOutsideValue: (rng) => 1_000_000 + rng.int(5000) };
+const CTX: ChallengeContext = { presenceTargets: 12, rankQuantile: 0.5,
+  drawOutsideValue: (rng) => 1_000_000 + rng.int(5000) };
 
 function liveWith(counts: Record<number, number>, ghosts: number[] = []): LiveSet {
   const live = new LiveSet();
@@ -161,6 +162,46 @@ describe("gradeStrike", () => {
       expect(() => gradeStrike({ kind: "frequency", value: 20 }, live, { targets: [0] }, RULES)).toThrow(RangeError);
       expect(() => gradeStrike({ kind: "count" }, live, { targets: [0] }, RULES)).toThrow(RangeError);
       expect(() => gradeStrike({ kind: "presence", targets: [10] }, live, { value: 5 }, RULES)).toThrow(RangeError);
+    }
+  });
+});
+
+describe("Rank", () => {
+  const ctx = (rankQuantile: number): ChallengeContext => ({ ...CTX, rankQuantile });
+  const issue = (live: LiveSet, q: number) => issueChallenge("rank", live, Rng.fromSeed("rank"), ctx(q));
+
+  it("sets the armor at the rank of the smallest live value that reaches the enemy's quantile, so that value is a perfect strike; cannot be issued with nothing live; answers with that value; and grades a strike by the rank of the value struck", () => {
+    // ten units: 10 x5, then 20 x3, 30 x2. The 0.5 quantile is 10 (rank 0.5); the 0.6 quantile is 20, and the armor is set at 20's rank, 0.8
+    const live = liveWith({ 10: 5, 20: 3, 30: 2 });
+    expect(issue(live, 0.5)).toEqual({ kind: "rank", quantile: 0.5 });
+    expect(issue(live, 0.6)).toEqual({ kind: "rank", quantile: 0.8 }); // snapped up to what a value can reach
+    expect(issue(live, 0.99)).toEqual({ kind: "rank", quantile: 1 });
+    expect(issue(new LiveSet(), 0.5)).toBeNull();
+
+    const armor = issue(live, 0.6) as Extract<ReturnType<typeof issue>, { kind: "rank" }>;
+    expect(trueAnswer(armor, live)).toEqual({ kind: "rank", quantile: 0.8, value: 20 });
+
+    // Striking the answer is a perfect hit; any lower value is blocked; a higher one loses damage by how far its rank is above (RANK_TOL 0.1 here)
+    expect(gradeStrike(armor, live, { value: 20 }, RULES)).toMatchObject({ kind: "rank", outcome: "hit", damage: 20, rank: 0.8, force: 20 });
+    expect(gradeStrike(armor, live, { value: 19 }, RULES)).toMatchObject({ outcome: "blocked", certaintyLost: 3, rank: 0.5 });
+    expect(gradeStrike(armor, live, { value: 10 }, RULES)).toMatchObject({ outcome: "blocked" });
+    expect(gradeStrike(armor, live, { value: 30 }, RULES)).toMatchObject({ outcome: "hit", damage: 0, rank: 1 }); // 0.2 above: past the tolerance
+    // a strike of the wrong kind is refused
+    expect(() => gradeStrike(armor, live, { targets: [0] }, RULES)).toThrow(RangeError);
+  });
+
+  it("never leaves the enemy with an armor no value can match, on any stream: the best value always deals full damage", () => {
+    // Heavy values span more of the ranks than the tolerance, which is what the snapping is for.
+    for (const counts of [{ 5: 1, 9: 1, 12: 1, 400: 97 }, { 1: 50, 2: 50 }, { 7: 1 }, Object.fromEntries(Array.from({ length: 30 }, (_, i) => [i * 3 + 1, i % 4 === 0 ? 20 : 1]))]) {
+      const live = liveWith(counts);
+      for (const q of [0.01, 0.5, 0.75, 0.9, 0.99]) {
+        const armor = issue(live, q);
+        if (armor?.kind !== "rank") throw new Error("expected a rank challenge");
+        const best = trueAnswer(armor, live);
+        if (best.kind !== "rank") throw new Error("expected a rank answer");
+        expect(armor.quantile).toBeGreaterThanOrEqual(q);
+        expect(gradeStrike(armor, live, { value: best.value }, RULES)).toMatchObject({ outcome: "hit", damage: 20 });
+      }
     }
   });
 });

@@ -9,6 +9,7 @@ const PROBES: Challenge[] = [
   { kind: "presence", targets: [1, 2, 3] },
   { kind: "frequency", value: 1 },
   { kind: "count" },
+  { kind: "rank", quantile: 0.5 },
 ];
 
 describe("structures.json", () => {

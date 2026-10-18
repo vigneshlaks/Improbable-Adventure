@@ -1,3 +1,4 @@
+import { quantileOfSorted } from "./quantiles";
 import { expectKind, optionsFromSnapshot, readCounts, readNumber, snapshotHeader } from "./snapshot";
 import {
   assertSpace,
@@ -79,6 +80,19 @@ export class ExactMemory implements Structure {
       }
       case "count":
         return { estimate: this.counts.size, low: this.counts.size, high: this.counts.size + missed, confidence };
+      case "rank": {
+        // The stored values are exact. Inserts it refused are unknown units that may lie on either side, so they move the quantile by at
+        // most their share of all the units it has seen.
+        const units = [...this.counts].flatMap(([value, count]) => Array.from({ length: count }, () => value)).sort((a, b) => a - b);
+        if (units.length === 0) return { estimate: 0, low: 0, high: Number.POSITIVE_INFINITY, confidence };
+        const share = missed / (units.length + missed);
+        return {
+          estimate: quantileOfSorted(units, challenge.quantile),
+          low: quantileOfSorted(units, Math.max(0, challenge.quantile - share)),
+          high: share === 0 ? quantileOfSorted(units, challenge.quantile) : quantileOfSorted(units, Math.min(1, challenge.quantile + share)),
+          confidence,
+        };
+      }
     }
   }
 

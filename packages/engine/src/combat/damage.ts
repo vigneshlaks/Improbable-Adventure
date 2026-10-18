@@ -16,6 +16,8 @@ export interface DamageRules {
   overshootExp: number;
   /** Count estimates within this share of the true count still deal some damage. */
   countTol: number;
+  /** A Rank strike whose rank is this far above the armor's quantile deals nothing. */
+  rankTol: number;
 }
 
 export interface PresenceStrike {
@@ -50,7 +52,18 @@ export interface CountStrike {
   trueDistinct: number;
 }
 
-export type StrikeResult = PresenceStrike | FrequencyStrike | CountStrike;
+export interface RankStrike {
+  kind: "rank";
+  outcome: "hit" | "blocked";
+  damage: number;
+  certaintyLost: number;
+  /** The value the player struck with, the share of live units at or below it (its rank), and the armor's quantile. */
+  force: number;
+  rank: number;
+  quantile: number;
+}
+
+export type StrikeResult = PresenceStrike | FrequencyStrike | CountStrike | RankStrike;
 
 const DECIMALS = 1e6;
 
@@ -81,6 +94,18 @@ export function frequencyStrike(rules: DamageRules, trueCount: number, force: nu
   }
   const ratio = force === 0 ? 1 : trueCount / force;
   return { kind: "frequency", outcome: "hit", damage: settle(rules.base * power(ratio, rules.overshootExp)), certaintyLost: 0, force, trueCount };
+}
+
+/**
+ * A value whose rank is below the armor's quantile is blocked and costs BLOCK_PENALTY. Otherwise damage is
+ * BASE x max(0, 1 - (rank - quantile) / RANK_TOL): full damage just at the quantile, none RANK_TOL above it.
+ * `rank` is the share of live units at or below the value the player struck with.
+ */
+export function rankStrike(rules: DamageRules, quantile: number, rank: number, force: number): RankStrike {
+  assertAmount(force, "value");
+  if (rank < quantile) return { kind: "rank", outcome: "blocked", damage: 0, certaintyLost: rules.blockPenalty, force, rank, quantile };
+  const damage = settle(rules.base * Math.max(0, 1 - (rank - quantile) / rules.rankTol));
+  return { kind: "rank", outcome: "hit", damage, certaintyLost: 0, force, rank, quantile };
 }
 
 /** Damage is BASE x (1 - |E - D| / (COUNT_TOL x D)), floored at zero. A negative accuracy costs MISS_PENALTY. */

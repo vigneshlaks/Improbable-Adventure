@@ -30,7 +30,8 @@ export interface StreamEvent {
 export type Challenge =
   | { kind: "presence"; targets: number[] }
   | { kind: "frequency"; value: number }
-  | { kind: "count" };
+  | { kind: "count" }
+  | { kind: "rank"; quantile: number };
 
 export interface Answer {
   /** A number, or the flagged subset of targets for presence questions. */

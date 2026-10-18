@@ -88,6 +88,22 @@ export class LiveSet {
     return best;
   }
 
+  /** The share of live units whose value is at most `value`: its rank, from 0 to 1. With nothing live it is 0. */
+  rankOf(value: number): number {
+    if (this.items.length === 0) return 0;
+    let atMost = 0;
+    for (const item of this.items) if (item <= value) atMost++;
+    return atMost / this.items.length;
+  }
+
+  /** The smallest live value whose rank reaches `quantile` (a number from 0 to 1), or null with nothing live. */
+  quantileValue(quantile: number): number | null {
+    if (this.items.length === 0) return null;
+    const sorted = [...this.items].sort((a, b) => a - b);
+    const needed = Math.max(1, Math.ceil(quantile * sorted.length - 1e-9)); // how many units must lie at or below it
+    return sorted[needed - 1] as number;
+  }
+
   /** Live values in ascending order. */
   liveValues(): number[] {
     return [...this.counts.keys()].sort((a, b) => a - b);

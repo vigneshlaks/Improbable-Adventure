@@ -179,6 +179,40 @@ describe("the environment", () => {
     }
   });
 
+  it("shows the armor of a Rank challenge as a number between 0 and 1 and no other part of the observation changes with it; and strikes a Rank challenge by the structure's estimate, upper end or lower end like any numeric one", () => {
+    const rankEnemy = (seed: string) => {
+      const base = buildRunConfig({ seed });
+      return { ...base, encounters: base.encounters.map((enemy) => ({ ...enemy, weakPoints: ["rank" as const], rankQuantile: 0.9, hp: 1e9 })) };
+    };
+    const env = new Env({ makeConfig: rankEnemy });
+    env.reset("rank-env");
+    const label = (text: string) => env.layout.labels.indexOf(text);
+    env.step(label("deploy reservoirSampling in slot 1 with 50% of the free Space"));
+    env.step(label("end deploy"));
+    const atStrike = env.step(label("end deploy"));
+    const state = (env as unknown as { state: RunState }).state;
+    expect(state.fight?.challenge).toMatchObject({ kind: "rank" });
+
+    // The armor shows in the observation: changing only its quantile changes exactly one number, by the difference.
+    const withArmor = (quantile: number) => {
+      const fight = { ...(state.fight as NonNullable<RunState["fight"]>), challenge: { kind: "rank" as const, quantile } };
+      return encodeObservation({ ...state, fight }, env.layout);
+    };
+    const [low, high] = [withArmor(0.2), withArmor(0.7)];
+    const differing = low.flatMap((x, i) => (x === high[i] ? [] : [i]));
+    expect(differing).toHaveLength(1);
+    expect((high[differing[0] as number] as number) - (low[differing[0] as number] as number)).toBeCloseTo(0.5, 12);
+
+    // The numeric strikes by meaning apply, and the upper end is never below the estimate.
+    const estimate = decodeAction(state, env.layout, label("strike estimate of slot 1"));
+    const upper = decodeAction(state, env.layout, label("strike high of slot 1"));
+    expect(estimate).toMatchObject({ type: "strikeValue" });
+    expect(upper).toMatchObject({ type: "strikeValue" });
+    expect((upper as { value: number }).value).toBeGreaterThanOrEqual((estimate as { value: number }).value);
+    expect(atStrike.mask[label("strike estimate of slot 1")]).toBe(true);
+    expect(decodeAction(state, env.layout, label("strike flaggedAll"))).toBeNull(); // a Presence meaning does not apply
+  });
+
   it("cuts an episode off at the step limit and refuses to step a finished one", () => {
     const env = new Env({ maxSteps: 3 });
     let step = env.reset("cut");

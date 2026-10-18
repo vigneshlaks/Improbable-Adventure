@@ -3,7 +3,7 @@ import { sizeBloom, sizeCountMin, sizeExact, sizeHyperLogLog, sizeLinearCounting
 
 /** What one strike showed, in words the field report can use. */
 export interface StrikeNote {
-  kind: "presence" | "frequency" | "count";
+  kind: "presence" | "frequency" | "count" | "rank";
   good: boolean;
   /** What happened, with the numbers. */
   text: string;
@@ -58,6 +58,12 @@ export function describeStrike(event: StrikeEvent): StrikeNote {
     const ratio = event.trueCount > 0 ? event.force / event.trueCount : 0;
     if (event.outcome === "blocked") return { kind: "frequency", good: false, text: `Struck with force ${round(event.force)} against a true count of ${event.trueCount}: too weak, and it was blocked.` };
     return { kind: "frequency", good: ratio <= 2, text: ratio > 2 ? `Struck with force ${round(event.force)} against a true count of ${event.trueCount}: it landed, but more than double the count wastes most of the damage.` : `Struck with force ${round(event.force)} against a true count of ${event.trueCount}.` };
+  }
+  if (event.kind === "rank") {
+    const over = event.rank - event.quantile;
+    const where = `ranked at ${Math.round(event.rank * 100)} percent against armor at ${Math.round(event.quantile * 100)} percent`;
+    if (event.outcome === "blocked") return { kind: "rank", good: false, text: `Struck with a value ${where}: too low, and it was blocked.` };
+    return { kind: "rank", good: over < 0.05, text: over >= 0.05 ? `Struck with a value ${where}: it landed, but so far above the armor that most of the damage was lost.` : `Struck with a value ${where}.` };
   }
   const error = event.trueDistinct > 0 ? Math.abs(event.estimate - event.trueDistinct) / event.trueDistinct : 0;
   return { kind: "count", good: event.outcome === "hit", text: `Estimated ${round(event.estimate)} distinct values against a true ${event.trueDistinct} (${Math.round(error * 100)}% off)${event.outcome === "miss" ? ", too far to hurt" : ""}.` };

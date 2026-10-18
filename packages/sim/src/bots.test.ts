@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { preferredKinds } from "./bots/common";
+import { strikeOnEstimate } from "./bots/greedy";
 import { eachCase } from "../../engine/src/testCases";
 import { balance, buildFightConfig, type TierName } from "@pda/content";
 import {
@@ -284,5 +285,30 @@ describe("what the bots can see", () => {
       expect(decisions.every((d) => d.view.truth === null)).toBe(true);
     }
     expect(observe(createFight("blind", config))).not.toHaveProperty("truth");
+  });
+});
+
+describe("Rank for the bots", () => {
+  const rankView = (answer: { estimate: number; low: number; high: number }): BotView => ({
+    observation: {
+      turn: 2, phase: "strike", certainty: 100, enemyHp: 20, spaceFree: 4096, slotsFree: 2, changesLeft: 6,
+      traits: { variety: "low", skew: "low", churn: "low", growth: "low", drift: "low" },
+      weakPoint: "rank",
+      challenge: { kind: "rank", quantile: 0.9 },
+      structures: [{ slot: 0, kind: "reservoirSampling", params: {}, spaceBits: 4096, answer: { ...answer, confidence: 0.95 } }],
+    },
+    loadout: ["reservoirSampling"],
+    legalActions: () => [],
+    truth: null,
+  });
+
+  it("strikes armor at the upper end of the range, because a value that ranks below the armor is blocked and an estimate is as likely to fall below it as above; takes the estimate when there is no upper end; prefers a sample or a table for Rank; and the Oracle strikes the value that reaches it", () => {
+    expect(strikeOnEstimate(rankView({ estimate: 5000, low: 4000, high: 6000.4 }))).toEqual({ type: "strikeValue", value: 6001 });
+    expect(strikeOnEstimate(rankView({ estimate: 5000, low: 4000, high: Number.POSITIVE_INFINITY }))).toEqual({ type: "strikeValue", value: 5000 });
+    expect(preferredKinds("rank", { variety: "low", skew: "low", churn: "low", growth: "low", drift: "low" })[0]).toBe("reservoirSampling");
+
+    const oracle = getBot("oracle").create();
+    const truth = { frequency: null, distinct: 0, answer: { kind: "rank" as const, quantile: 0.9, value: 4242 } };
+    expect(oracle({ ...rankView({ estimate: 1, low: 1, high: 1 }), truth }, Rng.fromSeed("oracle"))).toEqual({ type: "strikeValue", value: 4242 });
   });
 });

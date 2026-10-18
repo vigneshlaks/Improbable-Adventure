@@ -83,3 +83,35 @@ describe("LiveSet", () => {
     }
   });
 });
+
+describe("LiveSet rank", () => {
+  it("gives the share of live units at or below a value, counting every unit of a repeated value; finds the smallest live value that reaches a quantile; follows deletes; and has nothing to say with nothing live", () => {
+    const live = build([10, 10, 10, 20, 30, 30, 40, 50, 50, 60]); // ten units
+    expect(live.rankOf(9)).toBe(0);
+    expect(live.rankOf(10)).toBe(0.3); // all three units of 10 are at or below it
+    expect(live.rankOf(25)).toBe(0.4);
+    expect(live.rankOf(60)).toBe(1);
+    expect(live.rankOf(5e9)).toBe(1);
+    // the smallest live value whose rank reaches the quantile
+    expect(live.quantileValue(0.3)).toBe(10);
+    expect(live.quantileValue(0.31)).toBe(20);
+    expect(live.quantileValue(0.5)).toBe(30);
+    expect(live.quantileValue(0.9)).toBe(50);
+    expect(live.quantileValue(0.99)).toBe(60);
+    expect(live.quantileValue(1)).toBe(60);
+    expect(live.quantileValue(0.0001)).toBe(10);
+    // a value's rank is a measure of position, so it equals the rank of its quantile or more
+    for (const q of [0.1, 0.25, 0.5, 0.75, 0.95]) expect(live.rankOf(live.quantileValue(q) as number)).toBeGreaterThanOrEqual(q);
+    // deletes move it
+    const rng = rngFor("rank-delete");
+    const before = live.rankOf(30);
+    while (live.count(10) > 0) {
+      const removed = live.deleteRandom(rng) as number;
+      if (removed !== 10) live.insert(removed); // only the 10s are meant to go: put any other unit back
+    }
+    expect(live.rankOf(30)).not.toBe(before);
+    // nothing live
+    expect(new LiveSet().rankOf(1)).toBe(0);
+    expect(new LiveSet().quantileValue(0.5)).toBeNull();
+  });
+});

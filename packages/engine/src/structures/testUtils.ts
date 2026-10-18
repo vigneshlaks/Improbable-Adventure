@@ -74,6 +74,7 @@ export function presenceTargets(live: LiveSet, rng: Rng): number[] {
   const challenge = issueChallenge("presence", live, rng, {
     presenceTargets: 12,
     drawOutsideValue: (r) => 3_000_000_000 + r.int(1_000_000),
+    rankQuantile: 0.5,
   });
   if (challenge?.kind !== "presence") throw new Error("expected a presence challenge");
   return challenge.targets;

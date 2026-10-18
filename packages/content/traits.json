@@ -12,6 +12,7 @@
   },
 
   "weakPointBaseWeight": 1,
+  "rankWeight": 0,
   "weakPointHints": {
     "variety": { "medium": { "count": 1 }, "high": { "count": 3 } },
     "skew": { "medium": { "frequency": 1 }, "high": { "frequency": 3 } },
