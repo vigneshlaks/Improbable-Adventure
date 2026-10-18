@@ -2,10 +2,10 @@ import { structures } from "@pda/content";
 import type { StructureKind } from "@pda/engine";
 import { productionBits, type ProfileEntry, type RunAnalysis } from "./analysis";
 import { sizeBloom, sizeCountMin, sizeExact, sizeHyperLogLog, sizeLinearCounting, sizeLogLog, sizeReservoir, type SizingConstants, type Workload } from "./sizing";
-import type { Language } from "./toolkit";
+import { hasTemplate, type Language } from "./toolkit";
 
 /** When each structure is the right tool, and when it is not. Written for production, not for the game. */
-const GUIDE: Record<StructureKind, { use: string; avoid: string }> = {
+const GUIDE: Partial<Record<StructureKind, { use: string; avoid: string }>> = {
   exactMemory: { use: "The set of different items is small enough to store (thousands to a few million), or you need a ground truth to test the others against.", avoid: "Memory must stay fixed while the number of different items grows." },
   reservoirSampling: { use: "You need a fair random sample of a stream of unknown length, to estimate shares or to look at real examples.", avoid: "You need exact counts of rare items; a sample misses them." },
   bloomFilter: { use: "You ask \"have I seen this?\" and can tolerate occasional false yeses but never false nos (cache and database lookups, deduplication).", avoid: "Items must be removed, or a false yes is costly with no way to check." },
@@ -15,7 +15,7 @@ const GUIDE: Record<StructureKind, { use: string; avoid: string }> = {
   hyperLogLog: { use: "You count different items, possibly billions, in kilobytes, and can accept an error of a percent or two. Counters can be merged across machines.", avoid: "You need an exact count, or the count is small enough to store exactly." },
 };
 
-const CONSTRUCTORS: Record<StructureKind, { file: Record<Language, string>; cls: string }> = {
+const CONSTRUCTORS: Partial<Record<StructureKind, { file: Record<Language, string>; cls: string }>> = {
   exactMemory: { cls: "ExactMemory", file: { typescript: "src/exactMemory.ts", python: "src/exact_memory.py" } },
   reservoirSampling: { cls: "ReservoirSampling", file: { typescript: "src/reservoirSampling.ts", python: "src/reservoir_sampling.py" } },
   bloomFilter: { cls: "BloomFilter", file: { typescript: "src/bloomFilter.ts", python: "src/bloom_filter.py" } },
@@ -36,11 +36,14 @@ function size(bits: number): string {
 }
 
 export function readme(language: Language, owned: readonly StructureKind[]): string {
-  const rows = owned.map((kind) => {
+  const rows = owned.filter(hasTemplate).map((kind) => {
     const info = structures[kind];
+    const guide = GUIDE[kind] as { use: string; avoid: string };
+    const code = CONSTRUCTORS[kind] as { file: Record<Language, string>; cls: string };
     const answers = info.answers.map((a) => ANSWERS[a]).join(" / ");
-    return `### ${info.name}\n\n${info.summary}\n\n- Answers: ${answers}\n- Use it when: ${GUIDE[kind].use}\n- Avoid it when: ${GUIDE[kind].avoid}\n- Code: \`${CONSTRUCTORS[kind].file[language]}\` (\`${CONSTRUCTORS[kind].cls}\`)\n`;
+    return `### ${info.name}\n\n${info.summary}\n\n- Answers: ${answers}\n- Use it when: ${guide.use}\n- Avoid it when: ${guide.avoid}\n- Code: \`${code.file[language]}\` (\`${code.cls}\`)\n`;
   });
+  const without = owned.filter((kind) => !hasTemplate(kind));
   const run =
     language === "typescript"
       ? "Needs Node 22.18 or later, and nothing to install.\n\n```\nnode --test \"tests/*.test.ts\"\n```"
@@ -55,7 +58,7 @@ Start with \`SIZING.md\`: it says how big each structure should be for your work
 
 ## What is in here
 
-${rows.join("\n")}
+${rows.join("\n")}${without.length > 0 ? `\n### Used in your run, with no reference code yet\n\n${without.map((kind) => `- ${structures[kind].name}: ${structures[kind].summary}`).join("\n")}\n\nThey are in \`FIELD_REPORT.md\`; the toolkit has no code or sizing for them yet.\n` : ""}
 ## Using a structure
 
 Every structure takes a seed (the default is public, so pass your own secret one if inputs may be chosen by an attacker),
@@ -93,7 +96,7 @@ export function resolveWorkload(workload: Workload): Resolved {
 }
 
 function snippet(language: Language, kind: StructureKind, args: Record<string, number>): string {
-  const names: Record<StructureKind, string[]> = {
+  const names: Partial<Record<StructureKind, string[]>> = {
     exactMemory: [],
     reservoirSampling: ["sampleSize"],
     bloomFilter: ["bits", "hashes"],
@@ -102,8 +105,8 @@ function snippet(language: Language, kind: StructureKind, args: Record<string, n
     logLog: ["indexBits"],
     hyperLogLog: ["indexBits"],
   };
-  const values = names[kind].map((name) => number(args[name] as number).replace(/,/g, ""));
-  const cls = CONSTRUCTORS[kind].cls;
+  const values = (names[kind] ?? []).map((name) => number(args[name] as number).replace(/,/g, ""));
+  const cls = CONSTRUCTORS[kind]?.cls ?? kind;
   return language === "typescript" ? `new ${cls}(${values.join(", ")})` : `${cls}(${values.join(", ")})`;
 }
 
@@ -149,6 +152,8 @@ function sizeFor(kind: StructureKind, workload: Workload, constants: SizingConst
         const s = sizeExact(workload, constants);
         return { bits: s.memoryBits, args: {}, summary: [`${number(s.entries)} entries (${size(s.memoryBits)}) at ${constants.valueBits + constants.counterBits} bits each`, "no error at all"] };
       }
+      default:
+        return "There is no sizing rule for this structure yet.";
     }
   } catch (error) {
     return error instanceof RangeError ? `Cannot be sized: ${error.message}.` : "Cannot be sized.";
@@ -159,7 +164,7 @@ export function sizingReport(language: Language, owned: readonly StructureKind[]
   const { workload, notes } = resolveWorkload(input);
   const given = (value: number | undefined, text: (v: number) => string) => (value === undefined ? "not given" : text(value));
   const formula = formulas(constants);
-  const sections = owned.map((kind) => {
+  const sections = owned.filter(hasTemplate).map((kind) => {
     const info = structures[kind];
     const lines: string[] = [`## ${info.name}`, ""];
     const sized = sizeFor(kind, workload, constants);
@@ -168,7 +173,7 @@ export function sizingReport(language: Language, owned: readonly StructureKind[]
       lines.push(`- **Size it:** ${sized.summary[0]}.`, `- **Result:** ${sized.summary[1]}.`, `- **Construct it:** \`${snippet(language, kind, sized.args)}\``);
       const mine = profile.find((entry) => entry.kind === kind);
       if (mine && workload.items !== undefined) {
-        const budget = productionBits(kind, workload, constants);
+        const budget = productionBits(kind, workload, constants) ?? 0;
         const style = mine.spaceRatio < 1 ? "tighter than" : "roomier than";
         lines.push(`- **Your run's style:** you gave it about ${mine.spaceRatio.toFixed(2)} times the Space that the default ${pct(constants.defaultError)} target needs for the same stream, ${style} production sizing. Run that way on your workload it would take about ${size(mine.spaceRatio * budget)}.`);
       }
@@ -193,7 +198,7 @@ Change the workload by calling the calculator in \`${language === "typescript" ?
 ${sections.join("\n")}`;
 }
 
-function formulas(c: SizingConstants): Record<StructureKind, string> {
+function formulas(c: SizingConstants): Partial<Record<StructureKind, string>> {
   const z = (confidenceZ: number) => confidenceZ.toFixed(2);
   return {
     exactMemory: `bits = distinct x (${c.valueBits} + ${c.counterBits}).`,

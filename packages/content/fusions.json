@@ -2,8 +2,21 @@
   "hyperLogLog": {
     "name": "HyperLogLog",
     "phase": 1,
-    "inputs": ["logLog", "linearCounting"],
+    "inputs": [
+      "logLog",
+      "linearCounting"
+    ],
     "result": "hyperLogLog",
     "summary": "LogLog and Linear Counting fuse into HyperLogLog: a Count with error about 1.04 divided by the square root of the register count, which counts empty registers while the stream is small. This recipe is a teaching shortcut: historically HyperLogLog's main change from LogLog is averaging the registers harmonically, and counting empty registers only corrects small counts."
+  },
+  "topKTracker": {
+    "name": "Top-K Tracker",
+    "phase": 2,
+    "inputs": [
+      "countMinSketch",
+      "exactMemory"
+    ],
+    "result": "topKTracker",
+    "summary": "Count-Min Sketch and Exact Memory fuse into a Top-K Tracker: the grid ranks the values and an exact list follows the heaviest, so a skewed stream's favorites are answered tightly. It loses Exact Memory's guarantee for values that are not on the list."
   }
 }

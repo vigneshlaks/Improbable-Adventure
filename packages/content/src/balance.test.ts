@@ -89,6 +89,8 @@ describe("balance.json", () => {
         fadingWindow: 1.5,
         lightCounterBits: 8,
         lightRegisterBits: 3,
+        countSketchDefaultDepth: 5,
+        topKShare: 0.25,
       });
     }
     // matches the stand-in constants used by the engine's tests

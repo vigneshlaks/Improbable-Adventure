@@ -10,6 +10,8 @@ export const STRUCTURE_KINDS = [
   "logLog",
   "linearCounting",
   "hyperLogLog",
+  "countSketch",
+  "topKTracker",
 ] as const;
 
 export type StructureKind = (typeof STRUCTURE_KINDS)[number];
@@ -66,6 +68,10 @@ export interface StructureConstants {
   lightCounterBits: number;
   /** Bits in one HyperLogLog register with the Light enchantment. Such a register stops at rank 2^bits - 1. */
   lightRegisterBits: number;
+  /** Count Sketch rows when the player does not choose a depth. An odd number, so the median is one of the rows' estimates. */
+  countSketchDefaultDepth: number;
+  /** The share of a Top-K Tracker's Space that holds its exact candidate list; the rest is its Count-Min grid. */
+  topKShare: number;
 }
 
 /** Anything that survives JSON.stringify and JSON.parse unchanged. */

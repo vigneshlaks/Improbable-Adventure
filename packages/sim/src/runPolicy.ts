@@ -21,6 +21,7 @@ export const randomPolicy: RunPolicy = {
  */
 const TASTE = [
   "structure:countMinSketch",
+  "structure:countSketch",
   "structure:logLog",
   "enchantment:steady",
   "upgrade:power",
@@ -29,8 +30,6 @@ const TASTE = [
   "upgrade:capacity",
   "upgrade:slots",
 ];
-
-const is = (action: RunAction, type: RunAction["type"]) => action.type === type;
 
 export const sensiblePolicy: RunPolicy = {
   reward(offers) {
@@ -43,7 +42,8 @@ export const sensiblePolicy: RunPolicy = {
   rest(actions) {
     const steadyCountMin = actions.find((a) => a.type === "enchant" && a.enchantmentId === "steady" && a.kind === "countMinSketch");
     if (steadyCountMin) return steadyCountMin;
-    const fuse = actions.find((a) => is(a, "fuse"));
+    // HyperLogLog first; then a Top-K Tracker, which the bots' Frequency taste uses on skewed streams.
+    const fuse = actions.find((a) => a.type === "fuse" && a.recipeId === "hyperLogLog") ?? actions.find((a) => a.type === "fuse" && a.recipeId === "topKTracker");
     if (fuse) return fuse;
     const steadyLogLog = actions.find((a) => a.type === "enchant" && a.enchantmentId === "steady" && a.kind === "logLog");
     return steadyLogLog ?? { type: "leaveRest" };

@@ -115,5 +115,45 @@
     "summary": "Estimates how many distinct values appeared, accurately from tiny streams to huge ones.",
     "help": "Like LogLog, each register remembers the rarest hash pattern it has seen, but it averages them harmonically, which tames the odd register that got lucky. While many registers are still empty it counts those instead, as Linear Counting does. Its error is about 1.04 divided by the square root of the register count. It is made by fusing LogLog with Linear Counting at a rest stop; in real life that is a teaching shortcut, since HyperLogLog's main change from LogLog is the harmonic mean. It ignores deletes.",
     "flavor": "Counts the crowd by its rarest faces, and by the empty seats."
+  },
+  "countSketch": {
+    "name": "Count Sketch",
+    "phase": 2,
+    "aliases": [
+      "countsketch",
+      "csketch"
+    ],
+    "answers": [
+      "frequency"
+    ],
+    "knob": {
+      "name": "depth",
+      "description": "The number of counter rows. More rows make a bad estimate less likely; an odd number works best.",
+      "min": 1,
+      "max": 15
+    },
+    "summary": "Estimates how often a value appeared, without leaning high or low.",
+    "help": "A grid of signed counters: each value adds or subtracts one in every row, with a sign of its own in that row, so other values' collisions cancel out on average. A query takes the median over the rows. Unlike Count-Min it can answer below the truth as well as above it, so strike on its upper bound when a miss would hurt. Its error follows the size of the whole stream's heavy values, not its length, so it beats Count-Min when a few values dominate and handles deletes exactly.",
+    "flavor": "Counts by listening for the echoes that cancel out."
+  },
+  "topKTracker": {
+    "name": "Top-K Tracker",
+    "phase": 2,
+    "aliases": [
+      "topk",
+      "tracker"
+    ],
+    "answers": [
+      "frequency"
+    ],
+    "knob": {
+      "name": "depth",
+      "description": "The number of counter rows in its Count-Min grid.",
+      "min": 1,
+      "max": 16
+    },
+    "summary": "Tracks the heaviest values exactly, and the rest roughly.",
+    "help": "A Count-Min grid ranks the values and a short list keeps an interval around the heaviest ones, which then moves by exactly one for each insert or delete. A value that joined the list early keeps a narrow interval however big the stream grows, so on a skewed stream the heavy values are answered far better than the grid alone could. The rest are answered by the grid. A quarter of its Space holds the list. It is made by fusing Count-Min Sketch with Exact Memory at a rest stop.",
+    "flavor": "Remembers the loudest voices, and shrugs at the crowd."
   }
 }

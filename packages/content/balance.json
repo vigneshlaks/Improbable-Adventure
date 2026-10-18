@@ -11,6 +11,8 @@
   "FADING_WINDOW": 1.5,
   "LIGHT_COUNTER_BITS": 8,
   "LIGHT_REGISTER_BITS": 3,
+  "COUNT_SKETCH_DEFAULT_DEPTH": 5,
+  "TOPK_SHARE": 0.25,
   "EXPORT_DEFAULT_ERROR": 0.01,
   "RL_REWARD": { "enemyDefeated": 1, "perTurn": 0.01, "perCertaintyLost": 0.005, "runLoss": 1 },
   "RL_MAX_SLOTS": 6,

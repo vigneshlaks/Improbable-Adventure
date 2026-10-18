@@ -49,8 +49,10 @@ describe("the environment", () => {
     const weights = { enemyDefeated: 1, perTurn: 0.01, perCertaintyLost: 0.005, runLoss: 1 };
     let lostByTurnLimit = 0;
     let steps = 0;
-    for (const seed of ["7", "8", "9", "10", "11", "12", "13", "14", "15", "16"]) {
-      const config = buildRunConfig({ seed });
+    for (const seed of Array.from({ length: 30 }, (_, i) => String(7 + i))) {
+      const base = buildRunConfig({ seed });
+      // Half the games have a short turn limit, so that losing to it (the case this test is about) is common, not rare.
+      const config = Number(seed) % 2 === 0 ? { ...base, encounters: base.encounters.map((enemy) => ({ ...enemy, turnLimit: 3 })) } : base;
       const layout = buildLayout(config, 6);
       let state: RunState = createRun(seed, config);
       const rng = Rng.fromSeed(`oracle-${seed}`);

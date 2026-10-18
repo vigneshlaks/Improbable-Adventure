@@ -15,7 +15,10 @@ export function preferredKinds(weakPoint: WeakPoint, traits: StreamTraits): Stru
     case "presence":
       return ["bloomFilter", "exactMemory", "reservoirSampling"];
     case "frequency":
-      return ["countMinSketch", "exactMemory", "reservoirSampling"];
+      // A Top-K Tracker follows the heavy values exactly, so it is worth having once the stream has some; on a flat stream nothing helps much.
+      return traits.skew === "low"
+        ? ["countMinSketch", "exactMemory", "reservoirSampling"]
+        : ["topKTracker", "countMinSketch", "exactMemory", "reservoirSampling"];
     case "count":
       // LogLog suits huge streams. Linear Counting is more precise while its bitmap has room.
       // HyperLogLog (made by fusing the two) is the best of both.

@@ -1,4 +1,4 @@
-import { BloomFilter, CountMinSketch, HyperLogLog, LogLog, restoreStructure, type Json, type StructureConstants, type StructureSnapshot } from "@pda/engine";
+import { BloomFilter, CountMinSketch, CountSketch, HyperLogLog, LogLog, restoreStructure, TopKTracker, type Json, type StructureConstants, type StructureSnapshot } from "@pda/engine";
 import { structureLabel } from "./views";
 
 /** The most cells a visual draws; a bigger structure is shown averaged down to this many. */
@@ -60,6 +60,27 @@ export function structureVisual(snapshot: StructureSnapshot, slot: number, const
     const peak = Math.max(1, ...counters);
     const { width, depth } = live.params as { width: number; depth: number };
     return { ...base, shape: "heatmap", cells: counters.map((c) => c / peak), columns: width, caption: `${depth} rows of ${width} counters (brighter = higher)`, readout: `overshoot about ${live.errorBand.toFixed(1)} over ${live.liveTotal} values` };
+  }
+  if (live instanceof CountSketch) {
+    const counters = numbers(state, "counters").map((c) => Math.abs(c - 2 ** 31)); // stored with an offset; the size of a counter is what shows
+    const peak = Math.max(1, ...counters);
+    const { width, depth } = live.params as { width: number; depth: number };
+    return { ...base, shape: "heatmap", cells: counters.map((c) => c / peak), columns: width, caption: `${depth} rows of ${width} signed counters (brighter = larger, either way)`, readout: `error about ±${live.errorBand.toFixed(1)} either way` };
+  }
+  if (live instanceof TopKTracker) {
+    const grid = (state.grid as { state: StructureSnapshot["state"] }).state;
+    const counters = numbers(grid, "counters");
+    const peak = Math.max(1, ...counters);
+    const { width, depth, candidates } = live.params as { width: number; depth: number; candidates: number };
+    const heaviest = live.candidates[0];
+    return {
+      ...base,
+      shape: "heatmap",
+      cells: counters.map((c) => c / peak),
+      columns: width,
+      caption: `${depth} rows of ${width} counters, and a list of the ${candidates} heaviest values`,
+      readout: heaviest ? `${live.candidates.length} of ${candidates} listed; the heaviest is between ${heaviest.low} and ${heaviest.high}` : `0 of ${candidates} listed`,
+    };
   }
   if (live instanceof LogLog || live instanceof HyperLogLog) {
     const registers = numbers(state, "registers");

@@ -1,4 +1,4 @@
-import { buildRunConfig } from "@pda/content";
+import { buildRunConfig, structures } from "@pda/content";
 import { STRUCTURE_KINDS, type StructureKind } from "@pda/engine";
 import { getBot } from "./bots";
 import { playRun, type RunRecord } from "./runRunner";
@@ -117,7 +117,7 @@ const FAMILY = ["greedy", "prober", "cautious"];
 const pct = (x: number) => `${(x * 100).toFixed(1)}%`;
 
 /** The structures the MVP ships, which the spec wants to see in at least 15 percent of winning runs. */
-const MVP_STRUCTURES = STRUCTURE_KINDS.filter((kind) => kind !== "hyperLogLog");
+const MVP_STRUCTURES = STRUCTURE_KINDS.filter((kind) => structures[kind].phase === 1 && kind !== "hyperLogLog");
 
 /**
  * Checks the reports against the spec's initial balance targets. A target is only checked for the bots whose reports

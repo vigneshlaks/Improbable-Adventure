@@ -81,3 +81,28 @@ export function clopperPearson(hits: number, n: number, confidence: number): { l
 export function clamp(x: number, lo: number, hi: number): number {
   return Math.min(hi, Math.max(lo, x));
 }
+
+/** The chance that at least `atLeast` of `n` independent trials, each with success chance `p`, succeed. */
+export function binomialTail(n: number, p: number, atLeast: number): number {
+  if (p >= 1) return atLeast <= n ? 1 : 0;
+  let pmf = Math.pow(1 - p, n);
+  let tail = atLeast <= 0 ? pmf : 0;
+  for (let k = 1; k <= n; k++) {
+    pmf *= ((n - k + 1) / k) * (p / (1 - p));
+    if (k >= atLeast) tail += pmf;
+  }
+  return Math.min(1, tail);
+}
+
+/**
+ * How many "typical errors" wide a range around the median of `rows` independent estimates must be. Each estimate is
+ * off by more than `m` typical errors with chance at most 1 / m^2 (Chebyshev); the median is only that far off if at least
+ * half of the rows are. The smallest `m` that makes this at most `1 - confidence` is returned.
+ */
+export function medianBandMultiplier(rows: number, confidence: number): number {
+  if (!(confidence > 0 && confidence < 1)) throw new RangeError(`confidence must be in (0, 1), got ${confidence}`);
+  const needed = Math.ceil(rows / 2);
+  let m = 1;
+  while (binomialTail(rows, 1 / (m * m), needed) > 1 - confidence) m += 0.01;
+  return m;
+}

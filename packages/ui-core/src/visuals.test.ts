@@ -27,7 +27,7 @@ describe("structureVisual", () => {
         expect(visual.readout.length).toBeGreaterThan(0);
       }
     }
-    expect(shapes).toMatchObject({ bloomFilter: "meter", countMinSketch: "heatmap", logLog: "bars", hyperLogLog: "bars" });
+    expect(shapes).toMatchObject({ bloomFilter: "meter", countMinSketch: "heatmap", logLog: "bars", hyperLogLog: "bars", countSketch: "heatmap", topKTracker: "heatmap" });
     // A heatmap keeps its grid shape, a Bloom readout reports its fill.
     const grid = structureVisual(filled("countMinSketch", 4096), 0, constants);
     expect(grid.columns).toBe(4096 / (32 * constants.cmsDefaultDepth)); // one row per hash, one column per counter

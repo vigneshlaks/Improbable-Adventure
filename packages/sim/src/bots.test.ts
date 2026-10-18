@@ -136,8 +136,13 @@ describe("Greedy", () => {
   it("deploys the structure that suits the most likely weak point, first; falls back to what it owns when the best match is missing; covers its two best guesses, splitting the Space, then lets the stream arrive; and 2 more", () => {
     // deploys the structure that suits the most likely weak point, first
     {
+      // A skewed stream has heavy values for a Top-K Tracker to follow; on a flat one the plain Count-Min is as good as anything.
       const skewed = fightWith({ skew: "high" });
-      expect(firstAction(getBot("greedy"), skewed.state, skewed.config)).toMatchObject({ type: "deploy", kind: "countMinSketch" });
+      expect(firstAction(getBot("greedy"), skewed.state, skewed.config)).toMatchObject({ type: "deploy", kind: "topKTracker" });
+      const traitsOf = (skew: "low" | "medium" | "high") => ({ variety: "low", skew, churn: "low", growth: "low", drift: "low" }) as const;
+      expect(preferredKinds("frequency", traitsOf("low"))[0]).toBe("countMinSketch");
+      expect(preferredKinds("frequency", traitsOf("medium"))[0]).toBe("topKTracker");
+      expect(preferredKinds("frequency", traitsOf("high"))[0]).toBe("topKTracker");
 
       // With every structure owned, HyperLogLog is the best Count tool at any variety. Without it (below) the choice follows the stream.
       const varied = fightWith({ variety: "high" });
@@ -165,7 +170,7 @@ describe("Greedy", () => {
       const { decisions } = observed(getBot("greedy"), config, "split");
       const firstTurn = decisions.filter((d) => d.view.observation.turn === 1).map((d) => d.action);
       expect(firstTurn).toEqual([
-        { type: "deploy", slot: 0, kind: "countMinSketch", spaceBits: 4096 },
+        { type: "deploy", slot: 0, kind: "topKTracker", spaceBits: 4096 },
         { type: "deploy", slot: 1, kind: "bloomFilter", spaceBits: 4096 },
         { type: "endDeploy" },
       ]);
@@ -208,7 +213,7 @@ describe("Prober", () => {
       const { decisions } = observed(getBot("prober"), config, "commit");
       const firstTurn = decisions.filter((d) => d.view.observation.turn === 1).map((d) => d.action);
       expect(firstTurn[0]).toMatchObject({ kind: "reservoirSampling" });
-      expect(firstTurn[1]).toMatchObject({ type: "deploy", kind: "countMinSketch" });
+      expect(firstTurn[1]).toMatchObject({ type: "deploy", kind: "topKTracker" });
       expect(firstTurn.at(-1)).toEqual({ type: "endDeploy" });
     }
     // is never left without an answer, because the Reservoir can answer any question

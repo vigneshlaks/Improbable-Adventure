@@ -148,7 +148,10 @@ describe("buildRunConfig", () => {
     }
     // passes the recipes on, by id
     {
-      expect(config.fusions).toEqual([{ id: "hyperLogLog", inputs: ["logLog", "linearCounting"], result: "hyperLogLog" }]);
+      expect(config.fusions).toEqual([
+        { id: "hyperLogLog", inputs: ["logLog", "linearCounting"], result: "hyperLogLog" },
+        { id: "topKTracker", inputs: ["countMinSketch", "exactMemory"], result: "topKTracker" },
+      ]);
     }
     // designs each encounter on its own, so the five Minions are not copies of one another
     {

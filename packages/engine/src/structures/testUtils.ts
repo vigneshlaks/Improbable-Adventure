@@ -17,6 +17,8 @@ export const TEST_CONSTANTS: StructureConstants = {
   fadingWindow: 1.5,
   lightCounterBits: 8,
   lightRegisterBits: 3,
+  countSketchDefaultDepth: 5,
+  topKShare: 0.25,
 };
 
 /** Every structure's statistical test runs this many seeded trials. */

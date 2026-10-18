@@ -122,7 +122,7 @@ export interface ProfileEntry {
 }
 
 /** The Space production-grade sizing needs for a workload at the default error (its own error and memory are ignored). */
-export function productionBits(kind: StructureKind, { items, distinct }: Pick<Workload, "items" | "distinct">, constants: SizingConstants): number {
+export function productionBits(kind: StructureKind, { items, distinct }: Pick<Workload, "items" | "distinct">, constants: SizingConstants): number | null {
   const workload: Workload = { items, distinct };
   switch (kind) {
     case "bloomFilter":
@@ -139,6 +139,8 @@ export function productionBits(kind: StructureKind, { items, distinct }: Pick<Wo
       return sizeReservoir(workload, constants).memoryBits;
     case "exactMemory":
       return sizeExact(workload, constants).memoryBits;
+    default:
+      return null; // no production sizing rule for this structure yet
   }
 }
 
@@ -148,14 +150,18 @@ export function productionBits(kind: StructureKind, { items, distinct }: Pick<Wo
  */
 export function tradeoffProfile(analysis: RunAnalysis, constants: SizingConstants): ProfileEntry[] {
   const kinds = [...new Set(analysis.deploys.map((deploy) => deploy.kind))];
-  return kinds.map((kind) => {
+  return kinds.flatMap((kind): ProfileEntry[] => {
     const mine = analysis.deploys.filter((deploy) => deploy.kind === kind);
-    const ratios = mine.map((deploy) => deploy.spaceBits / productionBits(kind, { items: deploy.streamSize, distinct: deploy.streamSize }, constants));
-    return {
-      kind,
-      deploys: mine.length,
-      meanSpaceBits: mine.reduce((sum, deploy) => sum + deploy.spaceBits, 0) / mine.length,
-      spaceRatio: ratios.reduce((a, b) => a + b, 0) / ratios.length,
-    };
+    const needed = mine.map((deploy) => productionBits(kind, { items: deploy.streamSize, distinct: deploy.streamSize }, constants));
+    if (needed.some((bits) => bits === null)) return []; // without a production rule there is nothing to compare the player's Space with
+    const ratios = mine.map((deploy, i) => deploy.spaceBits / (needed[i] as number));
+    return [
+      {
+        kind,
+        deploys: mine.length,
+        meanSpaceBits: mine.reduce((sum, deploy) => sum + deploy.spaceBits, 0) / mine.length,
+        spaceRatio: ratios.reduce((a, b) => a + b, 0) / ratios.length,
+      },
+    ];
   });
 }

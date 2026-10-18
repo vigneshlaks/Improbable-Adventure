@@ -11,7 +11,7 @@ export interface TemplateSet {
 
 interface Layout {
   /** The source file of each structure (without extension), and the files it needs besides its own. */
-  structures: Record<StructureKind, { name: string; needs: string[] }>;
+  structures: Partial<Record<StructureKind, { name: string; needs: string[] }>>;
   extension: string;
   /** Files every toolkit has, whatever the player owns. */
   always: string[];
@@ -20,7 +20,8 @@ interface Layout {
   testName: (name: string) => string;
 }
 
-const STRUCTURES = {
+/** The structures that have reference code and tests in the templates. Others the player used are in the field report but have no code yet. */
+const STRUCTURES: Partial<Record<StructureKind, { typescript: string; python: string; needs: string[] }>> = {
   exactMemory: { typescript: "exactMemory", python: "exact_memory", needs: [] },
   reservoirSampling: { typescript: "reservoirSampling", python: "reservoir_sampling", needs: [] },
   bloomFilter: { typescript: "bloomFilter", python: "bloom_filter", needs: [] },
@@ -28,11 +29,14 @@ const STRUCTURES = {
   linearCounting: { typescript: "linearCounting", python: "linear_counting", needs: [] },
   logLog: { typescript: "logLog", python: "log_log", needs: ["registers"] },
   hyperLogLog: { typescript: "hyperLogLog", python: "hyper_log_log", needs: ["registers"] },
-} satisfies Record<StructureKind, { typescript: string; python: string; needs: string[] }>;
+};
+
+/** Whether a structure has templates, and so reference code, tests and a sizing function. */
+export const hasTemplate = (kind: StructureKind): boolean => kind in STRUCTURES;
 
 function layoutFor(language: Language): Layout {
-  const pick = (kind: StructureKind) => ({ name: STRUCTURES[kind][language], needs: STRUCTURES[kind].needs });
-  const structures = Object.fromEntries((Object.keys(STRUCTURES) as StructureKind[]).map((kind) => [kind, pick(kind)])) as Layout["structures"];
+  const structures: Layout["structures"] = {};
+  for (const kind of Object.keys(STRUCTURES) as StructureKind[]) structures[kind] = { name: (STRUCTURES[kind] as { typescript: string; python: string }) [language], needs: STRUCTURES[kind]?.needs ?? [] };
   if (language === "typescript") {
     return { structures, extension: "ts", sourceDir: "src", testDir: "tests", testName: (name) => `${name}.test.ts`, always: ["package.json", "sizing.ts", "src/hash.ts", "tests/helpers.ts", "tests/hash.test.ts", "tests/sizing.test.ts"] };
   }
@@ -47,7 +51,9 @@ export function generateToolkit(language: Language, owned: readonly StructureKin
   const layout = layoutFor(language);
   const wanted = new Set(layout.always);
   for (const kind of owned) {
-    const { name, needs } = layout.structures[kind];
+    const entry = layout.structures[kind];
+    if (!entry) continue; // no templates for this structure yet
+    const { name, needs } = entry;
     wanted.add(`${layout.sourceDir}/${name}.${layout.extension}`);
     wanted.add(`${layout.testDir}/${layout.testName(name)}`);
     for (const need of needs) wanted.add(`${layout.sourceDir}/${need}.${layout.extension}`);

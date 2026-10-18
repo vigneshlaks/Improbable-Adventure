@@ -40,6 +40,8 @@ export const balanceSchema = z.object({
   LIGHT_COUNTER_BITS: z.number().int().min(2).max(31),
   LIGHT_REGISTER_BITS: z.number().int().min(2).max(5),
   /** The relative error the exporter sizes for when the player leaves the target blank. */
+  COUNT_SKETCH_DEFAULT_DEPTH: z.number().int().positive(),
+  TOPK_SHARE: z.number().gt(0).lt(1),
   EXPORT_DEFAULT_ERROR: z.number().gt(0).lt(1),
   /** How a step is scored for reinforcement learning: a reward for each enemy beaten, and costs per turn, per Certainty lost and for losing the run. */
   RL_REWARD: z.object({ enemyDefeated: z.number(), perTurn: z.number().nonnegative(), perCertaintyLost: z.number().nonnegative(), runLoss: z.number().nonnegative() }).strict(),
@@ -107,5 +109,7 @@ export function structureConstants(b: Balance = balance): StructureConstants {
     fadingWindow: b.FADING_WINDOW,
     lightCounterBits: b.LIGHT_COUNTER_BITS,
     lightRegisterBits: b.LIGHT_REGISTER_BITS,
+    countSketchDefaultDepth: b.COUNT_SKETCH_DEFAULT_DEPTH,
+    topKShare: b.TOPK_SHARE,
   };
 }

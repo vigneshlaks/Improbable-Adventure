@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { structureConstants } from "@pda/content";
 import { STRUCTURE_KINDS } from "@pda/engine";
 import { loadTemplates, VECTORS_PATH } from "./templates";
-import { generateToolkit, type Language } from "./toolkit";
+import { generateToolkit, hasTemplate, type Language } from "./toolkit";
 import { buildVectors } from "./vectors";
 
 describe("toolkit", () => {
@@ -14,7 +14,11 @@ describe("toolkit", () => {
     for (const language of ["typescript", "python"] as Language[]) {
       const templates = loadTemplates(language);
       const all = generateToolkit(language, STRUCTURE_KINDS, templates);
-      expect(Object.keys(all).filter((path) => path.startsWith("src/")).length).toBeGreaterThanOrEqual(STRUCTURE_KINDS.length + 1);
+      expect(Object.keys(all).filter((path) => path.startsWith("src/")).length).toBeGreaterThanOrEqual(STRUCTURE_KINDS.filter(hasTemplate).length + 1);
+      // A structure with no templates yet is left out, not an error.
+      expect(Object.keys(all).some((path) => /count_?sketch\.|top_?k/i.test(path))).toBe(false);
+      expect(hasTemplate("countSketch")).toBe(false);
+      expect(hasTemplate("bloomFilter")).toBe(true);
       expect(all["tests/vectors.json"]).toBe(templates.vectors);
 
       // LogLog alone brings the register helper it needs, and none of the other structures.
