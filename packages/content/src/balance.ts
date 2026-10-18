@@ -41,6 +41,12 @@ export const balanceSchema = z.object({
   LIGHT_REGISTER_BITS: z.number().int().min(2).max(5),
   /** The relative error the exporter sizes for when the player leaves the target blank. */
   EXPORT_DEFAULT_ERROR: z.number().gt(0).lt(1),
+  /** How a step is scored for reinforcement learning: a reward for each enemy beaten, and costs per turn, per Certainty lost and for losing the run. */
+  RL_REWARD: z.object({ enemyDefeated: z.number(), perTurn: z.number().nonnegative(), perCertaintyLost: z.number().nonnegative(), runLoss: z.number().nonnegative() }).strict(),
+  /** The most deploy slots the learning agent's action table addresses (slots past this are never offered to it). */
+  RL_MAX_SLOTS: z.number().int().positive(),
+  /** Steps after which a learning episode is cut off, so an agent that never ends a turn cannot run forever. */
+  RL_MAX_STEPS: z.number().int().positive(),
 
   STARTING_SPACE: z.number().int().positive(),
   STARTING_CERTAINTY: z.number().int().positive(),

@@ -25,8 +25,11 @@ export function hashContent(files: Record<string, unknown>): string {
   return part(0x9747b28c) + part(0x1b873593);
 }
 
-/** The balance numbers that set the rules: everything except the exporter's own settings (`EXPORT_*`), which no run depends on. */
-const rulesBalance = (): Record<string, unknown> => Object.fromEntries(Object.entries(balanceJson).filter(([key]) => !key.startsWith("EXPORT_")));
+/** Settings of tools around the game (the exporter's `EXPORT_*`, the learning environment's `RL_*`): no run depends on them, so they are not part of the rules. */
+const TOOL_PREFIXES = ["EXPORT_", "RL_"];
+
+/** The balance numbers that set the rules. */
+const rulesBalance = (): Record<string, unknown> => Object.fromEntries(Object.entries(balanceJson).filter(([key]) => !TOOL_PREFIXES.some((prefix) => key.startsWith(prefix))));
 
 /**
  * A hash of the content that sets the rules: the balance numbers (without the exporter's settings), the stream traits, and the fusions, enchantments and

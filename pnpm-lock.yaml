@@ -53,6 +53,18 @@ importers:
 
   packages/engine: {}
 
+  packages/env-server:
+    dependencies:
+      '@pda/content':
+        specifier: workspace:*
+        version: link:../content
+      '@pda/engine':
+        specifier: workspace:*
+        version: link:../engine
+      '@pda/ui-core':
+        specifier: workspace:*
+        version: link:../ui-core
+
   packages/exporter:
     dependencies:
       '@pda/content':
