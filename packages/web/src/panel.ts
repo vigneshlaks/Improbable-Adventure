@@ -11,6 +11,7 @@ function draw(visual: StructureVisual): HTMLElement {
   const body = element("div", `visual ${visual.shape}`);
   body.setAttribute("aria-hidden", "true"); // the caption and readout say the same in words
   if (visual.shape === "heatmap") body.style.gridTemplateColumns = `repeat(${visual.columns}, 1fr)`;
+  if (visual.shape === "meter") body.style.gridTemplateColumns = `repeat(${Math.min(visual.cells.length, 64)}, 1fr)`; // a short strip still spans the width
   for (const value of visual.cells) {
     const cell = element("span", "cell");
     if (visual.shape === "bars") cell.style.height = `${Math.max(4, value * 100)}%`;
