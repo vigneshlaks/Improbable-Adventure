@@ -10,7 +10,8 @@
   "dependencies": {
     "@pda/content": "workspace:*",
     "@pda/engine": "workspace:*",
-    "@pda/ui-core": "workspace:*"
+    "@pda/ui-core": "workspace:*",
+    "@pda/exporter": "workspace:*"
   },
   "devDependencies": {
     "vite": "^8.3.2"

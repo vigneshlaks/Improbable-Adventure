@@ -1,7 +1,11 @@
+import { structureConstants } from "@pda/content";
+import { buildToolkit, sizingConstants, toolkitZip, type Language } from "@pda/exporter";
 import { createRunSession } from "@pda/ui-core";
 import { renderPanel } from "./panel";
 import { createTerminal } from "./terminal";
+import { templatesFor } from "./templates";
 import { initTheme } from "./theme";
+import { parseWorkload } from "./workload";
 import "./style.css";
 
 const byId = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -33,17 +37,59 @@ function start(next: string) {
   url.searchParams.set("seed", seed);
   history.replaceState(null, "", url);
   terminal.attach(current);
+  byId<HTMLFormElement>("export-form").hidden = true;
+  byId("export-toggle").setAttribute("aria-expanded", "false");
+  byId("export-status").textContent = "";
 }
 
 byId("new-run").addEventListener("click", () => start(freshSeed()));
 byId("download").addEventListener("click", () => {
   const replay = current.replay();
-  if (!replay) return;
+  if (replay) save(new Blob([JSON.stringify(replay, null, 2)], { type: "application/json" }), `replay-${seed}.json`);
+});
+
+function save(blob: Blob, name: string) {
   const link = document.createElement("a");
-  link.href = URL.createObjectURL(new Blob([JSON.stringify(replay, null, 2)], { type: "application/json" }));
-  link.download = `replay-${seed}.json`;
+  link.href = URL.createObjectURL(blob);
+  link.download = name;
   link.click();
   URL.revokeObjectURL(link.href);
+}
+
+const exportForm = byId<HTMLFormElement>("export-form");
+const exportStatus = byId("export-status");
+byId("export-toggle").addEventListener("click", () => {
+  exportForm.hidden = !exportForm.hidden;
+  byId("export-toggle").setAttribute("aria-expanded", String(!exportForm.hidden));
+});
+exportForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  const replay = current.replay();
+  if (!replay) return;
+  const field = (id: string) => byId<HTMLInputElement>(id).value;
+  const parsed = parseWorkload({ items: field("export-items"), distinct: field("export-distinct"), errorPercent: field("export-error"), memoryKiB: field("export-memory") });
+  if (!parsed.ok) {
+    exportStatus.textContent = parsed.message;
+    return;
+  }
+  const language = byId<HTMLSelectElement>("export-language").value as Language;
+  exportStatus.textContent = "Building...";
+  let files: Record<string, string>;
+  try {
+    files = buildToolkit({ language, replay, workload: parsed.workload, templates: templatesFor(language), constants: sizingConstants(structureConstants()) });
+  } catch (error) {
+    exportStatus.textContent = `The toolkit could not be built: ${error instanceof Error ? error.message : "unknown error"}`;
+    return;
+  }
+  toolkitZip(files).then(
+    (bytes) => {
+      save(new Blob([bytes as BlobPart], { type: "application/zip" }), `toolkit-${language}-${seed}.zip`);
+      exportStatus.textContent = `Done: ${Object.keys(files).length} files are downloading as a zip.`;
+    },
+    () => {
+      exportStatus.textContent = "The zip could not be written.";
+    },
+  );
 });
 
 // On a narrow screen the structures start folded away so the text has the room; on a wide one they are always open.

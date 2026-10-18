@@ -91,6 +91,9 @@ importers:
       '@pda/engine':
         specifier: workspace:*
         version: link:../engine
+      '@pda/exporter':
+        specifier: workspace:*
+        version: link:../exporter
       '@pda/ui-core':
         specifier: workspace:*
         version: link:../ui-core

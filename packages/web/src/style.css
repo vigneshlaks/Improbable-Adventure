@@ -92,7 +92,12 @@ pre.echo { color: var(--echo); }
   color: var(--text);
 }
 #ended { display: flex; gap: 8px; }
-#ended[hidden] { display: none; }
+#ended[hidden], #export-form[hidden] { display: none; }
+#export-form { display: grid; gap: 8px; padding: 12px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); max-height: 45vh; overflow-y: auto; }
+#export-form p { margin: 0; font-size: 0.85rem; color: var(--muted); }
+#export-form label { display: grid; gap: 2px; font-size: 0.85rem; }
+#export-form input, #export-form select { font: 1rem inherit; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--text); }
+#export-build { justify-self: start; background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
 #ended button { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
 
 #panel-box { border-left: 1px solid var(--line); overflow-y: auto; padding: 12px 16px; background: var(--surface); }
