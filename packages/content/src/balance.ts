@@ -39,6 +39,8 @@ export const balanceSchema = z.object({
   FADING_WINDOW: z.number().positive(),
   LIGHT_COUNTER_BITS: z.number().int().min(2).max(31),
   LIGHT_REGISTER_BITS: z.number().int().min(2).max(5),
+  /** The relative error the exporter sizes for when the player leaves the target blank. */
+  EXPORT_DEFAULT_ERROR: z.number().gt(0).lt(1),
 
   STARTING_SPACE: z.number().int().positive(),
   STARTING_CERTAINTY: z.number().int().positive(),

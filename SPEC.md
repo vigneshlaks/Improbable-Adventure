@@ -526,6 +526,14 @@ toolkit/
 
 **Templates** live in `packages/exporter/templates/<language>/`, one per structure. CI generates a toolkit containing every structure for every language and runs its tests with that language's real toolchain. A template change that breaks generated tests fails the build.
 
+**Sizing (decided 2026-10-18, M7 stage 1).** `packages/exporter/src/sizing.ts` has one pure function per structure. Each takes the workload (any field blank) and returns parameters, the error they give, the memory and `meetsTarget`: with a target error the memory is solved for; with a memory budget the error is; with both the memory is used and `meetsTarget` says whether the error was reached; with neither the default target `EXPORT_DEFAULT_ERROR` (1 percent, in `balance.json`) is used.
+- Bloom Filter: m = -n ln p / (ln 2)^2 bits and k = round(m / n x ln 2) hashes, then grown a bit at a time until the real rate with the whole-number k is at or under the target (the formula alone can land a hair above it).
+- Count-Min: width = e / error, depth = ceil(ln(1 / (1 - CONFIDENCE))) (3 at 95 percent); the error is a share of the items, so the overshoot in counts is that share times the item count.
+- HyperLogLog and LogLog: the register count is the power of two with (coefficient / error)^2 or more registers (or the largest that fits the budget); error is the coefficient over the square root of the registers.
+- Linear Counting: the smallest bit array whose standard error sqrt(m (e^t - t - 1)) / n, t = n / m, is within the target, by binary search (and a refusal, not a loop, if no size up to 2^50 bits reaches it).
+- Reservoir Sampling: sample size z^2 x 0.25 / error^2 for a proportion at the confidence; Exact Memory: every distinct value and its counter.
+- Two tests: one for the formulas and modes, and a statistical test per bound (300 seeded trials): a Bloom Filter sized for 1 percent flags decoys at no more than 1.3 times that rate, and a HyperLogLog sized for 2 percent is within 1.96 standard errors in at least the stated share of streams, both on the engine's own structures.
+
 The browser bundles the exporter and builds the zip client-side (JSZip), so exporting needs no server.
 
 ## User interface

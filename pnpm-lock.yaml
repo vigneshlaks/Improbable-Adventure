@@ -53,6 +53,15 @@ importers:
 
   packages/engine: {}
 
+  packages/exporter:
+    dependencies:
+      '@pda/content':
+        specifier: workspace:*
+        version: link:../content
+      '@pda/engine':
+        specifier: workspace:*
+        version: link:../engine
+
   packages/sim:
     dependencies:
       '@pda/content':
