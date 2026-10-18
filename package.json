@@ -9,7 +9,8 @@
     "sim": "tsx packages/sim/src/bin.ts",
     "cli": "tsx packages/cli/src/bin.ts",
     "dev": "pnpm --filter @pda/web dev",
-    "build": "pnpm --filter @pda/web build"
+    "build": "pnpm --filter @pda/web build",
+    "export": "tsx packages/exporter/src/bin.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

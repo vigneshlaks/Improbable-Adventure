@@ -1,0 +1,430 @@
+{
+  "note": "Known answers produced by the reference implementation. The i-th test stream value is (i + 1) * 2654435761 mod 2^32.",
+  "hash": [
+    {
+      "item": 0,
+      "seed": 0,
+      "hash": 593689054
+    },
+    {
+      "item": 0,
+      "seed": 1540483477,
+      "hash": 4014792284
+    },
+    {
+      "item": 1,
+      "seed": 0,
+      "hash": 4226891818
+    },
+    {
+      "item": 1,
+      "seed": 1540483477,
+      "hash": 2444701778
+    },
+    {
+      "item": 42,
+      "seed": 0,
+      "hash": 3160117731
+    },
+    {
+      "item": 42,
+      "seed": 1540483477,
+      "hash": 3169212909
+    },
+    {
+      "item": 4294967295,
+      "seed": 0,
+      "hash": 1982413648
+    },
+    {
+      "item": 4294967295,
+      "seed": 1540483477,
+      "hash": 1964043354
+    },
+    {
+      "item": "",
+      "seed": 0,
+      "hash": 0
+    },
+    {
+      "item": "",
+      "seed": 1540483477,
+      "hash": 3651860435
+    },
+    {
+      "item": "a",
+      "seed": 0,
+      "hash": 1009084850
+    },
+    {
+      "item": "a",
+      "seed": 1540483477,
+      "hash": 3348447516
+    },
+    {
+      "item": "hello",
+      "seed": 0,
+      "hash": 613153351
+    },
+    {
+      "item": "hello",
+      "seed": 1540483477,
+      "hash": 2389689188
+    },
+    {
+      "item": "héllo",
+      "seed": 0,
+      "hash": 3164577896
+    },
+    {
+      "item": "héllo",
+      "seed": 1540483477,
+      "hash": 2701376868
+    },
+    {
+      "item": "probabilistic data adventure",
+      "seed": 0,
+      "hash": 3981807643
+    },
+    {
+      "item": "probabilistic data adventure",
+      "seed": 1540483477,
+      "hash": 1825035116
+    }
+  ],
+  "positions": [
+    {
+      "item": 42,
+      "k": 7,
+      "modulus": 1000,
+      "seed": 1540483477,
+      "positions": [
+        909,
+        682,
+        456,
+        232,
+        11,
+        794,
+        582
+      ]
+    },
+    {
+      "item": 4294967295,
+      "k": 5,
+      "modulus": 65537,
+      "seed": 0,
+      "positions": [
+        50472,
+        3644,
+        22354,
+        41066,
+        59781
+      ]
+    },
+    {
+      "item": 2027808452,
+      "k": 4,
+      "modulus": 13,
+      "seed": 1540483477,
+      "positions": [
+        5,
+        9,
+        1,
+        8
+      ]
+    }
+  ],
+  "bloom": {
+    "bits": 2048,
+    "hashes": 6,
+    "items": 300,
+    "fill": 0.57421875,
+    "probes": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false
+    ]
+  },
+  "countMin": {
+    "width": 64,
+    "depth": 4,
+    "distinct": 50,
+    "events": 2000,
+    "estimates": [
+      40,
+      40,
+      40,
+      40,
+      40,
+      40,
+      40,
+      40,
+      40,
+      40
+    ]
+  },
+  "hyperLogLog": [
+    {
+      "indexBits": 8,
+      "items": 100,
+      "estimate": 101.80683972252402
+    },
+    {
+      "indexBits": 8,
+      "items": 5000,
+      "estimate": 4703.453156342675
+    },
+    {
+      "indexBits": 10,
+      "items": 100000,
+      "estimate": 100533.51981256012
+    }
+  ],
+  "logLog": [
+    {
+      "indexBits": 10,
+      "items": 50000,
+      "estimate": 50423.417677764
+    },
+    {
+      "indexBits": 12,
+      "items": 200000,
+      "estimate": 210644.6295726685
+    }
+  ],
+  "linearCounting": {
+    "bits": 4096,
+    "items": 1000,
+    "estimate": 1012.4190792492061
+  },
+  "sizing": [
+    {
+      "fn": "sizeBloom",
+      "input": {
+        "items": 1000,
+        "error": 0.01
+      },
+      "output": {
+        "bits": 9593,
+        "hashes": 7,
+        "falsePositiveRate": 0.00999977559689564,
+        "memoryBits": 9593,
+        "meetsTarget": true
+      }
+    },
+    {
+      "fn": "sizeBloom",
+      "input": {
+        "items": 1000,
+        "memoryBits": 4793
+      },
+      "output": {
+        "bits": 4793,
+        "hashes": 3,
+        "falsePositiveRate": 0.10069190038661482,
+        "memoryBits": 4793,
+        "meetsTarget": true
+      }
+    },
+    {
+      "fn": "sizeBloom",
+      "input": {
+        "items": 50000,
+        "error": 0.001,
+        "memoryBits": 200000
+      },
+      "output": {
+        "bits": 200000,
+        "hashes": 3,
+        "falsePositiveRate": 0.14689159766038104,
+        "memoryBits": 200000,
+        "meetsTarget": false
+      }
+    },
+    {
+      "fn": "sizeCountMin",
+      "input": {
+        "items": 100000,
+        "error": 0.01
+      },
+      "output": {
+        "width": 272,
+        "depth": 3,
+        "errorShare": 0.009993683192864136,
+        "overshoot": 999.3683192864136,
+        "confidence": 0.950212931632136,
+        "memoryBits": 26112,
+        "meetsTarget": true
+      }
+    },
+    {
+      "fn": "sizeCountMin",
+      "input": {
+        "items": 5000,
+        "memoryBits": 40000
+      },
+      "output": {
+        "width": 416,
+        "depth": 3,
+        "errorShare": 0.006534331318411166,
+        "overshoot": 32.67165659205583,
+        "confidence": 0.950212931632136,
+        "memoryBits": 39936,
+        "meetsTarget": true
+      }
+    },
+    {
+      "fn": "sizeHyperLogLog",
+      "input": {
+        "distinct": 1000000,
+        "error": 0.02
+      },
+      "output": {
+        "indexBits": 12,
+        "registers": 4096,
+        "standardError": 0.01625,
+        "memoryBits": 20480,
+        "meetsTarget": true
+      }
+    },
+    {
+      "fn": "sizeHyperLogLog",
+      "input": {
+        "memoryBits": 5000
+      },
+      "output": {
+        "indexBits": 9,
+        "registers": 512,
+        "standardError": 0.045961940777125586,
+        "memoryBits": 2560,
+        "meetsTarget": true
+      }
+    },
+    {
+      "fn": "sizeHyperLogLog",
+      "input": {
+        "error": 0.5
+      },
+      "output": {
+        "indexBits": 4,
+        "registers": 16,
+        "standardError": 0.26,
+        "memoryBits": 80,
+        "meetsTarget": true
+      }
+    },
+    {
+      "fn": "sizeLogLog",
+      "input": {
+        "distinct": 1000000,
+        "error": 0.05
+      },
+      "output": {
+        "indexBits": 10,
+        "registers": 1024,
+        "standardError": 0.040625,
+        "memoryBits": 5120,
+        "meetsTarget": true
+      }
+    },
+    {
+      "fn": "sizeLinearCounting",
+      "input": {
+        "distinct": 10000,
+        "error": 0.01
+      },
+      "output": {
+        "bits": 7960,
+        "standardError": 0.00999909813199217,
+        "memoryBits": 7960,
+        "meetsTarget": true
+      }
+    },
+    {
+      "fn": "sizeLinearCounting",
+      "input": {
+        "distinct": 10000,
+        "memoryBits": 8000
+      },
+      "output": {
+        "bits": 8000,
+        "standardError": 0.009961296933479462,
+        "memoryBits": 8000,
+        "meetsTarget": true
+      }
+    },
+    {
+      "fn": "sizeReservoir",
+      "input": {
+        "error": 0.05
+      },
+      "output": {
+        "sampleSize": 385,
+        "error": 0.049944476900557616,
+        "memoryBits": 12320,
+        "meetsTarget": true
+      }
+    },
+    {
+      "fn": "sizeReservoir",
+      "input": {
+        "memoryBits": 3200
+      },
+      "output": {
+        "sampleSize": 100,
+        "error": 0.09799814016373362,
+        "memoryBits": 3200,
+        "meetsTarget": true
+      }
+    },
+    {
+      "fn": "sizeExact",
+      "input": {
+        "distinct": 1000,
+        "memoryBits": 10000
+      },
+      "output": {
+        "entries": 1000,
+        "memoryBits": 64000,
+        "meetsTarget": false
+      }
+    }
+  ]
+}

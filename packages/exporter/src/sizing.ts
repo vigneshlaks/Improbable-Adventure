@@ -98,18 +98,24 @@ export function sizeCountMin(workload: Workload, constants: SizingConstants): Co
   };
 }
 
+/** The fewest index bits a register structure is sized to (16 registers), as in the game and the toolkit. */
+const MIN_INDEX_BITS = 4;
+
 export interface RegisterSizing extends Sized {
+  /** The register count is 2^indexBits. */
+  indexBits: number;
   registers: number;
   standardError: number;
 }
 
 function sizeRegisters(workload: Workload, constants: SizingConstants, coefficient: number): RegisterSizing {
-  const registers =
-    workload.memoryBits !== undefined
-      ? 2 ** Math.max(0, Math.floor(Math.log2(workload.memoryBits / constants.registerBits)))
-      : 2 ** Math.ceil(Math.log2((coefficient / target(workload, constants)) ** 2));
+  const indexBits = Math.max(
+    MIN_INDEX_BITS,
+    workload.memoryBits !== undefined ? Math.floor(Math.log2(workload.memoryBits / constants.registerBits)) : Math.ceil(Math.log2((coefficient / target(workload, constants)) ** 2)),
+  );
+  const registers = 2 ** indexBits;
   const standardError = coefficient / Math.sqrt(registers);
-  return { registers, standardError, memoryBits: registers * constants.registerBits, meetsTarget: meets(workload, standardError) };
+  return { indexBits, registers, standardError, memoryBits: registers * constants.registerBits, meetsTarget: meets(workload, standardError) };
 }
 
 export const sizeHyperLogLog = (workload: Workload, constants: SizingConstants) => sizeRegisters(workload, constants, constants.hyperLogLogErrorCoefficient);
