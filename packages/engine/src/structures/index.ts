@@ -1,9 +1,11 @@
 import { BloomFilter } from "./bloomFilter";
 import { CountMinSketch } from "./countMinSketch";
 import { CountSketch } from "./countSketch";
+import { CuckooFilter } from "./cuckooFilter";
 import { TopKTracker } from "./topKTracker";
 import { ExactMemory } from "./exactMemory";
 import { HyperLogLog } from "./hyperLogLog";
+import { KMinimumValues } from "./kMinimumValues";
 import { LinearCounting } from "./linearCounting";
 import { LogLog } from "./logLog";
 import { StableBloomFilter } from "./stableBloomFilter";
@@ -14,9 +16,11 @@ export * from "./types";
 export { BloomFilter, bloomFalsePositiveRate, bloomOptimalK, DEFAULT_BITS_PER_ITEM } from "./bloomFilter";
 export { CountMinSketch } from "./countMinSketch";
 export { CountSketch } from "./countSketch";
+export { CuckooFilter } from "./cuckooFilter";
 export { TopKTracker, type Candidate } from "./topKTracker";
 export { ExactMemory } from "./exactMemory";
 export { HyperLogLog, MIN_HLL_REGISTERS } from "./hyperLogLog";
+export { KMinimumValues } from "./kMinimumValues";
 export { LinearCounting } from "./linearCounting";
 export { LogLog, MIN_LOGLOG_REGISTERS } from "./logLog";
 export { ReservoirSampling } from "./reservoirSampling";
@@ -43,6 +47,10 @@ export function restoreStructure(snapshot: StructureSnapshot, constants: Structu
       return CountSketch.fromSnapshot(snapshot, constants);
     case "topKTracker":
       return TopKTracker.fromSnapshot(snapshot, constants);
+    case "cuckooFilter":
+      return CuckooFilter.fromSnapshot(snapshot, constants);
+    case "kMinimumValues":
+      return KMinimumValues.fromSnapshot(snapshot, constants);
     default:
       throw new RangeError(`Cannot restore unknown structure kind: ${String((snapshot as { kind: unknown }).kind)}`);
   }
@@ -68,5 +76,9 @@ export function createStructure(kind: StructureKind, options: StructureOptions, 
       return new CountSketch(options, constants);
     case "topKTracker":
       return new TopKTracker(options, constants);
+    case "cuckooFilter":
+      return new CuckooFilter(options, constants);
+    case "kMinimumValues":
+      return new KMinimumValues(options, constants);
   }
 }

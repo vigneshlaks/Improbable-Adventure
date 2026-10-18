@@ -12,6 +12,8 @@ export const STRUCTURE_KINDS = [
   "hyperLogLog",
   "countSketch",
   "topKTracker",
+  "cuckooFilter",
+  "kMinimumValues",
 ] as const;
 
 export type StructureKind = (typeof STRUCTURE_KINDS)[number];
@@ -72,6 +74,12 @@ export interface StructureConstants {
   countSketchDefaultDepth: number;
   /** The share of a Top-K Tracker's Space that holds its exact candidate list; the rest is its Count-Min grid. */
   topKShare: number;
+  /** Fingerprints a Cuckoo Filter bucket holds. */
+  cuckooBucketSize: number;
+  /** Bits in a Cuckoo Filter fingerprint when the player does not choose. */
+  cuckooFingerprintBits: number;
+  /** How many fingerprints an insert may push aside before the Cuckoo Filter gives up and drops one. */
+  cuckooMaxKicks: number;
 }
 
 /** Anything that survives JSON.stringify and JSON.parse unchanged. */

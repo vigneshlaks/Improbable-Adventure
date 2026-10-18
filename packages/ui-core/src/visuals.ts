@@ -1,4 +1,4 @@
-import { BloomFilter, CountMinSketch, CountSketch, HyperLogLog, LogLog, restoreStructure, TopKTracker, type Json, type StructureConstants, type StructureSnapshot } from "@pda/engine";
+import { BloomFilter, CountMinSketch, CountSketch, CuckooFilter, HyperLogLog, KMinimumValues, LogLog, restoreStructure, TopKTracker, type Json, type StructureConstants, type StructureSnapshot } from "@pda/engine";
 import { structureLabel } from "./views";
 
 /** The most cells a visual draws; a bigger structure is shown averaged down to this many. */
@@ -81,6 +81,15 @@ export function structureVisual(snapshot: StructureSnapshot, slot: number, const
       caption: `${depth} rows of ${width} counters, and a list of the ${candidates} heaviest values`,
       readout: heaviest ? `${live.candidates.length} of ${candidates} listed; the heaviest is between ${heaviest.low} and ${heaviest.high}` : `0 of ${candidates} listed`,
     };
+  }
+  if (live instanceof CuckooFilter) {
+    const table = numbers(state, "table").map((fingerprint) => (fingerprint > 0 ? 1 : 0));
+    const lost = live.lost > 0 ? `, ${live.lost} dropped` : "";
+    return { ...base, shape: "meter", cells: downsample(table), columns: 0, caption: "fingerprint places (lit = taken)", readout: `${percent(live.load)} full, false alarms about ${percent(live.falsePositiveRate())}${lost}` };
+  }
+  if (live instanceof KMinimumValues) {
+    const k = live.params.k as number;
+    return { ...base, shape: "bars", cells: downsample(live.hashes.map((h) => h / 2 ** 32)), columns: 0, caption: `the ${live.size} smallest of ${k} possible hashes (taller = larger)`, readout: live.size < k ? `${live.size} of ${k} kept: an exact count so far` : `error about ±${percent(live.standardError)}` };
   }
   if (live instanceof LogLog || live instanceof HyperLogLog) {
     const registers = numbers(state, "registers");

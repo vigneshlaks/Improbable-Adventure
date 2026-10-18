@@ -19,6 +19,9 @@ export const TEST_CONSTANTS: StructureConstants = {
   lightRegisterBits: 3,
   countSketchDefaultDepth: 5,
   topKShare: 0.25,
+  cuckooBucketSize: 4,
+  cuckooFingerprintBits: 8,
+  cuckooMaxKicks: 500,
 };
 
 /** Every structure's statistical test runs this many seeded trials. */

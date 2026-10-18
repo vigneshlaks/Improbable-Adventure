@@ -155,5 +155,39 @@
     "summary": "Tracks the heaviest values exactly, and the rest roughly.",
     "help": "A Count-Min grid ranks the values and a short list keeps an interval around the heaviest ones, which then moves by exactly one for each insert or delete. A value that joined the list early keeps a narrow interval however big the stream grows, so on a skewed stream the heavy values are answered far better than the grid alone could. The rest are answered by the grid. A quarter of its Space holds the list. It is made by fusing Count-Min Sketch with Exact Memory at a rest stop.",
     "flavor": "Remembers the loudest voices, and shrugs at the crowd."
+  },
+  "cuckooFilter": {
+    "name": "Cuckoo Filter",
+    "phase": 2,
+    "aliases": [
+      "cuckoo"
+    ],
+    "answers": [
+      "presence"
+    ],
+    "knob": {
+      "name": "fingerprint",
+      "description": "Bits in each stored fingerprint. More bits mean fewer false alarms but fewer places to store them.",
+      "min": 1,
+      "max": 16
+    },
+    "summary": "Flags values it has seen, and can forget the ones deleted.",
+    "help": "Stores a short fingerprint of every value in one of two buckets, and shuffles fingerprints between their two buckets to make room. A value is flagged when its fingerprint is in either bucket, so a stranger is flagged by chance, about 8 times in 2 to the power of the fingerprint bits when it is full. Unlike a Bloom Filter it handles deletes, but once it is more than about 95 percent full it starts dropping fingerprints, which hides real values: false negatives. Its range allows for both.",
+    "flavor": "Tucks every face into one of two drawers, and shuffles when both are full."
+  },
+  "kMinimumValues": {
+    "name": "K-Minimum Values",
+    "phase": 2,
+    "aliases": [
+      "kmv",
+      "minvalues"
+    ],
+    "answers": [
+      "count"
+    ],
+    "knob": null,
+    "summary": "Estimates how many distinct values appeared, from the k smallest hashes.",
+    "help": "Keeps the k smallest hashes of the distinct values it has seen. While it has fewer than k it counts them exactly. Past that, the k-th smallest hash says how crowded the values are: the estimate is k minus 1 over that hash as a share of the range, with an error of about 1 over the square root of k minus 2. It ignores deletes, like LogLog, so a deleted value still counts until the range allows for it, and two sketches merge into the sketch of both streams.",
+    "flavor": "Counts the crowd by how close its nearest strangers stand."
   }
 }

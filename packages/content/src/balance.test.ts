@@ -91,6 +91,9 @@ describe("balance.json", () => {
         lightRegisterBits: 3,
         countSketchDefaultDepth: 5,
         topKShare: 0.25,
+        cuckooBucketSize: 4,
+        cuckooFingerprintBits: 8,
+        cuckooMaxKicks: 500,
       });
     }
     // matches the stand-in constants used by the engine's tests

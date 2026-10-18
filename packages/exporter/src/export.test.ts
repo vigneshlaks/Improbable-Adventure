@@ -97,10 +97,16 @@ describe("toolkit export", () => {
   it("packs a toolkit into a zip under toolkit/ that reads back identically and is the same bytes every time", async () => {
     const files = buildToolkit({ language: "python", replay: replay("greedy-4-won"), workload: { items: 10000 }, templates: loadTemplates("python"), constants });
     const first = await toolkitZip(files);
+    // Build the second one only after the clock has moved on: a zip that stamps entries with the time of day (as JSZip does for the
+    // folders it makes up) differs across a second boundary, which made this test fail now and then.
+    const started = Date.now();
+    while (Date.now() - started < 1100) await new Promise((resolve) => setTimeout(resolve, 50));
     const second = await toolkitZip(files);
     expect(Buffer.from(first).equals(Buffer.from(second))).toBe(true);
     const zip = await JSZip.loadAsync(first);
     const names = Object.keys(zip.files).filter((name) => !zip.files[name]?.dir).sort();
+    expect(Object.keys(zip.files).some((name) => zip.files[name]?.dir && name.startsWith("toolkit/"))).toBe(true); // folders are real entries, with the fixed date
+    expect(Object.values(zip.files).every((entry) => entry.date.getUTCFullYear() === 2000)).toBe(true);
     expect(names).toEqual(Object.keys(files).sort().map((path) => `toolkit/${path}`));
     for (const [path, content] of Object.entries(files)) expect(await zip.file(`toolkit/${path}`)?.async("string")).toBe(content);
   });

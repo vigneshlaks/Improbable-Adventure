@@ -13,7 +13,8 @@ const MIN_BITS = 256;
 export function preferredKinds(weakPoint: WeakPoint, traits: StreamTraits): StructureKind[] {
   switch (weakPoint) {
     case "presence":
-      return ["bloomFilter", "exactMemory", "reservoirSampling"];
+      // A Bloom Filter cannot delete, so under Churn it flags the deleted values as well; a Cuckoo Filter can forget them.
+      return traits.churn === "low" ? ["bloomFilter", "exactMemory", "reservoirSampling"] : ["cuckooFilter", "bloomFilter", "exactMemory", "reservoirSampling"];
     case "frequency":
       // A Top-K Tracker follows the heavy values exactly, so it is worth having once the stream has some; on a flat stream nothing helps much.
       return traits.skew === "low"

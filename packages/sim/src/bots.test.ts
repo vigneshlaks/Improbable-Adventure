@@ -91,7 +91,7 @@ describe("the bots", () => {
         expect(playFight({ config, seed: "same", bot: getBot(name) })).toEqual(playFight({ config, seed: "same", bot: getBot(name) }));
       });
     }
-  });
+  }, 120_000); // every bot, tier and weak point with every structure available: about a minute alone, so it gets more than the default minute
 });
 
 describe("choosing structures", () => {
@@ -156,8 +156,12 @@ describe("Greedy", () => {
       expect(withoutIt("high")).toMatchObject({ type: "deploy", kind: "logLog" });
       expect(withoutIt("medium")).toMatchObject({ type: "deploy", kind: "linearCounting" });
 
+      // Under Churn a Bloom Filter flags the deleted values too, so a Cuckoo Filter (which can forget them) comes first; on a calm stream the Bloom Filter does.
       const churning = fightWith({ churn: "high" });
-      expect(firstAction(getBot("greedy"), churning.state, churning.config)).toMatchObject({ type: "deploy", kind: "bloomFilter" });
+      expect(firstAction(getBot("greedy"), churning.state, churning.config)).toMatchObject({ type: "deploy", kind: "cuckooFilter" });
+      const calmer = { variety: "low", skew: "low", churn: "low", growth: "low", drift: "low" } as const;
+      expect(preferredKinds("presence", calmer)[0]).toBe("bloomFilter");
+      expect(preferredKinds("presence", { ...calmer, churn: "medium" })[0]).toBe("cuckooFilter");
     }
     // falls back to what it owns when the best match is missing
     {
@@ -267,7 +271,7 @@ describe("Cautious", () => {
       const { config } = fightWith({ churn: "high" });
       const { decisions } = observed(getBot("cautious"), config, "pair");
       const deploys = decisions.filter((d) => d.action.type === "deploy" && d.view.observation.turn === 1).map((d) => (d.action as { kind: string }).kind);
-      expect(deploys.slice(0, 2)).toEqual(["bloomFilter", "exactMemory"]);
+      expect(deploys.slice(0, 2)).toEqual(["cuckooFilter", "bloomFilter"]); // Churn is high, so the Cuckoo Filter and the Bloom Filter cross-check each other
     }
   });
 });
