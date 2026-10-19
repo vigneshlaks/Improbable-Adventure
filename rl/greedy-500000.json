@@ -1,0 +1,135 @@
+
+
+{
+  "reports": [
+    {
+      "bot": "greedy",
+      "seedBase": 500000,
+      "runs": 200,
+      "outcomes": {
+        "won": 54,
+        "lost": 146,
+        "stalled": 0
+      },
+      "winRate": 0.27,
+      "winRateInterval": [
+        0.21323452933325243,
+        0.33543431054782674
+      ],
+      "meanFightsWon": 4.54,
+      "endedAt": [
+        {
+          "encounter": 0,
+          "tier": "minion",
+          "share": 0.09
+        },
+        {
+          "encounter": 1,
+          "tier": "minion",
+          "share": 0.11
+        },
+        {
+          "encounter": 2,
+          "tier": "minion",
+          "share": 0.075
+        },
+        {
+          "encounter": 3,
+          "tier": "minion",
+          "share": 0.035
+        },
+        {
+          "encounter": 4,
+          "tier": "minion",
+          "share": 0.06
+        },
+        {
+          "encounter": 5,
+          "tier": "elite",
+          "share": 0.115
+        },
+        {
+          "encounter": 6,
+          "tier": "boss",
+          "share": 0.245
+        }
+      ],
+      "fights": {
+        "minion": {
+          "played": 825,
+          "won": 751,
+          "lostToTurnLimit": 74,
+          "winRate": 0.9103030303030303
+        },
+        "elite": {
+          "played": 126,
+          "won": 103,
+          "lostToTurnLimit": 23,
+          "winRate": 0.8174603174603174
+        },
+        "boss": {
+          "played": 103,
+          "won": 54,
+          "lostToTurnLimit": 4,
+          "winRate": 0.5242718446601942
+        }
+      },
+      "meanTurnsWhenWon": 24.814814814814813,
+      "meanCertaintyLeftWhenWon": 61.111111111111114,
+      "strikes": {
+        "meanPerRun": 16.71,
+        "wrongShare": 0.36624775583482944
+      },
+      "inWinningRuns": {
+        "runs": 54,
+        "structures": {
+          "bloomFilter": 1,
+          "exactMemory": 0.8888888888888888,
+          "countMinSketch": 0.8148148148148148,
+          "linearCounting": 0.9074074074074074,
+          "spectralBloom": 0.46296296296296297,
+          "topKTracker": 0.5555555555555556,
+          "reservoirSampling": 0.37037037037037035,
+          "logLog": 0.09259259259259259,
+          "hyperLogLog": 0.3888888888888889,
+          "kllSketch": 0.018518518518518517,
+          "tDigest": 0.037037037037037035,
+          "minHash": 0.018518518518518517
+        },
+        "openers": {
+          "bloomFilter": 0.6111111111111112,
+          "linearCounting": 0.07407407407407407,
+          "exactMemory": 0.3148148148148148
+        },
+        "fusedShare": 0.9444444444444444,
+        "enchantedShare": 0.5555555555555556
+      }
+    }
+  ],
+  "targets": [
+    {
+      "id": "greedy-win-rate",
+      "target": "Greedy wins 55 to 70 percent of runs",
+      "ok": false,
+      "detail": "27.0%"
+    },
+    {
+      "id": "greedy-wrong-strikes",
+      "target": "Greedy's wrong strikes are 10 to 30 percent",
+      "ok": false,
+      "detail": "36.6%"
+    },
+    {
+      "id": "family-opener",
+      "target": "No opener is used in more than 40 percent of the Greedy family's winning runs",
+      "ok": false,
+      "detail": "bloomFilter 61.1%"
+    },
+    {
+      "id": "family-structures",
+      "target": "Every MVP structure appears in at least 15 percent of the Greedy family's winning runs",
+      "ok": false,
+      "detail": "below 15 percent: logLog 9.3%"
+    }
+  ]
+}

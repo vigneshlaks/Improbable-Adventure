@@ -647,6 +647,15 @@ Training runs in Python against the TypeScript engine, which runs as a Node proc
 
 Of the 200 games in each set the agent lost none or two; the rest (12 and 14) were cut off at the 400-step limit, which counts as a failure. Mean turns when it wins: about 23. Every finished game was saved as a replay (`--save-replays <folder>`, from the `replay` command of the server) and all 374 verify with `pnpm sim replay verify`, so the wins are the engine's own, not the environment's. The agent plays the whole run, including rewards and rest stops. Caveats: one training run, two seed sets of 200 (a 95 percent interval is about plus or minus 3.5 points); the agent is not yet measured on speed against the best human or the Oracle; it wins far more often than Greedy, which says Greedy is a weak player rather than that the game is easy (the Oracle wins all). The trained model is not committed (`rl/models/`, 600 KB).
 
+**Retrained on the final game (2026-10-19, M10).** The M8 agent no longer fit (the learning environment now has 594 actions and 372 observation numbers, and the game has Phase 2 structures, Cunning, Likeness and two-enemy fights), so it was trained again with the same settings (`--steps 4000000 --envs 16`, about 70 minutes of CPU time, since the engine is heavier). Mean training reward rose from 0.4 to about 5 and levelled off near 2 million steps. On 200 held-out runs per set, with Greedy on the same seeds:
+
+| Seeds | Agent wins | Greedy wins | Random wins |
+| --- | --- | --- | --- |
+| 100000 to 100199 | 152 (76.0 percent) | 58 (29.0 percent) | 0 |
+| 500000 to 500199 | 159 (79.5 percent) | 54 (27.0 percent) | not measured |
+
+All 400 saved games verify with `pnpm sim replay verify`. Mean turns when it wins: about 24. The agent wins about 2.7 times as often as Greedy, so the acceptance bar (beats Greedy on held-out seeds) is met again. The game is harder for the agent than before (93 to 76 percent), as it is for Greedy (54 to 29), and the Oracle still wins every run. One training run and two sets of 200 (a 95 percent interval is about plus or minus 6 points at these rates); the model is not committed.
+
 **Training lessons (recorded because each cost a run).**
 - *Stalling.* With a free cut-off, the first agents learned to stall (mean episode length 1,440 of 1,500) instead of risking a loss. A cut-off is now charged the run-loss weight and ends the episode as a failure, and the limit is 400.
 - *"NaN" crashes.* Four runs ended with `Expected parameter probs ... Simplex()`. Nothing was NaN: with over a hundred legal actions the float32 probabilities occasionally sum to 1 by more than 1e-6, which PyTorch's default check rejects. `train.py` turns the check off (sampling and log-probabilities use normalized logits). Tools kept in `train.py` from the hunt: `GuardCallback` (checks weights and the rollout buffer after every rollout), `SafePPO` (zeroes a non-finite gradient instead of stepping), `explain` (reports what the policy was given when a rollout fails), checkpoints every 250,000 steps, `--resume` and `--detect-anomaly`.
