@@ -52,4 +52,5 @@ jobs:
           python-version: "3.12"
       - run: pip install pytest
       - run: pnpm install --frozen-lockfile
-      - run: python -m pytest rl/tests/test_client.py -q
+      - run: python -m pytest tests/test_client.py -q
+        working-directory: rl
