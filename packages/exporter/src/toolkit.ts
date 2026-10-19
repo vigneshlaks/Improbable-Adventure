@@ -1,4 +1,5 @@
 import type { StructureKind } from "@pda/engine";
+import { CATALOG, type CatalogEntry } from "./catalog";
 
 export type Language = "typescript" | "python";
 
@@ -20,23 +21,12 @@ interface Layout {
   testName: (name: string) => string;
 }
 
-/** The structures that have reference code and tests in the templates. Others the player used are in the field report but have no code yet. */
-const STRUCTURES: Partial<Record<StructureKind, { typescript: string; python: string; needs: string[] }>> = {
-  exactMemory: { typescript: "exactMemory", python: "exact_memory", needs: [] },
-  reservoirSampling: { typescript: "reservoirSampling", python: "reservoir_sampling", needs: [] },
-  bloomFilter: { typescript: "bloomFilter", python: "bloom_filter", needs: [] },
-  countMinSketch: { typescript: "countMinSketch", python: "count_min_sketch", needs: [] },
-  linearCounting: { typescript: "linearCounting", python: "linear_counting", needs: [] },
-  logLog: { typescript: "logLog", python: "log_log", needs: ["registers"] },
-  hyperLogLog: { typescript: "hyperLogLog", python: "hyper_log_log", needs: ["registers"] },
-};
-
 /** Whether a structure has templates, and so reference code, tests and a sizing function. */
-export const hasTemplate = (kind: StructureKind): boolean => kind in STRUCTURES;
+export const hasTemplate = (kind: StructureKind): boolean => kind in CATALOG;
 
 function layoutFor(language: Language): Layout {
   const structures: Layout["structures"] = {};
-  for (const kind of Object.keys(STRUCTURES) as StructureKind[]) structures[kind] = { name: (STRUCTURES[kind] as { typescript: string; python: string }) [language], needs: STRUCTURES[kind]?.needs ?? [] };
+  for (const kind of Object.keys(CATALOG) as StructureKind[]) structures[kind] = { name: (CATALOG[kind] as CatalogEntry)[language], needs: CATALOG[kind]?.needs ?? [] };
   if (language === "typescript") {
     return { structures, extension: "ts", sourceDir: "src", testDir: "tests", testName: (name) => `${name}.test.ts`, always: ["package.json", "sizing.ts", "src/hash.ts", "tests/helpers.ts", "tests/hash.test.ts", "tests/sizing.test.ts"] };
   }

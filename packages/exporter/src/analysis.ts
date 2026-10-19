@@ -1,5 +1,6 @@
 import { createRun, STRUCTURE_KINDS, stepRun, type GameEvent, type Replay, type RunState, type StreamTraits, type StructureKind } from "@pda/engine";
-import { sizeBloom, sizeCountMin, sizeExact, sizeHyperLogLog, sizeLinearCounting, sizeLogLog, sizeReservoir, type SizingConstants, type Workload } from "./sizing";
+import { CATALOG } from "./catalog";
+import type { SizingConstants, Workload } from "./sizing";
 
 /** What one strike showed, in words the field report can use. */
 export interface StrikeNote {
@@ -132,27 +133,9 @@ export interface ProfileEntry {
   spaceRatio: number;
 }
 
-/** The Space production-grade sizing needs for a workload at the default error (its own error and memory are ignored). */
+/** The Space production-grade sizing needs for a workload at the default error (its own error and memory are ignored); null when there is no rule. */
 export function productionBits(kind: StructureKind, { items, distinct }: Pick<Workload, "items" | "distinct">, constants: SizingConstants): number | null {
-  const workload: Workload = { items, distinct };
-  switch (kind) {
-    case "bloomFilter":
-      return sizeBloom(workload, constants).memoryBits;
-    case "countMinSketch":
-      return sizeCountMin(workload, constants).memoryBits;
-    case "hyperLogLog":
-      return sizeHyperLogLog(workload, constants).memoryBits;
-    case "logLog":
-      return sizeLogLog(workload, constants).memoryBits;
-    case "linearCounting":
-      return sizeLinearCounting(workload, constants).memoryBits;
-    case "reservoirSampling":
-      return sizeReservoir(workload, constants).memoryBits;
-    case "exactMemory":
-      return sizeExact(workload, constants).memoryBits;
-    default:
-      return null; // no production sizing rule for this structure yet
-  }
+  return CATALOG[kind]?.production({ items, distinct }, constants) ?? null;
 }
 
 /**
