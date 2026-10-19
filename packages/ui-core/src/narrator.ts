@@ -151,7 +151,7 @@ export function narrateRunStep(events: ReadonlyArray<GameEvent | RunEvent>, opti
   );
 }
 
-const TRAIT_NAMES = ["variety", "skew", "churn", "growth", "drift", "likeness"] as const;
+const TRAIT_NAMES = ["variety", "skew", "churn", "growth", "drift", "likeness", "cunning"] as const;
 const title = (word: string) => word.charAt(0).toUpperCase() + word.slice(1);
 
 /** Introduces an enemy and describes each trait that is above Low. */

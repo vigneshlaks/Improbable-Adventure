@@ -35,6 +35,7 @@ const CONFIG: FightConfig = {
     likeMaxSet: 1000,
     likeRealMin: 0.66,
     likeRealMax: 0.95,
+    cunningSearch: 2000,
     expectedTurns: 5,
     turnLimitPenalty: 20,
     changesPerSlot: 2,
@@ -46,7 +47,7 @@ const CONFIG: FightConfig = {
     hp: 20,
     attack: 3,
     turnLimit: 4,
-    traits: { variety: "low", skew: "high", churn: "low", growth: "low", drift: "low", likeness: "low" },
+    traits: { variety: "low", skew: "high", churn: "low", growth: "low", drift: "low", likeness: "low", cunning: "low" },
     weakPoints: ["frequency"],
   },
   traitTables: {
@@ -60,6 +61,7 @@ const CONFIG: FightConfig = {
       high: { fraction: 0.5, everyTurns: 3 },
     },
     likeness: { low: { min: 0.05, max: 0.3 }, medium: { min: 0.35, max: 0.5 }, high: { min: 0.5, max: 0.58 } },
+    cunning: { low: { events: 0, decoys: 0 }, medium: { events: 0.05, decoys: 0.5 }, high: { events: 0.15, decoys: 1 } },
   },
 };
 
@@ -531,5 +533,84 @@ describe("determinism and purity", () => {
       const result = step(createFight("reward", CONFIG), endDeploy);
       expect(typeof result.reward).toBe("number");
     }
+  });
+});
+
+describe("a Cunning enemy in a fight", () => {
+  const cunning = (level: "low" | "high", weakPoint: "presence" | "count", extra: Partial<FightConfig> = {}): FightConfig => ({
+    ...CONFIG,
+    loadout: ["logLog", "bloomFilter", "exactMemory"],
+    enemy: { ...CONFIG.enemy, size: 1020, turnLimit: 12, traits: { ...CONFIG.enemy.traits, skew: "low", cunning: level }, weakPoints: [weakPoint] },
+    ...extra,
+  });
+  const deployLogLog: Action = { type: "deploy", slot: 0, kind: "logLog", spaceBits: 1024 };
+  const deployBloom: Action = { type: "deploy", slot: 0, kind: "bloomFilter", spaceBits: 2048 };
+  const burstEvents = (events: GameEvent[]) => events.filter((e) => e.type === "burstIngested").map((e) => (e as { events: number }).events);
+  const countEstimate = (state: FightState) => observe(state).structures[0]?.answer?.estimate as number;
+
+  it("adds crafted events to the burst (CUNNING share of it) that inflate an open LogLog many times over and do little to a Seeded one, advances its search each turn, keeps the fight reproducible and JSON-safe, and does nothing when it is not Cunning", () => {
+    const play = (config: FightConfig) => run(createFight("cunning-fight", config), [deployLogLog, endDeploy, endDeploy]);
+    const calm = play(cunning("low", "count"));
+    const open = play(cunning("high", "count"));
+    const secret = play(cunning("high", "count", { enchantments: { logLog: "seeded" } }));
+
+    // no extra events, no search, when it is not Cunning
+    expect(calm.state.cunningCursor).toBe(0);
+    // 15 percent more events in each burst (the burst itself is the same), and the search moves on by two stretches a turn
+    const base = burstEvents(calm.events);
+    expect(base).toHaveLength(2);
+    expect(burstEvents(open.events)).toEqual(base.map((n) => n + Math.round(0.15 * n)));
+    expect(burstEvents(secret.events)).toEqual(burstEvents(open.events)); // the enemy adds as many events whether or not they work
+    expect(open.state.cunningCursor).toBe(2 * 2 * 2000);
+
+    // the crafted events are in the truth, and are new values
+    const truth = (r: { state: FightState }) => groundTruth(r.state).distinct;
+    expect(truth(open) - truth(calm)).toBeGreaterThan(0);
+    expect(truth(open) - truth(calm)).toBeLessThanOrEqual(Math.round(0.15 * base[0]!) + Math.round(0.15 * base[1]!));
+
+    // an open LogLog is inflated far past the truth; a Seeded one is read as it would be without the attack
+    expect(countEstimate(open.state)).toBeGreaterThan(5 * truth(open));
+    expect(countEstimate(secret.state)).toBeLessThan(1.8 * truth(secret));
+    expect(countEstimate(calm.state)).toBeLessThan(1.8 * truth(calm));
+
+    // reproducible and JSON-safe
+    expect(play(cunning("high", "count")).state).toEqual(open.state);
+    expect(JSON.parse(JSON.stringify(open.state))).toEqual(open.state);
+  });
+
+  it("aims at the heaviest value of a Count-Min Sketch, whose estimate rises far above the truth when open and not when Seeded", () => {
+    const deployCms0: Action = { type: "deploy", slot: 0, kind: "countMinSketch", spaceBits: 4096 };
+    const play = (config: FightConfig) => run(createFight("cunning-cms", { ...config, loadout: ["countMinSketch", "exactMemory"], enemy: { ...config.enemy, size: 1020, turnLimit: 12, weakPoints: ["frequency"], traits: { ...config.enemy.traits, skew: "high", cunning: config.enemy.traits.cunning } } }), [deployCms0, endDeploy, endDeploy]).state;
+    const overshoot = (state: FightState) => {
+      const challenge = observe(state).challenge;
+      if (challenge?.kind !== "frequency") throw new Error("expected a frequency challenge");
+      return (observe(state).structures[0]?.answer?.estimate as number) - (groundTruth(state).frequency?.count ?? 0);
+    };
+    const open = overshoot(play(cunning("high", "count")));
+    const secret = overshoot(play(cunning("high", "count", { enchantments: { countMinSketch: "seeded" } })));
+    const calm = overshoot(play(cunning("low", "count")));
+    expect(open).toBeGreaterThan(2 * Math.max(secret, calm, 1));
+    expect(open).toBeGreaterThan(10);
+  });
+
+  it("offers Presence decoys that an open Bloom Filter flags and a Seeded one does not", () => {
+    const decoysFlagged = (config: FightConfig) => {
+      let state = createFight("cunning-presence", config);
+      state = run(state, [deployBloom, endDeploy, endDeploy]).state; // turn 2: the Presence challenge
+      const view = observe(state);
+      if (view.challenge?.kind !== "presence") throw new Error("expected a presence challenge");
+      const real = groundTruth(state).answer;
+      if (real?.kind !== "presence") throw new Error("expected a presence answer");
+      const flagged = new Set(view.structures[0]?.answer?.estimate as number[]);
+      const decoys = view.challenge.targets.filter((_, i) => !real.real[i]);
+      return { decoys: decoys.length, flagged: decoys.filter((t) => flagged.has(t)).length };
+    };
+    const open = decoysFlagged(cunning("high", "presence"));
+    const secret = decoysFlagged(cunning("high", "presence", { enchantments: { bloomFilter: "seeded" } }));
+    const calm = decoysFlagged(cunning("low", "presence"));
+    expect(open.flagged).toBe(open.decoys); // decoyShare 1: every decoy is a false positive of the filter
+    expect(open.decoys).toBeGreaterThan(3);
+    expect(secret.flagged).toBeLessThan(open.flagged / 2);
+    expect(calm.flagged).toBeLessThan(open.flagged / 2);
   });
 });

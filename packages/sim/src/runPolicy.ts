@@ -27,6 +27,7 @@ const TASTE = [
   "structure:tDigest",
   "structure:kllSketch",
   "enchantment:steady",
+  "enchantment:seeded",
   "upgrade:power",
   "upgrade:resolve",
   "upgrade:recovery",
@@ -48,6 +49,11 @@ export const sensiblePolicy: RunPolicy = {
     // HyperLogLog first; then a Top-K Tracker, which the bots' Frequency taste uses on skewed streams.
     const fuse = actions.find((a) => a.type === "fuse" && a.recipeId === "hyperLogLog") ?? actions.find((a) => a.type === "fuse" && a.recipeId === "topKTracker");
     if (fuse) return fuse;
+    // Seeded goes on the structure a Cunning enemy can hurt most, among those that are free to take it.
+    for (const kind of ["bloomFilter", "hyperLogLog", "logLog", "countMinSketch"]) {
+      const seeded = actions.find((a) => a.type === "enchant" && a.enchantmentId === "seeded" && a.kind === kind);
+      if (seeded) return seeded;
+    }
     const steadyLogLog = actions.find((a) => a.type === "enchant" && a.enchantmentId === "steady" && a.kind === "logLog");
     return steadyLogLog ?? { type: "leaveRest" };
   },

@@ -105,7 +105,7 @@ describe("narrateEvent", () => {
 });
 
 describe("describeEnemy", () => {
-  const calm = { variety: "low", skew: "low", churn: "low", growth: "low", drift: "low", likeness: "low" } as const;
+  const calm = { variety: "low", skew: "low", churn: "low", growth: "low", drift: "low", likeness: "low", cunning: "low" } as const;
 
   it("introduces the tier and says a plain stream looks plain; describes only the traits above Low, with their level", () => {
     // introduces the tier and says a plain stream looks plain
@@ -135,7 +135,7 @@ describe("renderStatus", () => {
           spaceFree: 4096,
           slotsFree: 2,
           weakPoint: "frequency",
-          traits: { variety: "low", skew: "high", churn: "low", growth: "medium", drift: "low", likeness: "low" },
+          traits: { variety: "low", skew: "high", churn: "low", growth: "medium", drift: "low", likeness: "low", cunning: "low" },
           structures: [view(0, "countMinSketch", null, 4096)],
         }),
       ).join("\n");

@@ -28,6 +28,7 @@ describe("buildFightConfig", () => {
         likeMaxSet: balance.LIKE_MAX_SET,
         likeRealMin: balance.LIKE_REAL_BAND.min,
         likeRealMax: balance.LIKE_REAL_BAND.max,
+        cunningSearch: balance.CUNNING_SEARCH,
         expectedTurns: balance.EXPECTED_TURNS,
         turnLimitPenalty: balance.TURN_LIMIT_PENALTY,
         changesPerSlot: balance.DEPLOY_CHANGES_PER_SLOT,

@@ -2,7 +2,7 @@ import { observeRun, STRUCTURE_KINDS, type Observation, type RunObservation, typ
 import { SLOT_FEATURES, type Layout } from "./layout";
 
 const LEVEL: Record<TraitLevel, number> = { low: 0, medium: 0.5, high: 1 };
-const TRAITS = ["variety", "skew", "churn", "growth", "drift", "likeness"] as const;
+const TRAITS = ["variety", "skew", "churn", "growth", "drift", "likeness", "cunning"] as const;
 const WEAK_POINTS = ["presence", "frequency", "count", "rank", "likeness"] as const;
 const TIERS = ["minion", "elite", "boss"] as const;
 const PHASES = ["fight", "reward", "rest"] as const;

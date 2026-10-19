@@ -15,6 +15,8 @@ export interface StreamTraits {
   drift: TraitLevel;
   /** How close the decoy copies of a Likeness challenge are to the threshold. It does not shape the stream. */
   likeness: TraitLevel;
+  /** How much of the enemy's play is crafted against the player's unseeded structures. It does not shape the random stream. */
+  cunning: TraitLevel;
 }
 
 export interface DriftParams {
@@ -33,6 +35,8 @@ export interface TraitTables {
   drift: Record<TraitLevel, DriftParams>;
   /** The range of Jaccard similarity a decoy copy is made with. */
   likeness: Record<TraitLevel, { min: number; max: number }>;
+  /** What a Cunning enemy crafts: the share of a burst's events (added to it), and the share of Presence decoys. */
+  cunning: Record<TraitLevel, { events: number; decoys: number }>;
 }
 
 /** An enemy's stream, fully described by numbers. */

@@ -33,6 +33,7 @@ export function fightRules(tuning: Balance = balance): FightRules {
     likeMaxSet: tuning.LIKE_MAX_SET,
     likeRealMin: tuning.LIKE_REAL_BAND.min,
     likeRealMax: tuning.LIKE_REAL_BAND.max,
+    cunningSearch: tuning.CUNNING_SEARCH,
     expectedTurns: tuning.EXPECTED_TURNS,
     turnLimitPenalty: tuning.TURN_LIMIT_PENALTY,
     changesPerSlot: tuning.DEPLOY_CHANGES_PER_SLOT,

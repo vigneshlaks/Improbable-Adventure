@@ -127,6 +127,33 @@ describe("issueChallenge: Presence", () => {
   });
 });
 
+describe("issueChallenge: Presence with a Cunning enemy's decoys", () => {
+  const live = liveWith(Object.fromEntries(Array.from({ length: 40 }, (_, i) => [i + 1, 2])));
+  const crafted = Array.from({ length: 12 }, (_, i) => 5_000_000 + i);
+  const used = (share: number, seed: string) => {
+    const challenge = issueChallenge("presence", live, Rng.fromSeed(seed), { ...CTX, cunning: { decoyShare: share, decoys: crafted } });
+    if (challenge?.kind !== "presence") throw new Error("expected a presence challenge");
+    const decoys = challenge.targets.filter((t) => live.count(t) === 0);
+    return { crafted: decoys.filter((t) => crafted.includes(t)).length, decoys: decoys.length };
+  };
+
+  it("uses crafted values for the share of decoys it is given: none at 0, all at 1, about half at a half, never twice", () => {
+    let half = 0;
+    let halfDecoys = 0;
+    for (let i = 0; i < 60; i++) {
+      expect(used(0, `none-${i}`).crafted).toBe(0);
+      const all = used(1, `all-${i}`);
+      expect(all.crafted).toBe(all.decoys);
+      const mid = used(0.5, `half-${i}`);
+      half += mid.crafted;
+      halfDecoys += mid.decoys;
+    }
+    expect(half / halfDecoys).toBeGreaterThan(0.4);
+    expect(half / halfDecoys).toBeLessThan(0.6);
+    expect(issueChallenge("presence", live, Rng.fromSeed("a"), { ...CTX, cunning: { decoyShare: 1, decoys: [] } })).toMatchObject({ kind: "presence" }); // nothing crafted: ordinary decoys
+  });
+});
+
 describe("trueAnswer", () => {
   it("reports which presence targets are real, the true frequency count, and the distinct count", () => {
     const live = liveWith({ 10: 3, 20: 9 }, [99]);

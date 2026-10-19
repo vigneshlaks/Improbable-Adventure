@@ -23,8 +23,9 @@ const TABLES: TraitTables = {
     high: { fraction: 0.5, everyTurns: 3 },
   },
   likeness: { low: { min: 0.05, max: 0.3 }, medium: { min: 0.35, max: 0.5 }, high: { min: 0.5, max: 0.58 } },
+  cunning: { low: { events: 0, decoys: 0 }, medium: { events: 0.05, decoys: 0.5 }, high: { events: 0.15, decoys: 1 } },
 };
-const LOW: StreamTraits = { variety: "low", skew: "low", churn: "low", growth: "low", drift: "low", likeness: "low" };
+const LOW: StreamTraits = { variety: "low", skew: "low", churn: "low", growth: "low", drift: "low", likeness: "low", cunning: "low" };
 const params = (traits: Partial<StreamTraits> = {}, size = 1000): StreamParams =>
   resolveStreamParams(size, { ...LOW, ...traits }, TABLES, 5);
 

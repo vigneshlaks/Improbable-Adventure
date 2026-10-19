@@ -29,7 +29,7 @@ describe("traits.json", () => {
 });
 
 describe("weakPointWeights", () => {
-  const calm = { variety: "low", skew: "low", churn: "low", growth: "low", drift: "low", likeness: "low" } as const;
+  const calm = { variety: "low", skew: "low", churn: "low", growth: "low", drift: "low", likeness: "low", cunning: "low" } as const;
 
   it("gives every weak point its base weight when no trait hints at one; adds a trait's hint to the weak point it points at", () => {
     // gives every weak point its base weight when no trait hints at one
@@ -39,6 +39,7 @@ describe("weakPointWeights", () => {
     // adds a trait's hint to the weak point it points at
     {
       expect(weakPointWeights({ ...calm, skew: "high" })).toEqual({ presence: 1, frequency: 4, count: 1, rank: traits.rankWeight, likeness: traits.likenessWeight });
+      expect(weakPointWeights({ ...calm, likeness: "high", variety: "medium" }).likeness).toBe(0); // its copies would be too large to show
       expect(weakPointWeights({ ...calm, likeness: "high" }).likeness).toBe(traits.likenessWeight + 1); // the Likeness trait draws Likeness enemies
       expect(weakPointWeights({ ...calm, variety: "high", churn: "medium" })).toEqual({ presence: 2, frequency: 1, count: 4, rank: traits.rankWeight, likeness: traits.likenessWeight });
     }

@@ -91,6 +91,15 @@ export class HyperLogLog implements Structure {
     return empty;
   }
 
+  /** The register a value goes to and the rank it would leave there, with what the register holds now: what an enemy that knows the hashes can read. */
+  probe(value: number): { register: number; rank: number; held: number } {
+    const h = murmur3U32(value, this.seed);
+    const idx = h >>> (32 - this.b);
+    const rest = (h << this.b) >>> 0;
+    const rank = Math.min(this.maxRank, rest === 0 ? 33 - this.b : Math.clz32(rest) + 1);
+    return { register: idx, rank, held: this.registers[idx] ?? 0 };
+  }
+
   ingest(event: StreamEvent): void {
     if (event.op === "delete") {
       this.deleteCount++; // it cannot undo a register, but it can count the departure

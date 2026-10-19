@@ -15,7 +15,7 @@ const templates = loadTemplates("typescript");
 
 describe("analysis", () => {
   it("replays a run into its fights, strikes and deployments, and a tradeoff profile in terms of production sizing", () => {
-    for (const name of ["oracle-1-won", "greedy-15-won", "prober-15-won", "cautious-1-lost", "random-1-lost"]) {
+    for (const name of ["oracle-1-won", "greedy-3-won", "prober-3-won", "cautious-1-lost", "random-1-lost"]) {
       const run = replay(name);
       const analysis = analyzeRun(run);
       expect(analysis.won).toBe(run.claimed.won);
@@ -38,7 +38,7 @@ describe("analysis", () => {
       }
     }
     // A Bloom Filter given exactly what production sizing asks for has a ratio of 1.
-    const analysis = analyzeRun(replay("greedy-15-won"));
+    const analysis = analyzeRun(replay("greedy-3-won"));
     const exact = { ...analysis, deploys: [{ fight: 1, kind: "bloomFilter" as const, spaceBits: sizeBloom({ items: 5000, distinct: 5000 }, constants).bits, streamSize: 5000 }] };
     expect(tradeoffProfile(exact, constants)[0]?.spaceRatio).toBeCloseTo(1, 9);
     const double = { ...exact, deploys: [{ ...exact.deploys[0]!, spaceBits: (exact.deploys[0]?.spaceBits ?? 0) * 2 }, { ...exact.deploys[0]!, spaceBits: exact.deploys[0]?.spaceBits ?? 0 }] };
@@ -72,7 +72,7 @@ describe("strike notes", () => {
 
 describe("toolkit export", () => {
   it("writes the three documents from the run and the workload, and says what it could not size", () => {
-    const files = buildToolkit({ language: "typescript", replay: replay("prober-15-won"), workload: { items: 1_000_000, distinct: 50_000, error: 0.01 }, templates, constants });
+    const files = buildToolkit({ language: "typescript", replay: replay("prober-3-won"), workload: { items: 1_000_000, distinct: 50_000, error: 0.01 }, templates, constants });
     expect(Object.keys(files)).toEqual(expect.arrayContaining(["README.md", "SIZING.md", "FIELD_REPORT.md", "sizing.ts", "src/hash.ts", "tests/vectors.json"]));
     // A structure a fusion used up was still part of the run, so its code is in the toolkit and its fights are in the report.
     expect(files).toHaveProperty(["src/linearCounting.ts"]);
@@ -91,7 +91,7 @@ describe("toolkit export", () => {
     expect(files["README.md"]).toContain("node --test");
 
     // A blank workload: defaults are stated, and a structure that needs a number it was not given says so instead of guessing.
-    const blank = buildToolkit({ language: "python", replay: replay("prober-15-won"), workload: {}, templates: loadTemplates("python"), constants })["SIZING.md"] as string;
+    const blank = buildToolkit({ language: "python", replay: replay("prober-3-won"), workload: {}, templates: loadTemplates("python"), constants })["SIZING.md"] as string;
     expect(blank).toMatch(/Needs the item count/);
     expect(blank).toMatch(/default of 1%/);
 
@@ -101,7 +101,7 @@ describe("toolkit export", () => {
   });
 
   it("packs a toolkit into a zip under toolkit/ that reads back identically and is the same bytes every time", async () => {
-    const files = buildToolkit({ language: "python", replay: replay("greedy-15-won"), workload: { items: 10000 }, templates: loadTemplates("python"), constants });
+    const files = buildToolkit({ language: "python", replay: replay("greedy-3-won"), workload: { items: 10000 }, templates: loadTemplates("python"), constants });
     const first = await toolkitZip(files);
     // Build the second one only after the clock has moved on: a zip that stamps entries with the time of day (as JSZip does for the
     // folders it makes up) differs across a second boundary, which made this test fail now and then.

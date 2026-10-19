@@ -27,6 +27,8 @@ export interface FightRules extends DamageRules {
   /** The similarity a real copy is made with is drawn between these. */
   likeRealMin: number;
   likeRealMax: number;
+  /** How many candidate values a Cunning enemy looks through each turn when it searches for values that hurt the player's structures. */
+  cunningSearch: number;
   /** Bursts are sized so the stream totals the enemy's Size over this many turns. */
   expectedTurns: number;
   /** Certainty lost when the fight reaches its turn limit. */
@@ -100,6 +102,8 @@ export interface FightState {
   weakPoint: WeakPoint | null;
   /** Deploys and removals made so far this turn; back to zero when the next turn begins. */
   changes: number;
+  /** Candidate values a Cunning enemy has already looked through, so each turn it looks through new ones. */
+  cunningCursor: number;
 }
 
 export type Action =

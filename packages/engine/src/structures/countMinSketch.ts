@@ -104,6 +104,12 @@ export class CountMinSketch implements Structure {
     return out;
   }
 
+  /** The counter each row holds for a value (their indices, one per row) and what those counters hold: what an enemy that knows the hashes can read. */
+  probe(value: number): { slots: number[]; counters: number[] } {
+    const slots = this.slots(value);
+    return { slots, counters: slots.map((slot) => this.counters[slot] ?? 0) };
+  }
+
   estimate(value: number): number {
     let best = this.counterMax;
     for (const slot of this.slots(value)) best = Math.min(best, this.counters[slot] ?? 0);

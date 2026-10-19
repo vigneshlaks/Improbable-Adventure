@@ -11,7 +11,7 @@
       "hyperLogLog"
     ],
     "transforms": {},
-    "reward": false
+    "reward": true
   },
   "steady": {
     "name": "Steady",

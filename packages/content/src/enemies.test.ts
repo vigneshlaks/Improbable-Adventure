@@ -111,3 +111,24 @@ describe("Rank enemies", () => {
     expect([...seen].sort()).toEqual([...balance.RANK_QUANTILES.boss].sort()); // every quantile of the list is used
   });
 });
+
+describe("Likeness and Cunning enemies", () => {
+  it("draw the Cunning and Likeness traits like any other, and give Likeness as a weak point only to a Low Variety enemy", () => {
+    const levels = { cunning: new Set<string>(), likeness: new Set<string>() };
+    let likenessEnemies = 0;
+    for (const tier of TIERS) {
+      for (let i = 0; i < 200; i++) {
+        const enemy = generateEnemy(`cl-${i}`, tier);
+        levels.cunning.add(enemy.traits.cunning);
+        levels.likeness.add(enemy.traits.likeness);
+        if (enemy.weakPoints.includes("likeness")) {
+          likenessEnemies++;
+          expect(enemy.traits.variety).toBe("low");
+        }
+      }
+    }
+    expect([...levels.cunning].sort()).toEqual(["high", "low", "medium"]);
+    expect([...levels.likeness].sort()).toEqual(["high", "low", "medium"]);
+    expect(likenessEnemies).toBeGreaterThan(5);
+  });
+});

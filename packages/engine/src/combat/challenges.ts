@@ -26,6 +26,8 @@ export interface ChallengeContext {
   /** The quantile of live values a Rank challenge asks about: the enemy's own. */
   rankQuantile: number;
   likeness: LikenessSettings;
+  /** A Cunning enemy's crafted Presence decoys (values a deployed filter wrongly flags) and the share of decoys it uses them for. */
+  cunning?: { decoyShare: number; decoys: readonly number[] };
 }
 
 /** What the player commits: a subset of Presence targets by position, or a number (a force or an estimate). */
@@ -72,9 +74,13 @@ function issuePresence(live: LiveSet, rng: Rng, context: ChallengeContext): Chal
 
   const ghostPool = live.ghosts();
   const decoys = new Set<number>();
+  const crafted = [...(context.cunning?.decoys ?? [])];
+  const share = context.cunning?.decoyShare ?? 0;
   let attempts = 0;
   while (real.length + decoys.size < total) {
-    if (ghostPool.length > 0 && rng.float() < 0.5) {
+    if (crafted.length > 0 && share > 0 && rng.float() < share) {
+      decoys.add(crafted.shift() as number);
+    } else if (ghostPool.length > 0 && rng.float() < 0.5) {
       const index = rng.int(ghostPool.length);
       decoys.add(ghostPool[index] as number);
       ghostPool[index] = ghostPool[ghostPool.length - 1] as number;

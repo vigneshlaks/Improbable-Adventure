@@ -20,6 +20,7 @@ export const traitsSchema = z
         growth: perLevel(z.number().min(1)),
         drift: perLevel(z.object({ fraction: z.number().min(0).max(1), everyTurns: z.number().int().min(0) }).strict()),
         likeness: perLevel(z.object({ min: z.number().min(0).max(1), max: z.number().min(0).max(1) }).strict()),
+        cunning: perLevel(z.object({ events: z.number().min(0).max(1), decoys: z.number().min(0).max(1) }).strict()),
       })
       .strict(),
     /** Every weak point starts with this weight when an enemy picks one. */
@@ -30,7 +31,7 @@ export const traitsSchema = z
     likenessWeight: z.number().nonnegative(),
     /** Traits nudge the choice: certain trait levels make certain weak points likelier. */
     weakPointHints: z
-      .object({ variety: traitHints, skew: traitHints, churn: traitHints, growth: traitHints, drift: traitHints, likeness: traitHints })
+      .object({ variety: traitHints, skew: traitHints, churn: traitHints, growth: traitHints, drift: traitHints, likeness: traitHints, cunning: traitHints })
       .strict(),
   })
   .strict();
@@ -48,7 +49,7 @@ export const traits: Traits = parseTraits(traitsJson);
 export const traitTables: TraitTables = traits.levels;
 
 const WEAK_POINTS: WeakPoint[] = ["presence", "frequency", "count", "rank", "likeness"];
-const TRAIT_NAMES = ["variety", "skew", "churn", "growth", "drift", "likeness"] as const;
+const TRAIT_NAMES = ["variety", "skew", "churn", "growth", "drift", "likeness", "cunning"] as const;
 
 /** How likely each weak point is for an enemy with these trait levels: a base weight plus the traits' hints. */
 export function weakPointWeights(levels: StreamTraits, source: Traits = traits): Record<WeakPoint, number> {
@@ -61,5 +62,8 @@ export function weakPointWeights(levels: StreamTraits, source: Traits = traits):
       weights[point] += source.weakPointHints[trait][level]?.[point] ?? 0;
     }
   }
+  // A Likeness challenge shows copies as large as the live set, which the game only allows for a small one (LIKE_MAX_SET). Only a Low
+  // Variety stream (256 values) is always small enough, so only such an enemy can have Likeness as a weak point.
+  if (levels.variety !== "low") weights.likeness = 0;
   return weights;
 }

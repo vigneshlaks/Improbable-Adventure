@@ -50,10 +50,10 @@ describe("fusions.json", () => {
 });
 
 describe("enchantments.json", () => {
-  it("has Seeded, which fits every structure that hashes, and is not yet offered as a reward; has Steady, which fits Count-Min and LogLog, turns them into their named variants, and is offered as a reward; rejects an enchantment that fits nothing, lists a structure twice, transforms one it does not fit, or has no summary; and 1 more", () => {
-    // has Seeded, which fits every structure that hashes, and is not yet offered as a reward
+  it("has Seeded, which fits every structure that hashes, and is offered as a reward now that a Cunning enemy exists; has Steady, which fits Count-Min and LogLog, turns them into their named variants, and is offered as a reward; rejects an enchantment that fits nothing, lists a structure twice, transforms one it does not fit, or has no summary; and 1 more", () => {
+    // has Seeded, which fits every structure that hashes, and is offered as a reward
     {
-      expect(enchantments.seeded).toMatchObject({ name: "Seeded", valid: ["bloomFilter", "countMinSketch", "logLog", "linearCounting", "hyperLogLog"], reward: false });
+      expect(enchantments.seeded).toMatchObject({ name: "Seeded", valid: ["bloomFilter", "countMinSketch", "logLog", "linearCounting", "hyperLogLog"], reward: true });
       expect(enchantments.seeded?.valid).not.toContain("exactMemory"); // nothing is hashed there
     }
     // has Steady, which fits Count-Min and LogLog, turns them into their named variants, and is offered as a reward
@@ -136,15 +136,16 @@ describe("buildRunConfig", () => {
         { id: "fading", valid: [...(enchantments.fading?.valid ?? [])] },
         { id: "light", valid: [...(enchantments.light?.valid ?? [])] },
       ]);
-      // Steady and Fading are offered; Seeded is not (it only matters against an enemy that does not exist yet).
+      // Seeded, Steady, Fading and Light are offered; one marked as no reward is not.
       expect(config.rewards.filter((r) => r.kind === "enchantment")).toEqual([
         { id: "enchantment:fading", kind: "enchantment", enchantment: "fading", weight: balance.REWARD_WEIGHTS.enchantment },
         { id: "enchantment:light", kind: "enchantment", enchantment: "light", weight: balance.REWARD_WEIGHTS.enchantment },
+        { id: "enchantment:seeded", kind: "enchantment", enchantment: "seeded", weight: balance.REWARD_WEIGHTS.enchantment },
         { id: "enchantment:steady", kind: "enchantment", enchantment: "steady", weight: balance.REWARD_WEIGHTS.enchantment },
       ]);
-      const offered = { ...enchantments, seeded: { ...enchantments.seeded!, reward: true } };
-      const withIt = buildRunConfig({ seed: "run-1", enchantmentData: offered });
-      expect(withIt.rewards.filter((r) => r.kind === "enchantment").map((r) => r.id)).toEqual(["enchantment:fading", "enchantment:light", "enchantment:seeded", "enchantment:steady"]);
+      const hidden = { ...enchantments, seeded: { ...enchantments.seeded!, reward: false } };
+      const without = buildRunConfig({ seed: "run-1", enchantmentData: hidden });
+      expect(without.rewards.filter((r) => r.kind === "enchantment").map((r) => r.id)).toEqual(["enchantment:fading", "enchantment:light", "enchantment:steady"]);
     }
     // passes the recipes on, by id
     {

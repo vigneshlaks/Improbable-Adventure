@@ -19,7 +19,7 @@ import type { Bot, BotView } from "./bots/types";
 import { makeView, playFight, type FightRecord } from "./runner";
 import { minion } from "./testUtils";
 
-const CALM: StreamTraits = { variety: "low", skew: "low", churn: "low", growth: "low", drift: "low", likeness: "low" };
+const CALM: StreamTraits = { variety: "low", skew: "low", churn: "low", growth: "low", drift: "low", likeness: "low", cunning: "low" };
 const WEAK_POINTS: WeakPoint[] = ["presence", "frequency", "count"];
 
 /** A fight with chosen traits and loadout, with the weak point hidden as in a real fight. */
@@ -97,7 +97,7 @@ describe("the bots", () => {
 
 describe("choosing structures", () => {
   it("prefers HyperLogLog for Count when it is owned, whatever the stream's variety", () => {
-    const traits = { variety: "low", skew: "low", churn: "low", growth: "low", drift: "low", likeness: "low" } as const;
+    const traits = { variety: "low", skew: "low", churn: "low", growth: "low", drift: "low", likeness: "low", cunning: "low" } as const;
     expect(preferredKinds("count", traits)[0]).toBe("hyperLogLog");
     expect(preferredKinds("count", { ...traits, variety: "high" })[0]).toBe("hyperLogLog");
   });
@@ -140,7 +140,7 @@ describe("Greedy", () => {
       // A skewed stream has heavy values for a Top-K Tracker to follow; on a flat one the plain Count-Min is as good as anything.
       const skewed = fightWith({ skew: "high" });
       expect(firstAction(getBot("greedy"), skewed.state, skewed.config)).toMatchObject({ type: "deploy", kind: "topKTracker" });
-      const traitsOf = (skew: "low" | "medium" | "high") => ({ variety: "low", skew, churn: "low", growth: "low", drift: "low", likeness: "low" }) as const;
+      const traitsOf = (skew: "low" | "medium" | "high") => ({ variety: "low", skew, churn: "low", growth: "low", drift: "low", likeness: "low", cunning: "low" }) as const;
       expect(preferredKinds("frequency", traitsOf("low"))[0]).toBe("countMinSketch");
       expect(preferredKinds("frequency", traitsOf("medium"))[0]).toBe("topKTracker");
       expect(preferredKinds("frequency", traitsOf("high"))[0]).toBe("topKTracker");
@@ -160,7 +160,7 @@ describe("Greedy", () => {
       // Under Churn a Bloom Filter flags the deleted values too, so a Cuckoo Filter (which can forget them) comes first; on a calm stream the Bloom Filter does.
       const churning = fightWith({ churn: "high" });
       expect(firstAction(getBot("greedy"), churning.state, churning.config)).toMatchObject({ type: "deploy", kind: "cuckooFilter" });
-      const calmer = { variety: "low", skew: "low", churn: "low", growth: "low", drift: "low", likeness: "low" } as const;
+      const calmer = { variety: "low", skew: "low", churn: "low", growth: "low", drift: "low", likeness: "low", cunning: "low" } as const;
       expect(preferredKinds("presence", calmer)[0]).toBe("bloomFilter");
       expect(preferredKinds("presence", { ...calmer, churn: "medium" })[0]).toBe("cuckooFilter");
     }
@@ -292,7 +292,7 @@ describe("Rank for the bots", () => {
   const rankView = (answer: { estimate: number; low: number; high: number }): BotView => ({
     observation: {
       turn: 2, phase: "strike", certainty: 100, enemyHp: 20, spaceFree: 4096, slotsFree: 2, changesLeft: 6,
-      traits: { variety: "low", skew: "low", churn: "low", growth: "low", drift: "low", likeness: "low" },
+      traits: { variety: "low", skew: "low", churn: "low", growth: "low", drift: "low", likeness: "low", cunning: "low" },
       weakPoint: "rank",
       challenge: { kind: "rank", quantile: 0.9 },
       structures: [{ slot: 0, kind: "reservoirSampling", params: {}, spaceBits: 4096, answer: { ...answer, confidence: 0.95 } }],
@@ -305,7 +305,7 @@ describe("Rank for the bots", () => {
   it("strikes armor at the upper end of the range, because a value that ranks below the armor is blocked and an estimate is as likely to fall below it as above; takes the estimate when there is no upper end; prefers a t-digest, then a KLL sketch, for Rank; and the Oracle strikes the value that reaches it", () => {
     expect(strikeOnEstimate(rankView({ estimate: 5000, low: 4000, high: 6000.4 }))).toEqual({ type: "strikeValue", value: 6001 });
     expect(strikeOnEstimate(rankView({ estimate: 5000, low: 4000, high: Number.POSITIVE_INFINITY }))).toEqual({ type: "strikeValue", value: 5000 });
-    expect(preferredKinds("rank", { variety: "low", skew: "low", churn: "low", growth: "low", drift: "low", likeness: "low" }).slice(0, 2)).toEqual(["tDigest", "kllSketch"]);
+    expect(preferredKinds("rank", { variety: "low", skew: "low", churn: "low", growth: "low", drift: "low", likeness: "low", cunning: "low" }).slice(0, 2)).toEqual(["tDigest", "kllSketch"]);
 
     const oracle = getBot("oracle").create();
     const truth = { frequency: null, distinct: 0, answer: { kind: "rank" as const, quantile: 0.9, value: 4242 } };
@@ -317,7 +317,7 @@ describe("Likeness for the bots", () => {
   const likenessView = (): BotView => ({
     observation: {
       turn: 2, phase: "strike", certainty: 100, enemyHp: 20, spaceFree: 4096, slotsFree: 2, changesLeft: 6,
-      traits: { variety: "low", skew: "low", churn: "low", growth: "low", drift: "low", likeness: "medium" },
+      traits: { variety: "low", skew: "low", churn: "low", growth: "low", drift: "low", likeness: "medium", cunning: "low" },
       weakPoint: "likeness",
       challenge: { kind: "likeness", targets: [0, 1, 2, 3], copies: [[1], [2], [3], [4]], threshold: 0.6 },
       structures: [

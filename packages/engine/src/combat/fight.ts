@@ -1,4 +1,5 @@
 import { LiveSet } from "../enemies/liveSet";
+import { craftDecoys, craftInserts } from "../enemies/cunning";
 import { createStream, nextBurst, outsideValue, type StreamParams } from "../enemies/stream";
 import { Rng } from "../rng/rng";
 import { gradeStrike, issueChallenge, type ChallengeContext } from "./challenges";
@@ -61,6 +62,7 @@ export function createFight(seed: string, config: FightConfig): FightState {
     challenge: null,
     weakPoint: null,
     changes: 0,
+    cunningCursor: 0,
   };
 }
 
@@ -111,12 +113,13 @@ function finishTurn(state: FightState, events: GameEvent[], tally: Tally): void 
   events.push({ type: "turnStarted", turn: state.turn });
 }
 
-function challengeContext(state: FightState, params: StreamParams): ChallengeContext {
+function challengeContext(state: FightState, params: StreamParams, craftedDecoys: number[] = []): ChallengeContext {
   const range = Math.min(OUTSIDE_VALUE_RANGE, 2 ** 32 - params.universe);
   return {
     presenceTargets: state.config.rules.presenceTargets,
     drawOutsideValue: (rng) => outsideValue(params, state.seed, rng.int(range)),
     rankQuantile: state.config.enemy.rankQuantile ?? 0.5,
+    cunning: { decoyShare: cunningOf(state).decoys, decoys: craftedDecoys },
     likeness: {
       copies: state.config.rules.likeCopies,
       threshold: state.config.rules.likeThreshold,
@@ -130,11 +133,37 @@ function challengeContext(state: FightState, params: StreamParams): ChallengeCon
   };
 }
 
+/** What the enemy's Cunning trait makes it craft. */
+function cunningOf(state: FightState): { events: number; decoys: number } {
+  return state.config.traitTables.cunning[state.config.enemy.traits.cunning];
+}
+
+/** The Cunning enemy's search: the structures as they are now, the heaviest value, and the next stretch of candidate values. */
+function attackContext(state: FightState, params: StreamParams, coreValue: number | null, offset: number) {
+  return {
+    snapshots: state.slots,
+    constants: state.config.constants,
+    coreValue,
+    budget: state.config.rules.cunningSearch,
+    candidate: (index: number) => outsideValue(params, state.seed, state.cunningCursor + offset + index),
+  };
+}
+
 /** Ingest: the enemy emits a burst, every deployed structure sees it, and from turn 2 a challenge follows. */
 function endDeploy(state: FightState, events: GameEvent[], tally: Tally): void {
   const params = streamParamsOf(state.config);
   const live = liveSetOf(state);
+  const cunning = cunningOf(state);
+  const core = live.mode()?.value ?? null; // what a Frequency challenge will shield, as seen before the burst
   const burst = nextBurst(params, state.stream, live);
+  // A Cunning enemy adds events aimed at the structures that are deployed now, found with the public hash seed.
+  if (cunning.events > 0) {
+    const crafted = craftInserts(attackContext(state, params, core, 0), Math.round(cunning.events * burst.events.length));
+    for (const event of crafted) {
+      live.insert(event.value);
+      burst.events.push(event);
+    }
+  }
 
   // A structure only learns what streams while it is deployed.
   const structures = loadStructures(state);
@@ -146,13 +175,19 @@ function endDeploy(state: FightState, events: GameEvent[], tally: Tally): void {
   const deletes = burst.events.filter((event) => event.op === "delete").length;
   events.push({ type: "burstIngested", turn: state.turn, events: burst.events.length, inserts: burst.events.length - deletes, deletes });
 
+  // Each turn the search looks through new candidates: one stretch for the inserts and one for the decoys.
+  const spent = cunning.events > 0 || cunning.decoys > 0 ? 2 * state.config.rules.cunningSearch : 0;
+  if (state.turn < 2) state.cunningCursor += spent;
   if (state.turn >= 2) {
     const weakPoints = state.config.enemy.weakPoints;
     const weakPoint = weakPoints[(state.turn - 2) % weakPoints.length] as (typeof weakPoints)[number];
     const rng = Rng.fromState(state.challengeRng);
-    const challenge = issueChallenge(weakPoint, live, rng, challengeContext(state, params));
+    // For Presence, it offers values the player's filters wrongly flag (found in the structures as they are after this burst).
+    const decoys = weakPoint === "presence" && cunning.decoys > 0 ? craftDecoys(attackContext(state, params, core, state.config.rules.cunningSearch), state.config.rules.presenceTargets) : [];
+    const challenge = issueChallenge(weakPoint, live, rng, challengeContext(state, params, decoys));
     state.challengeRng = rng.getState();
 
+    state.cunningCursor += spent;
     if (challenge) {
       const firstReveal = state.weakPoint === null;
       state.weakPoint = weakPoint;

@@ -75,7 +75,7 @@ export const narrationSchema = z
         intro: z.object({ minion: z.string().min(1), elite: z.string().min(1), boss: z.string().min(1) }).strict(),
         calm: z.string().min(1),
         traits: z
-          .object({ variety: perLevel, skew: perLevel, churn: perLevel, growth: perLevel, drift: perLevel, likeness: perLevel })
+          .object({ variety: perLevel, skew: perLevel, churn: perLevel, growth: perLevel, drift: perLevel, likeness: perLevel, cunning: perLevel })
           .strict(),
       })
       .strict(),

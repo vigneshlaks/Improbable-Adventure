@@ -11,6 +11,7 @@ const play = (bot: string, seed: string, maxSteps?: number) =>
 
 const structure = (kind: "countMinSketch" | "logLog"): RewardView => ({ id: `structure:${kind}`, kind: "structure", structure: kind });
 const upgrade = (id: string): RewardView => ({ id: `upgrade:${id}`, kind: "upgrade", upgrade: id });
+const enchantmentOffer = (id: string): RewardView => ({ id: `enchantment:${id}`, kind: "enchantment", enchantment: id });
 
 describe("the run policies", () => {
   const rng = Rng.fromSeed("policy");
@@ -43,7 +44,14 @@ describe("the run policies", () => {
     {
       expect(sensiblePolicy.rest([attach("steady", "logLog"), fuse, leave], rng)).toEqual(fuse);
       expect(sensiblePolicy.rest([attach("steady", "logLog"), leave], rng)).toEqual(attach("steady", "logLog")); // nothing to fuse: it is the best use
-      expect(sensiblePolicy.rest([attach("seeded", "bloomFilter"), leave], rng)).toEqual(leave);
+    }
+    // the sensible one puts Seeded on what a Cunning enemy can hurt most: a Bloom Filter, then HyperLogLog, LogLog, Count-Min; and not on what it does not know
+    {
+      expect(sensiblePolicy.rest([attach("seeded", "countMinSketch"), attach("seeded", "hyperLogLog"), attach("seeded", "bloomFilter"), leave], rng)).toEqual(attach("seeded", "bloomFilter"));
+      expect(sensiblePolicy.rest([attach("seeded", "countMinSketch"), attach("seeded", "hyperLogLog"), leave], rng)).toEqual(attach("seeded", "hyperLogLog"));
+      expect(sensiblePolicy.rest([attach("seeded", "linearCounting"), leave], rng)).toEqual(leave);
+      expect(sensiblePolicy.rest([attach("steady", "countMinSketch"), attach("seeded", "bloomFilter"), leave], rng)).toEqual(attach("steady", "countMinSketch")); // Steady on Count-Min comes first
+      expect(sensiblePolicy.reward([upgrade("power"), enchantmentOffer("seeded")], rng)).toBe(1);
     }
     // the random one picks every reward and every rest action sometimes
     {
@@ -96,8 +104,8 @@ describe("playRun", () => {
       const records = Array.from({ length: 80 }, (_, i) => play("greedy", `ench-${i}`));
       const attached = records.flatMap((record) => record.enchanted);
       expect(attached.length).toBeGreaterThan(0);
-      for (const entry of attached) expect(["steady:countMinSketch", "steady:logLog"]).toContain(entry);
-      expect(records.filter((record) => record.enchanted.length > 0).every((record) => record.rewards.includes("enchantment:steady"))).toBe(true);
+      for (const entry of attached) expect(["steady:countMinSketch", "steady:logLog", "seeded:bloomFilter", "seeded:hyperLogLog", "seeded:logLog", "seeded:countMinSketch"]).toContain(entry);
+      expect(records.filter((record) => record.enchanted.length > 0).every((record) => record.rewards.some((id) => id === "enchantment:steady" || id === "enchantment:seeded"))).toBe(true);
     }
     // records why a fight was lost: the turn limit or Certainty
     {

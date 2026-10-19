@@ -70,6 +70,11 @@
         "low": "sends look-alikes that are plainly different",
         "medium": "sends look-alikes that are hard to tell apart",
         "high": "sends look-alikes that are almost the real thing"
+      },
+      "cunning": {
+        "low": "plays fair",
+        "medium": "sometimes slips in values aimed at your structures",
+        "high": "studies your structures and aims values at them"
       }
     }
   },

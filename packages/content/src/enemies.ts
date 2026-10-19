@@ -4,7 +4,7 @@ import { traits as defaultTraits, weakPointWeights, type Traits } from "./traits
 
 export type TierName = keyof Balance["TIERS"];
 
-const TRAIT_NAMES = ["variety", "skew", "churn", "growth", "drift", "likeness"] as const;
+const TRAIT_NAMES = ["variety", "skew", "churn", "growth", "drift", "likeness", "cunning"] as const;
 const WEAK_POINTS: WeakPoint[] = ["presence", "frequency", "count", "rank", "likeness"];
 
 /** A whole number from `min` to `max`, inclusive. */
@@ -26,7 +26,7 @@ export function generateEnemy(
   if (!spec) throw new RangeError(`Unknown tier: ${String(tier)}`);
   const rng = Rng.fromSeed(`${seed}/enemy-design`);
 
-  const levels: StreamTraits = { variety: "low", skew: "low", churn: "low", growth: "low", drift: "low", likeness: "low" };
+  const levels: StreamTraits = { variety: "low", skew: "low", churn: "low", growth: "low", drift: "low", likeness: "low", cunning: "low" };
   const pool = [...TRAIT_NAMES];
   for (let i = between(rng, spec.traitCount); i > 0 && pool.length > 0; i--) {
     const trait = pool.splice(rng.int(pool.length), 1)[0] as (typeof TRAIT_NAMES)[number];
