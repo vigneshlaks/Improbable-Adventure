@@ -48,5 +48,25 @@
     ],
     "result": "dyadicCountMin",
     "summary": "Two Count-Min Sketches fuse into a Dyadic Count-Min: sketches over the runs of the value range, which answer Rank. You need a second Count-Min Sketch, which can turn up as a reward."
+  },
+  "lsh": {
+    "name": "Locality-Sensitive Hashing",
+    "phase": 2,
+    "inputs": [
+      "minHash",
+      "minHash"
+    ],
+    "result": "lsh",
+    "summary": "Two MinHashes fuse into Locality-Sensitive Hashing: MinHash's minima read in bands, which flags every copy that could be real at the price of more look-alikes. You need a second MinHash, which can turn up as a reward."
+  },
+  "hyperMinHash": {
+    "name": "HyperMinHash",
+    "phase": 3,
+    "inputs": [
+      "hyperLogLog",
+      "minHash"
+    ],
+    "result": "hyperMinHash",
+    "summary": "A HyperLogLog and a MinHash fuse into HyperMinHash: Likeness in HyperLogLog's registers, four times as many as a MinHash gets from the same Space."
   }
 }

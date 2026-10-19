@@ -327,5 +327,35 @@
     "summary": "Judges how alike two sets are from the angle between them, read off a fingerprint of signs.",
     "help": "Gives every value a random sign on each of many planes and keeps a counter of the signs it has seen. A copy gets its own signs the same way, and the share of planes where the two disagree estimates their angle; the cosine of the angle, with the sizes of the two sets, gives the similarity. It is rough: a plane says less than a MinHash slot, and it is weak on duplicates, because a value that repeats outweighs the others, so on a stream with a few very common values it sees the copies as less like the stream than they are. It ignores deletes.",
     "flavor": "Does not look at the faces, only at which way the crowd leans."
+  },
+  "lsh": {
+    "name": "Locality-Sensitive Hashing",
+    "phase": 2,
+    "aliases": [
+      "lsh",
+      "banding"
+    ],
+    "answers": [
+      "likeness"
+    ],
+    "knob": null,
+    "summary": "A MinHash that flags every copy that could be real: it almost never misses one, and lets look-alikes close to the line through.",
+    "help": "Keeps MinHash's minima and cuts them into bands of several rows. A copy is flagged when, in some band, every row agrees with the stream's. The number of rows is the most for which a copy right at the threshold is still flagged nine times in ten, so a real copy is almost never missed, but a look-alike just under the line is flagged more often than not. It tells you how many of the flagged are surely real, as MinHash does. Strike on all it flags when a miss costs more than a wrong flag; otherwise a MinHash is the better judge.",
+    "flavor": "Throws a wide net, and trusts you to sort the catch."
+  },
+  "hyperMinHash": {
+    "name": "HyperMinHash",
+    "phase": 3,
+    "aliases": [
+      "hyperminhash",
+      "hmh"
+    ],
+    "answers": [
+      "likeness"
+    ],
+    "knob": null,
+    "summary": "MinHash laid out like a HyperLogLog: about four times as many registers for the same Space.",
+    "help": "Each value goes to one bucket, as in HyperLogLog, and a register keeps the smallest hash of its bucket in a small coded form (where its first one bit is and the next three bits), eight bits in all. So the same Space holds four times as many registers as a MinHash has slots, and an insert touches one. Two sets agree in a bucket when the union's smallest hash is in both, which has the chance of their Jaccard similarity, or when two different ones happen to have the same code, which it measures with a set of the copy's size from outside the stream and takes out. It ignores deletes, and the same registers count the distinct values.",
+    "flavor": "Remembers a fingerprint of the first thing it would pick, in a single byte."
   }
 }

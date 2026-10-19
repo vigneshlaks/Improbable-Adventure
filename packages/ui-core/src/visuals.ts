@@ -1,4 +1,4 @@
-import { BloomFilter, DyadicCountMin, CountMinSketch, CountSketch, CuckooFilter, HyperLogLog, KllSketch, KMinimumValues, LogLog, MinHash, QuotientFilter, restoreStructure, ScalableBloom, SimHash, SpectralBloom, TDigest, TopKTracker, type Json, type StructureConstants, type StructureSnapshot } from "@pda/engine";
+import { BloomFilter, DyadicCountMin, HyperMinHash, LocalitySensitiveHash, CountMinSketch, CountSketch, CuckooFilter, HyperLogLog, KllSketch, KMinimumValues, LogLog, MinHash, QuotientFilter, restoreStructure, ScalableBloom, SimHash, SpectralBloom, TDigest, TopKTracker, type Json, type StructureConstants, type StructureSnapshot } from "@pda/engine";
 import { structureLabel } from "./views";
 
 /** The most cells a visual draws; a bigger structure is shown averaged down to this many. */
@@ -96,6 +96,15 @@ export function structureVisual(snapshot: StructureSnapshot, slot: number, const
     const top = Math.max(1, ...items.map((item) => item.weight));
     // Each bar is a stored item: how tall is how many units it stands for (taller = more), in the order of the values.
     return { ...base, shape: "bars", cells: downsample(items.map((item) => item.weight / top)), columns: 0, caption: `${items.length} stored values, each as tall as the units it stands for`, readout: `rank error about ±${percent(live.rankError)}` };
+  }
+  if (live instanceof LocalitySensitiveHash) {
+    const k = live.params.slots as number;
+    return { ...base, shape: "bars", cells: downsample(live.signature.map((m) => 1 - m / 2 ** 32)), columns: 0, caption: `${k} minima, read in bands of rows that must all agree (taller = a smaller hash)`, readout: `bands of ${live.rowsFor(0.6)} rows at the usual threshold` };
+  }
+  if (live instanceof HyperMinHash) {
+    const registers = numbers(state, "registers");
+    const peak = Math.max(1, ...registers);
+    return { ...base, shape: "bars", cells: downsample(registers.map((r) => r / peak)), columns: 0, caption: `${registers.length} registers (taller = a smaller hash in the bucket)`, readout: `about ${Math.round(live.distinctEver(0.95).estimate)} different values, similarity error about ±${percent(0.5 / Math.sqrt(registers.length))}` };
   }
   if (live instanceof QuotientFilter) {
     const slots = live.params.slots as number;

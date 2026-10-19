@@ -105,6 +105,8 @@ describe("balance.json", () => {
         dyadicExactCounterBits: 16,
         quotientRemainderBits: 8,
         simHashCounterBits: 16,
+        hyperMinHashMantissaBits: 3,
+        lshRecall: 0.9,
       });
     }
     // matches the stand-in constants used by the engine's tests

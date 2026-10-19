@@ -330,9 +330,9 @@ describe("Likeness for the bots", () => {
     truth: null,
   });
 
-  it("strikes the copies the best structure flagged, prefers MinHash then Exact Memory, and the Oracle strikes the real copies", () => {
+  it("strikes the copies the best structure flagged, prefers HyperMinHash, MinHash, then Exact Memory, and the Oracle strikes the real copies", () => {
     expect(strikeOnEstimate(likenessView())).toEqual({ type: "strikeSubset", targets: [1, 3] });
-    expect(preferredKinds("likeness", likenessView().observation.traits).slice(0, 2)).toEqual(["minHash", "exactMemory"]);
+    expect(preferredKinds("likeness", likenessView().observation.traits).slice(0, 3)).toEqual(["hyperMinHash", "minHash", "exactMemory"]);
     const oracle = getBot("oracle").create();
     const truth = { frequency: null, distinct: 0, answer: { kind: "likeness" as const, real: [true, false, false, true], similarity: [0.9, 0.1, 0.2, 0.7] } };
     expect(oracle({ ...likenessView(), truth }, Rng.fromSeed("oracle"))).toEqual({ type: "strikeSubset", targets: [0, 3] });

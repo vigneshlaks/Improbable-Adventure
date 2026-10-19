@@ -27,6 +27,8 @@
   "DYADIC_EXACT_COUNTER_BITS": 16,
   "QUOTIENT_REMAINDER_BITS": 8,
   "SIMHASH_COUNTER_BITS": 16,
+  "HYPERMINHASH_MANTISSA_BITS": 3,
+  "LSH_RECALL": 0.9,
   "EXPORT_DEFAULT_ERROR": 0.01,
   "RL_REWARD": { "enemyDefeated": 1, "perTurn": 0.01, "perCertaintyLost": 0.005, "runLoss": 1 },
   "RL_MAX_SLOTS": 6,

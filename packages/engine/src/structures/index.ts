@@ -11,6 +11,8 @@ import { LinearCounting } from "./linearCounting";
 import { LogLog } from "./logLog";
 import { StableBloomFilter } from "./stableBloomFilter";
 import { DyadicCountMin } from "./dyadicCountMin";
+import { HyperMinHash } from "./hyperMinHash";
+import { LocalitySensitiveHash } from "./localitySensitiveHash";
 import { MinHash } from "./minHash";
 import { QuotientFilter } from "./quotientFilter";
 import { SimHash } from "./simHash";
@@ -30,6 +32,8 @@ export { ExactMemory } from "./exactMemory";
 export { HyperLogLog, MIN_HLL_REGISTERS } from "./hyperLogLog";
 export { KllSketch } from "./kllSketch";
 export { DyadicCountMin } from "./dyadicCountMin";
+export { HyperMinHash } from "./hyperMinHash";
+export { LocalitySensitiveHash } from "./localitySensitiveHash";
 export { MinHash } from "./minHash";
 export { QuotientFilter } from "./quotientFilter";
 export { SimHash } from "./simHash";
@@ -83,6 +87,10 @@ export function restoreStructure(snapshot: StructureSnapshot, constants: Structu
       return QuotientFilter.fromSnapshot(snapshot, constants);
     case "simHash":
       return SimHash.fromSnapshot(snapshot, constants);
+    case "lsh":
+      return LocalitySensitiveHash.fromSnapshot(snapshot, constants);
+    case "hyperMinHash":
+      return HyperMinHash.fromSnapshot(snapshot, constants);
     default:
       throw new RangeError(`Cannot restore unknown structure kind: ${String((snapshot as { kind: unknown }).kind)}`);
   }
@@ -128,5 +136,9 @@ export function createStructure(kind: StructureKind, options: StructureOptions, 
       return new QuotientFilter(options, constants);
     case "simHash":
       return new SimHash(options, constants);
+    case "lsh":
+      return new LocalitySensitiveHash(options, constants);
+    case "hyperMinHash":
+      return new HyperMinHash(options, constants);
   }
 }

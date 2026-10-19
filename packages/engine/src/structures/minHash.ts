@@ -120,16 +120,15 @@ export class MinHash implements Structure {
   }
 
   /**
-   * Flags the copies whose estimated similarity reaches the threshold (to every value ever inserted: ghosts pull it
+   * For each copy, its estimated similarity (to every value ever inserted: ghosts pull it
    * the other way for a copy that holds them and so lower it for one that does not, and a correction for the ghosts to expect was tried and
-   * made the flags no better). A flag is a bet, so the range says how many of the flagged copies
-   * are surely real: those whose similarity cannot be below the threshold. The miss chance is shared: half to the copies' estimates (a
+   * made the flags no better) and whether it is surely real: its similarity cannot be below the threshold. The query flags the copies at or
+   * above the threshold, and its range says how many of those are surely real. The miss chance is shared: half to the copies' estimates (a
    * Hoeffding bound for each of the K, with the half split between them), a quarter to the number of distinct values, a quarter to the ghosts.
    * With r the most that ghosts can be of the values ever inserted, the live similarity is between J - e - r and (J + e) / (1 - r) for the
    * estimate J and the estimate's error e: removing g values from a union of size U moves the shares by at most g / U.
    */
-  query(challenge: Challenge): Answer | null {
-    if (challenge.kind !== "likeness") return null;
+  assess(challenge: Extract<Challenge, { kind: "likeness" }>): Array<{ target: number; similarity: number; surelyReal: boolean }> {
     const confidence = this.constants.confidence;
     const miss = 1 - confidence;
     const copies = challenge.copies.length;
@@ -142,16 +141,16 @@ export class MinHash implements Structure {
       const ghosts = Math.min(this.deleteCount, binomialUpper(n, deletedShare(this.insertCount, this.deleteCount), 1 - miss / 4));
       ghostShare = Math.min(1, ghosts / n);
     }
-
-    const flagged: number[] = [];
-    let surelyReal = 0;
-    challenge.copies.forEach((copy, index) => {
+    return challenge.copies.map((copy, index) => {
       const similarity = this.similarity(copy);
-      if (similarity < challenge.threshold) return;
-      flagged.push(challenge.targets[index] as number);
-      if (similarity - halfWidth - ghostShare >= challenge.threshold) surelyReal++;
+      return { target: challenge.targets[index] as number, similarity, surelyReal: similarity - halfWidth - ghostShare >= challenge.threshold };
     });
-    return { estimate: flagged, low: surelyReal, high: flagged.length, confidence };
+  }
+
+  query(challenge: Challenge): Answer | null {
+    if (challenge.kind !== "likeness") return null;
+    const flagged = this.assess(challenge).filter((copy) => copy.similarity >= challenge.threshold);
+    return { estimate: flagged.map((copy) => copy.target), low: flagged.filter((copy) => copy.surelyReal).length, high: flagged.length, confidence: this.constants.confidence };
   }
 
   snapshot(): StructureSnapshot {

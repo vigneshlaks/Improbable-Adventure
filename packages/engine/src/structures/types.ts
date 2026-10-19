@@ -22,6 +22,8 @@ export const STRUCTURE_KINDS = [
   "dyadicCountMin",
   "quotientFilter",
   "simHash",
+  "lsh",
+  "hyperMinHash",
 ] as const;
 
 export type StructureKind = (typeof STRUCTURE_KINDS)[number];
@@ -112,6 +114,10 @@ export interface StructureConstants {
   quotientRemainderBits: number;
   /** The bits of each counter of a SimHash. */
   simHashCounterBits: number;
+  /** The mantissa bits a HyperMinHash register keeps beside the position of the first one bit. */
+  hyperMinHashMantissaBits: number;
+  /** The chance a copy exactly at the threshold must have of being flagged by a locality-sensitive hash, which sets how many rows a band has. */
+  lshRecall: number;
 }
 
 /** Anything that survives JSON.stringify and JSON.parse unchanged. */

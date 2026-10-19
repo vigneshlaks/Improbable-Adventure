@@ -33,6 +33,8 @@ export const TEST_CONSTANTS: StructureConstants = {
   dyadicExactCounterBits: 16,
   quotientRemainderBits: 8,
   simHashCounterBits: 16,
+  hyperMinHashMantissaBits: 3,
+  lshRecall: 0.9,
 };
 
 /** Every structure's statistical test runs this many seeded trials. */
