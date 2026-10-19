@@ -12,6 +12,8 @@ import { LogLog } from "./logLog";
 import { StableBloomFilter } from "./stableBloomFilter";
 import { DyadicCountMin } from "./dyadicCountMin";
 import { MinHash } from "./minHash";
+import { QuotientFilter } from "./quotientFilter";
+import { SimHash } from "./simHash";
 import { ScalableBloom } from "./scalableBloom";
 import { SpectralBloom } from "./spectralBloom";
 import { TDigest } from "./tDigest";
@@ -29,6 +31,8 @@ export { HyperLogLog, MIN_HLL_REGISTERS } from "./hyperLogLog";
 export { KllSketch } from "./kllSketch";
 export { DyadicCountMin } from "./dyadicCountMin";
 export { MinHash } from "./minHash";
+export { QuotientFilter } from "./quotientFilter";
+export { SimHash } from "./simHash";
 export { ScalableBloom } from "./scalableBloom";
 export { SpectralBloom } from "./spectralBloom";
 export { TDigest } from "./tDigest";
@@ -75,6 +79,10 @@ export function restoreStructure(snapshot: StructureSnapshot, constants: Structu
       return SpectralBloom.fromSnapshot(snapshot, constants);
     case "dyadicCountMin":
       return DyadicCountMin.fromSnapshot(snapshot, constants);
+    case "quotientFilter":
+      return QuotientFilter.fromSnapshot(snapshot, constants);
+    case "simHash":
+      return SimHash.fromSnapshot(snapshot, constants);
     default:
       throw new RangeError(`Cannot restore unknown structure kind: ${String((snapshot as { kind: unknown }).kind)}`);
   }
@@ -116,5 +124,9 @@ export function createStructure(kind: StructureKind, options: StructureOptions, 
       return new SpectralBloom(options, constants);
     case "dyadicCountMin":
       return new DyadicCountMin(options, constants);
+    case "quotientFilter":
+      return new QuotientFilter(options, constants);
+    case "simHash":
+      return new SimHash(options, constants);
   }
 }

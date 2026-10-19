@@ -292,5 +292,40 @@
     "summary": "Finds quantiles from Count-Min sketches over the value range's runs, in 256 buckets.",
     "help": "Cuts each value to its top 8 bits, giving 256 ordered buckets, and counts every aligned run of buckets (the whole range, its halves, quarters and so on). A quantile is found by walking down, going left when the target falls in the left half. The few big runs are counted exactly; the small ones are Count-Min sketches that share the rest of the Space, and they only overcount, so it finds a bucket at or below the true one. It answers with a bucket's edges, and says the quantile has no upper end when its error reaches past the total. It handles deletes. It needs a lot of Space for a tight answer: a KLL Sketch is far sharper at the same size.",
     "flavor": "Halves the range again and again until the crowd is found."
+  },
+  "quotientFilter": {
+    "name": "Quotient Filter",
+    "phase": 3,
+    "aliases": [
+      "quotient",
+      "qf"
+    ],
+    "answers": [
+      "presence"
+    ],
+    "knob": {
+      "name": "remainder bits",
+      "description": "How many bits of each value's fingerprint are stored in its slot. More bits make a false alarm rarer and each slot dearer.",
+      "min": 1,
+      "max": 16
+    },
+    "summary": "A compact table of fingerprints that handles deletes and merges.",
+    "help": "Splits a hash into a quotient, which picks a home slot, and a remainder, which the slot stores, with three bits of bookkeeping that let neighbours that share a home push each other along. The table has as many slots as fit (a power of two), each remainder bits plus three. A value is present if its fingerprint is held, so a stranger is flagged about as often as the load times two to the minus the remainder bits. A delete takes away one copy exactly, and two filters of the same shape merge. Every insert takes a slot, repeats too, and a full table drops the next one and so hides a value.",
+    "flavor": "Files each face under its first letters, and makes room when two share a drawer."
+  },
+  "simHash": {
+    "name": "SimHash",
+    "phase": 3,
+    "aliases": [
+      "simhash",
+      "angle"
+    ],
+    "answers": [
+      "likeness"
+    ],
+    "knob": null,
+    "summary": "Judges how alike two sets are from the angle between them, read off a fingerprint of signs.",
+    "help": "Gives every value a random sign on each of many planes and keeps a counter of the signs it has seen. A copy gets its own signs the same way, and the share of planes where the two disagree estimates their angle; the cosine of the angle, with the sizes of the two sets, gives the similarity. It is rough: a plane says less than a MinHash slot, and it is weak on duplicates, because a value that repeats outweighs the others, so on a stream with a few very common values it sees the copies as less like the stream than they are. It ignores deletes.",
+    "flavor": "Does not look at the faces, only at which way the crowd leans."
   }
 }

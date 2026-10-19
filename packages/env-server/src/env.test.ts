@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildRunConfig } from "@pda/content";
 import { createRun, legalRunActions, Rng, stepRun, type RunAction, type RunState } from "@pda/engine";
-import { decodeAction } from "./actions";
+import { actionMask, decodeAction } from "./actions";
 import { Env } from "./env";
 import { buildLayout } from "./layout";
 import { encodeObservation } from "./observation";
@@ -56,8 +56,8 @@ describe("the environment", () => {
       const layout = buildLayout(config, 6);
       let state: RunState = createRun(seed, config);
       const rng = Rng.fromSeed(`oracle-${seed}`);
-      for (let i = 0; i < 800 && state.phase !== "won" && state.phase !== "lost"; i++) {
-        const options = layout.actions.flatMap((_, index) => (decodeAction(state, layout, index) ? [index] : []));
+      for (let i = 0; i < 1500 && state.phase !== "won" && state.phase !== "lost"; i++) {
+        const options = actionMask(state, layout).flatMap((on, index) => (on ? [index] : []));
         const action = decodeAction(state, layout, options[rng.int(options.length)] as number) as RunAction;
         let result;
         try {

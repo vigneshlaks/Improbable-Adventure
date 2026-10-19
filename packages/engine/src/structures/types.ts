@@ -20,6 +20,8 @@ export const STRUCTURE_KINDS = [
   "scalableBloom",
   "spectralBloom",
   "dyadicCountMin",
+  "quotientFilter",
+  "simHash",
 ] as const;
 
 export type StructureKind = (typeof STRUCTURE_KINDS)[number];
@@ -106,6 +108,10 @@ export interface StructureConstants {
   dyadicBits: number;
   dyadicExactMax: number;
   dyadicExactCounterBits: number;
+  /** The remainder bits of a Quotient Filter when the player gives none. */
+  quotientRemainderBits: number;
+  /** The bits of each counter of a SimHash. */
+  simHashCounterBits: number;
 }
 
 /** Anything that survives JSON.stringify and JSON.parse unchanged. */

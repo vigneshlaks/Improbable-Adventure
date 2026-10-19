@@ -1,4 +1,4 @@
-import { BloomFilter, DyadicCountMin, CountMinSketch, CountSketch, CuckooFilter, HyperLogLog, KllSketch, KMinimumValues, LogLog, MinHash, restoreStructure, ScalableBloom, SpectralBloom, TDigest, TopKTracker, type Json, type StructureConstants, type StructureSnapshot } from "@pda/engine";
+import { BloomFilter, DyadicCountMin, CountMinSketch, CountSketch, CuckooFilter, HyperLogLog, KllSketch, KMinimumValues, LogLog, MinHash, QuotientFilter, restoreStructure, ScalableBloom, SimHash, SpectralBloom, TDigest, TopKTracker, type Json, type StructureConstants, type StructureSnapshot } from "@pda/engine";
 import { structureLabel } from "./views";
 
 /** The most cells a visual draws; a bigger structure is shown averaged down to this many. */
@@ -96,6 +96,17 @@ export function structureVisual(snapshot: StructureSnapshot, slot: number, const
     const top = Math.max(1, ...items.map((item) => item.weight));
     // Each bar is a stored item: how tall is how many units it stands for (taller = more), in the order of the values.
     return { ...base, shape: "bars", cells: downsample(items.map((item) => item.weight / top)), columns: 0, caption: `${items.length} stored values, each as tall as the units it stands for`, readout: `rank error about ±${percent(live.rankError)}` };
+  }
+  if (live instanceof QuotientFilter) {
+    const slots = live.params.slots as number;
+    const cells = Math.min(slots, MAX_VISUAL_CELLS);
+    const lit = Math.round(live.load * cells);
+    return { ...base, shape: "meter", cells: Array.from({ length: cells }, (_, i) => (i < lit ? 1 : 0)), columns: 0, caption: "slots (lit = holds a fingerprint)", readout: `${percent(live.load)} full, false alarms about ${percent(live.falsePositiveRate())}${live.lost > 0 ? `, ${live.lost} dropped` : ""}` };
+  }
+  if (live instanceof SimHash) {
+    const counters = live.counterValues.map((c) => Math.abs(c));
+    const peak = Math.max(1, ...counters);
+    return { ...base, shape: "bars", cells: downsample(counters.map((c) => c / peak)), columns: 0, caption: `${counters.length} planes (taller = a stronger lean to one sign)`, readout: `about ${live.effectiveSize().toFixed(0)} values seen as the planes count them` };
   }
   if (live instanceof DyadicCountMin) {
     const counts = live.bucketCounts();

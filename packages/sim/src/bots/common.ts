@@ -10,7 +10,7 @@ const WEAK_POINTS: WeakPoint[] = ["presence", "frequency", "count", "rank", "lik
 const MIN_BITS = 256;
 
 /** Structures that cannot be built in even that: a Top-K Tracker needs room for a Count-Min grid and a candidate list (a quarter of its Space, 96 bits an entry). */
-const MIN_BITS_OF: Partial<Record<StructureKind, number>> = { topKTracker: 384, tDigest: 512, kllSketch: 1536, dyadicCountMin: 4096, minHash: 256 };
+const MIN_BITS_OF: Partial<Record<StructureKind, number>> = { topKTracker: 384, tDigest: 512, kllSketch: 1536, dyadicCountMin: 4096, simHash: 1024, minHash: 256 };
 const minBitsOf = (kind: StructureKind): number => Math.max(MIN_BITS, MIN_BITS_OF[kind] ?? 0);
 
 /** Structures that suit each weak point, best first. Exact Memory and Reservoir Sampling answer anything. */
@@ -21,7 +21,7 @@ export function preferredKinds(weakPoint: WeakPoint, traits: StreamTraits): Stru
       // A Spectral Bloom Filter takes deletes back too, so it is the next choice under Churn; a Scalable Bloom Filter hedges against Growth.
       return traits.churn === "low"
         ? [...(traits.growth === "low" ? [] : (["scalableBloom"] as StructureKind[])), "bloomFilter", "spectralBloom", "exactMemory", "reservoirSampling"]
-        : ["cuckooFilter", "bloomFilter", "spectralBloom", "exactMemory", "reservoirSampling"];
+        : ["cuckooFilter", "bloomFilter", "quotientFilter", "spectralBloom", "exactMemory", "reservoirSampling"];
     case "frequency":
       // A Top-K Tracker follows the heavy values exactly, so it is worth having once the stream has some; on a flat stream nothing helps much.
       return traits.skew === "low"
@@ -29,7 +29,7 @@ export function preferredKinds(weakPoint: WeakPoint, traits: StreamTraits): Stru
         : ["topKTracker", "countMinSketch", "spectralBloom", "exactMemory", "reservoirSampling"];
     case "likeness":
       // MinHash is built for it. Exact Memory compares copies with its table exactly while the table has room.
-      return ["minHash", "exactMemory"];
+      return ["minHash", "exactMemory", "simHash"];
     case "rank":
       // Both are far sharper than a sample of the same Space. A t-digest wins at the extreme quantiles the tougher enemies ask for.
       return ["tDigest", "kllSketch", "dyadicCountMin", "reservoirSampling", "exactMemory"];

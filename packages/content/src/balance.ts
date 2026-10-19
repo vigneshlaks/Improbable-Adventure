@@ -54,6 +54,8 @@ export const balanceSchema = z.object({
   DYADIC_BITS: z.number().int().min(2).max(16),
   DYADIC_EXACT_MAX: z.number().int().positive(),
   DYADIC_EXACT_COUNTER_BITS: z.number().int().min(2).max(32),
+  QUOTIENT_REMAINDER_BITS: z.number().int().min(1).max(16),
+  SIMHASH_COUNTER_BITS: z.number().int().min(4).max(32),
   EXPORT_DEFAULT_ERROR: z.number().gt(0).lt(1),
   /** How a step is scored for reinforcement learning: a reward for each enemy beaten, and costs per turn, per Certainty lost and for losing the run. */
   RL_REWARD: z.object({ enemyDefeated: z.number(), perTurn: z.number().nonnegative(), perCertaintyLost: z.number().nonnegative(), runLoss: z.number().nonnegative() }).strict(),
@@ -146,5 +148,7 @@ export function structureConstants(b: Balance = balance): StructureConstants {
     dyadicBits: b.DYADIC_BITS,
     dyadicExactMax: b.DYADIC_EXACT_MAX,
     dyadicExactCounterBits: b.DYADIC_EXACT_COUNTER_BITS,
+    quotientRemainderBits: b.QUOTIENT_REMAINDER_BITS,
+    simHashCounterBits: b.SIMHASH_COUNTER_BITS,
   };
 }
