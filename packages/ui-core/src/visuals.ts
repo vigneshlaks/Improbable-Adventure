@@ -1,4 +1,4 @@
-import { BloomFilter, CountMinSketch, CountSketch, CuckooFilter, HyperLogLog, KllSketch, KMinimumValues, LogLog, MinHash, restoreStructure, ScalableBloom, SpectralBloom, TDigest, TopKTracker, type Json, type StructureConstants, type StructureSnapshot } from "@pda/engine";
+import { BloomFilter, DyadicCountMin, CountMinSketch, CountSketch, CuckooFilter, HyperLogLog, KllSketch, KMinimumValues, LogLog, MinHash, restoreStructure, ScalableBloom, SpectralBloom, TDigest, TopKTracker, type Json, type StructureConstants, type StructureSnapshot } from "@pda/engine";
 import { structureLabel } from "./views";
 
 /** The most cells a visual draws; a bigger structure is shown averaged down to this many. */
@@ -96,6 +96,11 @@ export function structureVisual(snapshot: StructureSnapshot, slot: number, const
     const top = Math.max(1, ...items.map((item) => item.weight));
     // Each bar is a stored item: how tall is how many units it stands for (taller = more), in the order of the values.
     return { ...base, shape: "bars", cells: downsample(items.map((item) => item.weight / top)), columns: 0, caption: `${items.length} stored values, each as tall as the units it stands for`, readout: `rank error about ±${percent(live.rankError)}` };
+  }
+  if (live instanceof DyadicCountMin) {
+    const counts = live.bucketCounts();
+    const peak = Math.max(1, ...counts);
+    return { ...base, shape: "bars", cells: downsample(counts.map((c) => c / peak)), columns: 0, caption: `${counts.length} buckets of the value range, in order (taller = more units)`, readout: `quantile error about ±${live.liveTotal > 0 ? percent(Math.min(1, live.errorBand / live.liveTotal)) : "0%"}` };
   }
   if (live instanceof ScalableBloom) {
     const fills = live.layerFills;

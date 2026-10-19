@@ -156,6 +156,7 @@ describe("buildRunConfig", () => {
         { id: "topKTracker", inputs: ["countMinSketch", "exactMemory"], result: "topKTracker" },
         { id: "scalableBloom", inputs: ["bloomFilter", "bloomFilter"], result: "scalableBloom" },
         { id: "spectralBloom", inputs: ["bloomFilter", "countMinSketch"], result: "spectralBloom" },
+        { id: "dyadicCountMin", inputs: ["countMinSketch", "countMinSketch"], result: "dyadicCountMin" },
       ]);
     }
     // designs each encounter on its own, so the five Minions are not copies of one another

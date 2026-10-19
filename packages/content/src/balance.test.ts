@@ -100,6 +100,9 @@ describe("balance.json", () => {
         scalableBloomTarget: 0.005,
         scalableBloomTightening: 0.5,
         spectralCounterBits: 16,
+        dyadicBits: 8,
+        dyadicExactMax: 64,
+        dyadicExactCounterBits: 16,
       });
     }
     // matches the stand-in constants used by the engine's tests

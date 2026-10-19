@@ -272,5 +272,25 @@
     "summary": "A Bloom filter made of counters: Presence and Frequency from one slot, and it handles deletes.",
     "help": "Every value adds one to each of its counters, and a delete takes one off. Presence asks whether all of a value's counters are above zero; Frequency reads the smallest, which is never below the truth, so strike on it. The counters are 16 bits each, so the same Space buys half as many cells as a Count-Min Sketch of 32-bit counters, and a counter that reaches its top stops and says only \"at least\".",
     "flavor": "A Bloom filter that learned to count."
+  },
+  "dyadicCountMin": {
+    "name": "Dyadic Count-Min",
+    "phase": 2,
+    "aliases": [
+      "dyadic",
+      "quantiles"
+    ],
+    "answers": [
+      "rank"
+    ],
+    "knob": {
+      "name": "depth",
+      "description": "The number of counter rows in each sketch. More rows make a bad overestimate less likely.",
+      "min": 1,
+      "max": 8
+    },
+    "summary": "Finds quantiles from Count-Min sketches over the value range's runs, in 256 buckets.",
+    "help": "Cuts each value to its top 8 bits, giving 256 ordered buckets, and counts every aligned run of buckets (the whole range, its halves, quarters and so on). A quantile is found by walking down, going left when the target falls in the left half. The few big runs are counted exactly; the small ones are Count-Min sketches that share the rest of the Space, and they only overcount, so it finds a bucket at or below the true one. It answers with a bucket's edges, and says the quantile has no upper end when its error reaches past the total. It handles deletes. It needs a lot of Space for a tight answer: a KLL Sketch is far sharper at the same size.",
+    "flavor": "Halves the range again and again until the crowd is found."
   }
 }

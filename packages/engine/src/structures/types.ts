@@ -19,6 +19,7 @@ export const STRUCTURE_KINDS = [
   "minHash",
   "scalableBloom",
   "spectralBloom",
+  "dyadicCountMin",
 ] as const;
 
 export type StructureKind = (typeof STRUCTURE_KINDS)[number];
@@ -101,6 +102,10 @@ export interface StructureConstants {
   scalableBloomTightening: number;
   /** Bits of each counter of a Spectral Bloom Filter. */
   spectralCounterBits: number;
+  /** A Dyadic Count-Min: the bits of a value it keeps (so 2^bits buckets), the most intervals a level may have and still be counted exactly, and the bits of an exact counter. */
+  dyadicBits: number;
+  dyadicExactMax: number;
+  dyadicExactCounterBits: number;
 }
 
 /** Anything that survives JSON.stringify and JSON.parse unchanged. */

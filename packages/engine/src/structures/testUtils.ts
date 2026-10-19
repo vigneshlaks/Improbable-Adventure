@@ -28,6 +28,9 @@ export const TEST_CONSTANTS: StructureConstants = {
   scalableBloomTarget: 0.005,
   scalableBloomTightening: 0.5,
   spectralCounterBits: 16,
+  dyadicBits: 8,
+  dyadicExactMax: 64,
+  dyadicExactCounterBits: 16,
 };
 
 /** Every structure's statistical test runs this many seeded trials. */

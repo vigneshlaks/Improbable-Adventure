@@ -10,6 +10,7 @@ import { KMinimumValues } from "./kMinimumValues";
 import { LinearCounting } from "./linearCounting";
 import { LogLog } from "./logLog";
 import { StableBloomFilter } from "./stableBloomFilter";
+import { DyadicCountMin } from "./dyadicCountMin";
 import { MinHash } from "./minHash";
 import { ScalableBloom } from "./scalableBloom";
 import { SpectralBloom } from "./spectralBloom";
@@ -26,6 +27,7 @@ export { TopKTracker, type Candidate } from "./topKTracker";
 export { ExactMemory } from "./exactMemory";
 export { HyperLogLog, MIN_HLL_REGISTERS } from "./hyperLogLog";
 export { KllSketch } from "./kllSketch";
+export { DyadicCountMin } from "./dyadicCountMin";
 export { MinHash } from "./minHash";
 export { ScalableBloom } from "./scalableBloom";
 export { SpectralBloom } from "./spectralBloom";
@@ -71,6 +73,8 @@ export function restoreStructure(snapshot: StructureSnapshot, constants: Structu
       return ScalableBloom.fromSnapshot(snapshot, constants);
     case "spectralBloom":
       return SpectralBloom.fromSnapshot(snapshot, constants);
+    case "dyadicCountMin":
+      return DyadicCountMin.fromSnapshot(snapshot, constants);
     default:
       throw new RangeError(`Cannot restore unknown structure kind: ${String((snapshot as { kind: unknown }).kind)}`);
   }
@@ -110,5 +114,7 @@ export function createStructure(kind: StructureKind, options: StructureOptions, 
       return new ScalableBloom(options, constants);
     case "spectralBloom":
       return new SpectralBloom(options, constants);
+    case "dyadicCountMin":
+      return new DyadicCountMin(options, constants);
   }
 }

@@ -38,5 +38,15 @@
     ],
     "result": "spectralBloom",
     "summary": "A Bloom Filter and a Count-Min Sketch fuse into a Spectral Bloom Filter: a Bloom filter of counters that answers Presence and Frequency, and takes deletes back."
+  },
+  "dyadicCountMin": {
+    "name": "Dyadic Count-Min",
+    "phase": 2,
+    "inputs": [
+      "countMinSketch",
+      "countMinSketch"
+    ],
+    "result": "dyadicCountMin",
+    "summary": "Two Count-Min Sketches fuse into a Dyadic Count-Min: sketches over the runs of the value range, which answer Rank. You need a second Count-Min Sketch, which can turn up as a reward."
   }
 }
