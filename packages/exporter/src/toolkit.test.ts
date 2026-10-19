@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { structureConstants } from "@pda/content";
-import { STRUCTURE_KINDS } from "@pda/engine";
+import { STRUCTURE_KINDS, type StructureKind } from "@pda/engine";
 import { loadTemplates, VECTORS_PATH } from "./templates";
 import { generateToolkit, hasTemplate, type Language } from "./toolkit";
 import { buildVectors } from "./vectors";
@@ -15,10 +15,12 @@ describe("toolkit", () => {
       const templates = loadTemplates(language);
       const all = generateToolkit(language, STRUCTURE_KINDS, templates);
       expect(Object.keys(all).filter((path) => path.startsWith("src/")).length).toBeGreaterThanOrEqual(STRUCTURE_KINDS.filter(hasTemplate).length + 1);
-      // A structure with no templates yet is left out, not an error.
-      expect(Object.keys(all).some((path) => /count_?sketch\.|top_?k/i.test(path))).toBe(false);
-      expect(hasTemplate("countSketch")).toBe(false);
+      // A structure with no templates is left out, not an error.
+      const unknown = "notAStructure" as StructureKind;
+      expect(hasTemplate(unknown)).toBe(false);
+      expect(Object.keys(generateToolkit(language, [unknown, "bloomFilter"], templates))).toEqual(Object.keys(generateToolkit(language, ["bloomFilter"], templates)));
       expect(hasTemplate("bloomFilter")).toBe(true);
+      expect(hasTemplate("minHash")).toBe(true);
       expect(all["tests/vectors.json"]).toBe(templates.vectors);
 
       // LogLog alone brings the register helper it needs, and none of the other structures.

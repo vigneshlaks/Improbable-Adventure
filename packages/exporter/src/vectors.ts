@@ -1,5 +1,5 @@
-import { BloomFilter, CountMinSketch, HyperLogLog, LinearCounting, LogLog, murmur3String, murmur3U32, doubleHashIndices, PUBLIC_HASH_SEED, type StructureConstants } from "@pda/engine";
-import { sizeBloom, sizeCountMin, sizeExact, sizeHyperLogLog, sizeLinearCounting, sizeLogLog, sizeReservoir, sizingConstants } from "./sizing";
+import { BloomFilter, CountMinSketch, CountSketch, CuckooFilter, HyperLogLog, KMinimumValues, LinearCounting, LogLog, MinHash, murmur3String, murmur3U32, doubleHashIndices, PUBLIC_HASH_SEED, type StructureConstants } from "@pda/engine";
+import { sizeBloom, sizeCountMin, sizeCountSketch, sizeCuckoo, sizeExact, sizeHyperLogLog, sizeKmv, sizeLinearCounting, sizeLogLog, sizeMinHash, sizeReservoir, sizingConstants } from "./sizing";
 
 /** The i-th value of the fixed test stream every language's tests replay: spread across the 32-bit range. */
 export const stream = (i: number): number => Math.imul(i + 1, 2654435761) >>> 0;
@@ -44,6 +44,34 @@ export function buildVectors(constants: StructureConstants): Record<string, unkn
   const linear = new LinearCounting({ spaceBits: 4096 }, constants);
   for (let i = 0; i < 1000; i++) linear.ingest({ op: "insert", value: stream(i) });
 
+  const csWidth = 64;
+  const csDepth = 5;
+  const countSketch = new CountSketch({ spaceBits: 32 * csWidth * csDepth, knob: csDepth }, constants);
+  for (let i = 0; i < cmsEvents; i++) countSketch.ingest({ op: "insert", value: stream(i % cmsDistinct) });
+  for (let i = 0; i < 300; i++) countSketch.ingest({ op: "delete", value: stream(i % 7) });
+
+  const cuckooBuckets = 128;
+  const cuckooBits = 8;
+  const cuckooItems = 300;
+  const cuckoo = new CuckooFilter({ spaceBits: cuckooBuckets * 4 * cuckooBits, knob: cuckooBits }, constants);
+  for (let i = 0; i < cuckooItems; i++) cuckoo.ingest({ op: "insert", value: stream(i) });
+  for (let i = 0; i < 60; i++) cuckoo.ingest({ op: "delete", value: stream(i * 5) });
+  const has = (value: number) => (cuckoo.query({ kind: "presence", targets: [value] })?.estimate as number[]).length === 1;
+
+  const kmvK = 64;
+  const kmv = new KMinimumValues({ spaceBits: 32 * kmvK }, constants);
+  for (let i = 0; i < 1000; i++) kmv.ingest({ op: "insert", value: stream(i) });
+  const kmvSmall = new KMinimumValues({ spaceBits: 32 * kmvK }, constants);
+  for (let i = 0; i < 40; i++) kmvSmall.ingest({ op: "insert", value: stream(i) });
+  const kmvOther = new KMinimumValues({ spaceBits: 32 * kmvK }, constants);
+  for (let i = 600; i < 1800; i++) kmvOther.ingest({ op: "insert", value: stream(i) });
+
+  const minK = 64;
+  const left = new MinHash({ spaceBits: 32 * minK }, constants);
+  const right = new MinHash({ spaceBits: 32 * minK }, constants);
+  for (let i = 0; i < 300; i++) left.ingest({ op: "insert", value: stream(i) });
+  for (let i = 150; i < 450; i++) right.ingest({ op: "insert", value: stream(i) });
+
   const sizingCases = [
     { fn: "sizeBloom", input: { items: 1000, error: 0.01 }, output: sizeBloom({ items: 1000, error: 0.01 }, sc) },
     { fn: "sizeBloom", input: { items: 1000, memoryBits: 4793 }, output: sizeBloom({ items: 1000, memoryBits: 4793 }, sc) },
@@ -59,6 +87,14 @@ export function buildVectors(constants: StructureConstants): Record<string, unkn
     { fn: "sizeReservoir", input: { error: 0.05 }, output: sizeReservoir({ error: 0.05 }, sc) },
     { fn: "sizeReservoir", input: { memoryBits: 3200 }, output: sizeReservoir({ memoryBits: 3200 }, sc) },
     { fn: "sizeExact", input: { distinct: 1000, memoryBits: 10000 }, output: sizeExact({ distinct: 1000, memoryBits: 10000 }, sc) },
+    { fn: "sizeCountSketch", input: { error: 0.1 }, output: sizeCountSketch({ error: 0.1 }, sc) },
+    { fn: "sizeCountSketch", input: { memoryBits: 100000 }, output: sizeCountSketch({ memoryBits: 100000 }, sc) },
+    { fn: "sizeCuckoo", input: { items: 100000, error: 0.01 }, output: sizeCuckoo({ items: 100000, error: 0.01 }, sc) },
+    { fn: "sizeCuckoo", input: { items: 5000, memoryBits: 60000 }, output: sizeCuckoo({ items: 5000, memoryBits: 60000 }, sc) },
+    { fn: "sizeKmv", input: { error: 0.02 }, output: sizeKmv({ error: 0.02 }, sc) },
+    { fn: "sizeKmv", input: { memoryBits: 8192 }, output: sizeKmv({ memoryBits: 8192 }, sc) },
+    { fn: "sizeMinHash", input: { error: 0.02 }, output: sizeMinHash({ error: 0.02 }, sc) },
+    { fn: "sizeMinHash", input: { memoryBits: 4096 }, output: sizeMinHash({ memoryBits: 4096 }, sc) },
   ];
 
   return {
@@ -70,6 +106,19 @@ export function buildVectors(constants: StructureConstants): Record<string, unkn
     hyperLogLog: [registers("hyperLogLog", 8, 100), registers("hyperLogLog", 8, 5000), registers("hyperLogLog", 10, 100000)],
     logLog: [registers("logLog", 10, 50000), registers("logLog", 12, 200000)],
     linearCounting: { bits: 4096, items: 1000, estimate: linear.query({ kind: "count" })?.estimate },
+    countSketch: { width: csWidth, depth: csDepth, distinct: cmsDistinct, events: cmsEvents, removed: 300, estimates: Array.from({ length: 10 }, (_, i) => countSketch.rawEstimate(stream(i))), squaredNorm: countSketch.squaredNorm },
+    cuckoo: { buckets: cuckooBuckets, fingerprintBits: cuckooBits, items: cuckooItems, removed: 60, size: cuckoo.size, present: Array.from({ length: 80 }, (_, i) => has(stream(i * 5 + (i % 5)))), outside: Array.from({ length: 60 }, (_, i) => has(stream(cuckooItems + i))) },
+    kmv: { k: kmvK, items: 1000, count: kmv.query({ kind: "count" })?.estimate, hashes: kmv.hashes.slice(0, 6), small: { items: 40, count: kmvSmall.query({ kind: "count" })?.estimate }, mergedWith: { from: 600, to: 1800, count: kmv.merge(kmvOther).query({ kind: "count" })?.estimate } },
+    minHash: { k: minK, left: { from: 0, to: 300 }, right: { from: 150, to: 450 }, signature: left.signature.slice(0, 8), similarity: minHashSimilarity(left, right), merged: left.merge(right).signature.slice(0, 8) },
     sizing: sizingCases,
   };
+}
+
+/** The share of slots whose minima agree (what the toolkit's `similarity` returns), read off two engine MinHashes. */
+function minHashSimilarity(a: MinHash, b: MinHash): number {
+  const x = a.signature;
+  const y = b.signature;
+  let agree = 0;
+  for (let i = 0; i < x.length; i++) if (x[i] === y[i] && x[i] !== 2 ** 32) agree++;
+  return agree / x.length;
 }

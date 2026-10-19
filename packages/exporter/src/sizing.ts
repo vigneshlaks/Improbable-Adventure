@@ -199,3 +199,73 @@ export function sizeExact(workload: Workload, constants: SizingConstants): Exact
   const memoryBits = entries * (constants.valueBits + constants.counterBits);
   return { entries, memoryBits, meetsTarget: workload.memoryBits === undefined || memoryBits <= workload.memoryBits };
 }
+
+export interface CountSketchSizing extends Sized {
+  width: number;
+  depth: number;
+  /** The error either way, as a share of the L2 norm of the counts (the square root of the sum of their squares), with probability `confidence`. */
+  errorShare: number;
+  confidence: number;
+}
+
+/**
+ * Count Sketch: a row's error exceeds epsilon x L2 norm with probability at most 1 / (width x epsilon^2) (Chebyshev), so width = 4 / epsilon^2 makes a
+ * row wrong with probability at most 1/4, and the median of an odd number of rows is wrong only if half of them are, which has probability at most
+ * e^(-depth x D) with D = (1/2) ln 2 + (1/2) ln (2/3), the relative entropy of one half against one quarter. The depth is the smallest odd one with that
+ * under 1 - confidence. Given a memory budget, the width is what fits and epsilon is 2 / sqrt(width).
+ */
+export function sizeCountSketch(workload: Workload, constants: SizingConstants): CountSketchSizing {
+  const entropy = 0.5 * Math.log(2) + 0.5 * Math.log(2 / 3);
+  let depth = Math.max(1, Math.ceil(Math.log(1 / (1 - constants.confidence)) / entropy));
+  if (depth % 2 === 0) depth++;
+  const width = workload.memoryBits !== undefined ? Math.max(1, Math.floor(workload.memoryBits / (depth * constants.counterBits))) : Math.ceil(4 / target(workload, constants) ** 2);
+  const errorShare = 2 / Math.sqrt(width);
+  return { width, depth, errorShare, confidence: constants.confidence, memoryBits: width * depth * constants.counterBits, meetsTarget: meets(workload, errorShare) };
+}
+
+/** A Cuckoo Filter's buckets hold four fingerprints, and it works up to about this share full. */
+const CUCKOO_BUCKET_SIZE = 4;
+const CUCKOO_MAX_LOAD = 0.95;
+
+export interface CuckooSizing extends Sized {
+  buckets: number;
+  fingerprintBits: number;
+  falsePositiveRate: number;
+}
+
+/** False positives are about 2 x bucket size / 2^f at full load: f = ceil(log2(8 / error)). Given memory, the fingerprint is what fits. */
+export function sizeCuckoo(workload: Workload, constants: SizingConstants): CuckooSizing {
+  const n = need("the item count", workload.items);
+  const buckets = Math.ceil(n / (CUCKOO_BUCKET_SIZE * CUCKOO_MAX_LOAD));
+  const fingerprintBits =
+    workload.memoryBits !== undefined
+      ? Math.min(16, Math.max(1, Math.floor(workload.memoryBits / (buckets * CUCKOO_BUCKET_SIZE))))
+      : Math.min(16, Math.max(1, Math.ceil(Math.log2((2 * CUCKOO_BUCKET_SIZE) / target(workload, constants)))));
+  const falsePositiveRate = (2 * CUCKOO_BUCKET_SIZE) / 2 ** fingerprintBits;
+  return { buckets, fingerprintBits, falsePositiveRate, memoryBits: buckets * CUCKOO_BUCKET_SIZE * fingerprintBits, meetsTarget: meets(workload, falsePositiveRate) };
+}
+
+export interface KmvSizing extends Sized {
+  k: number;
+  standardError: number;
+}
+
+/** K-Minimum Values: relative standard error 1 / sqrt(k - 2), so k = 1 / error^2 + 2, at 32 bits a hash. */
+export function sizeKmv(workload: Workload, constants: SizingConstants): KmvSizing {
+  const k = workload.memoryBits !== undefined ? Math.max(3, Math.floor(workload.memoryBits / constants.valueBits)) : Math.ceil(1 / target(workload, constants) ** 2) + 2;
+  const standardError = 1 / Math.sqrt(k - 2);
+  return { k, standardError, memoryBits: k * constants.valueBits, meetsTarget: meets(workload, standardError) };
+}
+
+export interface MinHashSizing extends Sized {
+  k: number;
+  /** The most the standard error of an estimated similarity can be. */
+  standardError: number;
+}
+
+/** MinHash: standard error at most 1 / (2 sqrt(k)), so k = 1 / (4 error^2), at 32 bits a slot. */
+export function sizeMinHash(workload: Workload, constants: SizingConstants): MinHashSizing {
+  const k = workload.memoryBits !== undefined ? Math.max(1, Math.floor(workload.memoryBits / constants.valueBits)) : Math.ceil(1 / (4 * target(workload, constants) ** 2));
+  const standardError = 1 / (2 * Math.sqrt(k));
+  return { k, standardError, memoryBits: k * constants.valueBits, meetsTarget: meets(workload, standardError) };
+}

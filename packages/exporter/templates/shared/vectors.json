@@ -234,6 +234,231 @@
     "items": 1000,
     "estimate": 1012.4190792492061
   },
+  "countSketch": {
+    "width": 64,
+    "depth": 5,
+    "distinct": 50,
+    "events": 2000,
+    "removed": 300,
+    "estimates": [
+      -3,
+      -3,
+      -40,
+      -3,
+      37,
+      -3,
+      -2,
+      40,
+      37,
+      40
+    ],
+    "squaredNorm": 64938
+  },
+  "cuckoo": {
+    "buckets": 128,
+    "fingerprintBits": 8,
+    "items": 300,
+    "removed": 60,
+    "size": 240,
+    "present": [
+      false,
+      true,
+      true,
+      true,
+      true,
+      false,
+      true,
+      true,
+      true,
+      true,
+      false,
+      true,
+      true,
+      true,
+      true,
+      false,
+      true,
+      true,
+      true,
+      true,
+      false,
+      true,
+      true,
+      true,
+      true,
+      false,
+      true,
+      true,
+      true,
+      true,
+      false,
+      true,
+      true,
+      true,
+      true,
+      false,
+      true,
+      true,
+      true,
+      true,
+      false,
+      true,
+      true,
+      true,
+      true,
+      false,
+      true,
+      true,
+      true,
+      true,
+      false,
+      true,
+      true,
+      true,
+      true,
+      false,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ],
+    "outside": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "kmv": {
+    "k": 64,
+    "items": 1000,
+    "count": 904.5835421681841,
+    "hashes": [
+      1386528,
+      3808176,
+      9864645,
+      24350913,
+      26240207,
+      28648397
+    ],
+    "small": {
+      "items": 40,
+      "count": 40
+    },
+    "mergedWith": {
+      "from": 600,
+      "to": 1800,
+      "count": 1451.2986549346283
+    }
+  },
+  "minHash": {
+    "k": 64,
+    "left": {
+      "from": 0,
+      "to": 300
+    },
+    "right": {
+      "from": 150,
+      "to": 450
+    },
+    "signature": [
+      17158245,
+      8141198,
+      12282116,
+      2482214,
+      19281416,
+      8195419,
+      43281047,
+      14737215
+    ],
+    "similarity": 0.421875,
+    "merged": [
+      16793802,
+      8141198,
+      12282116,
+      2482214,
+      19281416,
+      8195419,
+      14771478,
+      14737215
+    ]
+  },
   "sizing": [
     {
       "fn": "sizeBloom",
@@ -424,6 +649,110 @@
         "entries": 1000,
         "memoryBits": 64000,
         "meetsTarget": false
+      }
+    },
+    {
+      "fn": "sizeCountSketch",
+      "input": {
+        "error": 0.1
+      },
+      "output": {
+        "width": 400,
+        "depth": 21,
+        "errorShare": 0.1,
+        "confidence": 0.95,
+        "memoryBits": 268800,
+        "meetsTarget": true
+      }
+    },
+    {
+      "fn": "sizeCountSketch",
+      "input": {
+        "memoryBits": 100000
+      },
+      "output": {
+        "width": 148,
+        "depth": 21,
+        "errorShare": 0.1643989873053573,
+        "confidence": 0.95,
+        "memoryBits": 99456,
+        "meetsTarget": true
+      }
+    },
+    {
+      "fn": "sizeCuckoo",
+      "input": {
+        "items": 100000,
+        "error": 0.01
+      },
+      "output": {
+        "buckets": 26316,
+        "fingerprintBits": 10,
+        "falsePositiveRate": 0.0078125,
+        "memoryBits": 1052640,
+        "meetsTarget": true
+      }
+    },
+    {
+      "fn": "sizeCuckoo",
+      "input": {
+        "items": 5000,
+        "memoryBits": 60000
+      },
+      "output": {
+        "buckets": 1316,
+        "fingerprintBits": 11,
+        "falsePositiveRate": 0.00390625,
+        "memoryBits": 57904,
+        "meetsTarget": true
+      }
+    },
+    {
+      "fn": "sizeKmv",
+      "input": {
+        "error": 0.02
+      },
+      "output": {
+        "k": 2502,
+        "standardError": 0.02,
+        "memoryBits": 80064,
+        "meetsTarget": true
+      }
+    },
+    {
+      "fn": "sizeKmv",
+      "input": {
+        "memoryBits": 8192
+      },
+      "output": {
+        "k": 256,
+        "standardError": 0.06274558051381586,
+        "memoryBits": 8192,
+        "meetsTarget": true
+      }
+    },
+    {
+      "fn": "sizeMinHash",
+      "input": {
+        "error": 0.02
+      },
+      "output": {
+        "k": 625,
+        "standardError": 0.02,
+        "memoryBits": 20000,
+        "meetsTarget": true
+      }
+    },
+    {
+      "fn": "sizeMinHash",
+      "input": {
+        "memoryBits": 4096
+      },
+      "output": {
+        "k": 128,
+        "standardError": 0.044194173824159216,
+        "memoryBits": 4096,
+        "meetsTarget": true
       }
     }
   ]

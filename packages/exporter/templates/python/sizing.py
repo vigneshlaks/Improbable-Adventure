@@ -166,3 +166,57 @@ def size_exact(distinct: float = None, memory_bits: float = None, **_: object) -
     entries = math.ceil(_need("distinct", distinct))
     memory = entries * (VALUE_BITS + COUNTER_BITS)
     return {"entries": entries, "memoryBits": memory, "meetsTarget": memory_bits is None or memory <= memory_bits}
+
+
+def size_count_sketch(error: float = None, memory_bits: float = None, **_: object) -> Sized:
+    """Count Sketch: a row's error exceeds epsilon x L2 norm with probability at most 1 / (width x epsilon^2) (Chebyshev), so width = 4 / epsilon^2
+    makes a row wrong with probability at most 1/4, and the median of an odd number of rows is wrong only if half of them are, which has probability
+    at most e^(-depth x D) with D = (1/2) ln 2 + (1/2) ln (2/3). The depth is the smallest odd one with that under 1 - confidence. Given a memory
+    budget, the width is what fits and epsilon is 2 / sqrt(width)."""
+    entropy = 0.5 * math.log(2) + 0.5 * math.log(2 / 3)
+    depth = max(1, math.ceil(math.log(1 / (1 - CONFIDENCE)) / entropy))
+    if depth % 2 == 0:
+        depth += 1
+    if memory_bits is not None:
+        width = max(1, math.floor(memory_bits / (depth * COUNTER_BITS)))
+    else:
+        width = math.ceil(4 / _target(error) ** 2)
+    achieved = 2 / math.sqrt(width)
+    return {"width": width, "depth": depth, "errorShare": achieved, "confidence": CONFIDENCE, "memoryBits": width * depth * COUNTER_BITS, "meetsTarget": _meets(error, achieved)}
+
+
+#: A Cuckoo Filter's buckets hold four fingerprints, and it works up to about this share full.
+CUCKOO_BUCKET_SIZE = 4
+CUCKOO_MAX_LOAD = 0.95
+
+
+def size_cuckoo(items: float = None, error: float = None, memory_bits: float = None, **_: object) -> Sized:
+    """False positives are about 2 x bucket size / 2^f at full load: f = ceil(log2(8 / error)). Given memory, the fingerprint is what fits."""
+    n = _need("items", items)
+    buckets = math.ceil(n / (CUCKOO_BUCKET_SIZE * CUCKOO_MAX_LOAD))
+    if memory_bits is not None:
+        fingerprint_bits = min(16, max(1, math.floor(memory_bits / (buckets * CUCKOO_BUCKET_SIZE))))
+    else:
+        fingerprint_bits = min(16, max(1, math.ceil(math.log2(2 * CUCKOO_BUCKET_SIZE / _target(error)))))
+    rate = 2 * CUCKOO_BUCKET_SIZE / 2**fingerprint_bits
+    return {"buckets": buckets, "fingerprintBits": fingerprint_bits, "falsePositiveRate": rate, "memoryBits": buckets * CUCKOO_BUCKET_SIZE * fingerprint_bits, "meetsTarget": _meets(error, rate)}
+
+
+def size_kmv(error: float = None, memory_bits: float = None, **_: object) -> Sized:
+    """K-Minimum Values: relative standard error 1 / sqrt(k - 2), so k = 1 / error^2 + 2, at 32 bits a hash."""
+    if memory_bits is not None:
+        k = max(3, math.floor(memory_bits / VALUE_BITS))
+    else:
+        k = math.ceil(1 / _target(error) ** 2) + 2
+    achieved = 1 / math.sqrt(k - 2)
+    return {"k": k, "standardError": achieved, "memoryBits": k * VALUE_BITS, "meetsTarget": _meets(error, achieved)}
+
+
+def size_min_hash(error: float = None, memory_bits: float = None, **_: object) -> Sized:
+    """MinHash: standard error at most 1 / (2 sqrt(k)), so k = 1 / (4 error^2), at 32 bits a slot."""
+    if memory_bits is not None:
+        k = max(1, math.floor(memory_bits / VALUE_BITS))
+    else:
+        k = math.ceil(1 / (4 * _target(error) ** 2))
+    achieved = 1 / (2 * math.sqrt(k))
+    return {"k": k, "standardError": achieved, "memoryBits": k * VALUE_BITS, "meetsTarget": _meets(error, achieved)}

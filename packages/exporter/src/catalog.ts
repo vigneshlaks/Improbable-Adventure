@@ -3,10 +3,14 @@ import { number, pct, size } from "./format";
 import {
   sizeBloom,
   sizeCountMin,
+  sizeCountSketch,
+  sizeCuckoo,
   sizeExact,
   sizeHyperLogLog,
+  sizeKmv,
   sizeLinearCounting,
   sizeLogLog,
+  sizeMinHash,
   sizeReservoir,
   type SizingConstants,
   type Workload,
@@ -147,5 +151,63 @@ export const CATALOG: Partial<Record<StructureKind, CatalogEntry>> = {
     },
     production: (workload, constants) => sizeHyperLogLog(workload, constants).memoryBits,
     formula: (c) => `registers m = 2^ceil(log2((${c.hyperLogLogErrorCoefficient} / error)^2)); bits = ${c.registerBits} x m; standard error = ${c.hyperLogLogErrorCoefficient} / sqrt(m).`,
+  },
+  countSketch: {
+    cls: "CountSketch",
+    typescript: "countSketch",
+    python: "count_sketch",
+    needs: [],
+    args: ["width", "depth"],
+    guide: { use: "You need approximate counts per item, a few items are far heavier than the rest, and you want errors that cancel instead of always overshooting.", avoid: "You need a count that never underestimates (use Count-Min), or most items are light and similar: its error follows the whole stream's L2 norm." },
+    size(workload, constants) {
+      const s = sizeCountSketch(workload, constants);
+      return { bits: s.memoryBits, args: { width: s.width, depth: s.depth }, summary: [`${number(s.width)} columns by ${s.depth} rows (${size(s.memoryBits)})`, `an estimate is within ${pct(s.errorShare)} of the L2 norm of the counts (the square root of the sum of their squares) of the truth, with probability ${pct(s.confidence)}`] };
+    },
+    production: (workload, constants) => sizeCountSketch(workload, constants).memoryBits,
+    formula: (c) => `width w = ceil(4 / error^2); depth d = the smallest odd number with e^(-0.1438 d) <= 1 - confidence (${pct(c.confidence)}); bits = ${c.counterBits} x w x d. A row is wrong by more than error x L2 norm with probability at most 1/4 (Chebyshev), and the median of d rows is wrong only if half of them are.`,
+  },
+  cuckooFilter: {
+    cls: "CuckooFilter",
+    typescript: "cuckooFilter",
+    python: "cuckoo_filter",
+    needs: [],
+    args: ["buckets", "fingerprintBits"],
+    guide: { use: "You ask \"have I seen this?\" like a Bloom filter, and items must also be removable (sessions, caches that expire, sets that change).", avoid: "The set can grow past what you sized for: above about 95 percent full it refuses adds, and a refused add loses an earlier item." },
+    size(workload, constants) {
+      const lack = missing(workload, "items", "the item count");
+      if (lack) return lack;
+      const s = sizeCuckoo(workload, constants);
+      return { bits: s.memoryBits, args: { buckets: s.buckets, fingerprintBits: s.fingerprintBits }, summary: [`${number(s.buckets)} buckets of 4, with ${s.fingerprintBits}-bit fingerprints (${size(s.memoryBits)})`, `false-positive rate about ${pct(s.falsePositiveRate)}, at 95 percent full`] };
+    },
+    production: (workload, constants) => (workload.items === undefined ? null : sizeCuckoo(workload, constants).memoryBits),
+    formula: () => "buckets = ceil(items / (4 x 0.95)); fingerprint bits f = ceil(log2(8 / error)); bits = buckets x 4 x f; false-positive rate about 8 / 2^f at full load.",
+  },
+  kMinimumValues: {
+    cls: "KMinimumValues",
+    typescript: "kMinimumValues",
+    python: "k_minimum_values",
+    needs: [],
+    args: ["k"],
+    guide: { use: "You count different items and need to combine counts from several streams (two sketches merge into the sketch of the union), or want a count that is exact while small.", avoid: "Items are removed: it cannot forget. HyperLogLog needs less memory for the same error." },
+    size(workload, constants) {
+      const s = sizeKmv(workload, constants);
+      return { bits: s.memoryBits, args: { k: s.k }, summary: [`k = ${number(s.k)} hashes (${size(s.memoryBits)})`, `standard error ${pct(s.standardError)}; exact until ${number(s.k)} different items`] };
+    },
+    production: (workload, constants) => sizeKmv(workload, constants).memoryBits,
+    formula: (c) => `k = ceil(1 / error^2) + 2; bits = ${c.valueBits} x k; standard error = 1 / sqrt(k - 2).`,
+  },
+  minHash: {
+    cls: "MinHash",
+    typescript: "minHash",
+    python: "min_hash",
+    needs: [],
+    args: ["k"],
+    guide: { use: "You compare how alike two large sets are (documents by their words, users by what they viewed) from a short signature, and need to find near-duplicates.", avoid: "You need an exact similarity, or the sets are small enough to compare directly." },
+    size(workload, constants) {
+      const s = sizeMinHash(workload, constants);
+      return { bits: s.memoryBits, args: { k: s.k }, summary: [`k = ${number(s.k)} slots (${size(s.memoryBits)}) per set`, `an estimated similarity has a standard error of at most ${pct(s.standardError)}`] };
+    },
+    production: (workload, constants) => sizeMinHash(workload, constants).memoryBits,
+    formula: (c) => `k = ceil(1 / (4 error^2)); bits = ${c.valueBits} x k per set; standard error at most 1 / (2 sqrt(k)).`,
   },
 };
