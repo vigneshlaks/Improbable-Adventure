@@ -10,8 +10,8 @@ test("a Cuckoo Filter matches the reference answers, never forgets what it took,
   for (let i = 0; i < v.items; i++) assert.equal(filter.add(stream(i)), true);
   for (let i = 0; i < v.removed; i++) assert.equal(filter.remove(stream(i * 5)), true);
   assert.equal(filter.size, v.size);
-  v.present.forEach((expected: boolean, i: number) => assert.equal(filter.has(stream(i * 5 + (i % 5))), expected, `present ${i}`));
-  v.outside.forEach((expected: boolean, i: number) => assert.equal(filter.has(stream(v.items + i)), expected, `outside ${i}`));
+  v.present.forEach((expected: boolean, i: number) => assert.equal(filter.mightContain(stream(i * 5 + (i % 5))), expected, `present ${i}`));
+  v.outside.forEach((expected: boolean, i: number) => assert.equal(filter.mightContain(stream(v.items + i)), expected, `outside ${i}`));
 
   const small = new CuckooFilter(4, 8); // 16 places
   const taken: number[] = [];
@@ -37,13 +37,13 @@ test(`statistical (${TRIALS} seeded trials): no added item is missed, and a neve
     }
     assert.ok(added.size >= 1990, `took ${added.size}`);
     let missed = 0;
-    for (const value of added) if (!filter.has(value)) missed++;
+    for (const value of added) if (!filter.mightContain(value)) missed++;
     assert.ok(missed <= 10, `missed ${missed}`); // an add that dropped a fingerprint costs one earlier item
     for (let i = 0; i < 200; i++) {
       const stranger = randomU32(random);
       if (added.has(stranger)) continue;
       probes++;
-      if (filter.has(stranger)) falseYes++;
+      if (filter.mightContain(stranger)) falseYes++;
     }
   }
   assert.ok(falseYes / probes <= sized.falsePositiveRate * 1.3, `false yes ${falseYes / probes} against ${sized.falsePositiveRate}`);

@@ -220,3 +220,75 @@ def size_min_hash(error: float = None, memory_bits: float = None, **_: object) -
         k = math.ceil(1 / (4 * _target(error) ** 2))
     achieved = 1 / (2 * math.sqrt(k))
     return {"k": k, "standardError": achieved, "memoryBits": k * VALUE_BITS, "meetsTarget": _meets(error, achieved)}
+
+
+#: A Quotient Filter is run up to this share full.
+QUOTIENT_MAX_LOAD = 0.9
+
+
+def size_quotient(items: float = None, error: float = None, memory_bits: float = None, **_: object) -> Sized:
+    """q = ceil(log2(items / 0.9)); false positives are the load times 2^-r, so r = ceil(log2(load / error)); the table is 2^q (r + 3) bits. Given memory, r is what fits."""
+    n = _need("items", items)
+    quotient_bits = max(2, math.ceil(math.log2(n / QUOTIENT_MAX_LOAD)))
+    slots = 2**quotient_bits
+    load = n / slots
+    if memory_bits is not None:
+        remainder_bits = min(16, max(1, math.floor(memory_bits / slots) - 3))
+    else:
+        remainder_bits = min(16, max(1, math.ceil(math.log2(load / _target(error)))))
+    rate = load * 2.0**-remainder_bits
+    return {"quotientBits": quotient_bits, "remainderBits": remainder_bits, "slots": slots, "falsePositiveRate": rate, "memoryBits": slots * (remainder_bits + 3), "meetsTarget": _meets(error, rate)}
+
+
+#: The bits of a Spectral Bloom Filter's counter, as in the game.
+SPECTRAL_COUNTER_BITS = 16
+
+
+def size_spectral(items: float = None, error: float = None, memory_bits: float = None, **_: object) -> Sized:
+    """A Bloom filter's size for the false-positive rate, in 16-bit counters; a count overshoots by at most e k N / counters."""
+    n = _need("items", items)
+
+    def rate_for(counters: int):
+        hashes = max(1, math.floor(counters / n * math.log(2) + 0.5))  # round half up, as in the other languages
+        return hashes, (1 - math.exp(-hashes * n / counters)) ** hashes
+
+    if memory_bits is not None:
+        counters = max(1, math.floor(memory_bits / SPECTRAL_COUNTER_BITS))
+    else:
+        wanted = _target(error)
+        counters = math.ceil(-n * math.log(wanted) / math.log(2) ** 2)
+        while rate_for(counters)[1] > wanted:
+            counters += 1
+    hashes, rate = rate_for(counters)
+    return {"counters": counters, "hashes": hashes, "falsePositiveRate": rate, "overshootShare": math.e * hashes / counters, "memoryBits": counters * SPECTRAL_COUNTER_BITS, "meetsTarget": _meets(error, rate)}
+
+
+def size_scalable(items: float = None, error: float = None, memory_bits: float = None, **_: object) -> Sized:
+    """A Scalable Bloom Filter for an expected number of items: the first layer holds a seventh of them, so three layers (1 + 2 + 4 sevenths) hold them all;
+    it grows past that on its own."""
+    n = _need("items", items)
+    rate = _target(error)
+    initial_capacity = max(1, math.ceil(n / 7))
+    layers = 1
+    while initial_capacity * (2**layers - 1) < n:
+        layers += 1
+    bits = 0
+    for i in range(layers):
+        capacity = initial_capacity * 2**i
+        bits += math.ceil(-capacity * math.log(rate * 0.45 * 0.5**i) / math.log(2) ** 2)
+    return {"initialCapacity": initial_capacity, "falsePositiveRate": rate, "layers": layers, "memoryBits": bits, "meetsTarget": memory_bits is None or bits <= memory_bits}
+
+
+#: The bits of a SimHash counter, as in the game.
+SIMHASH_COUNTER_BITS = 16
+
+
+def size_sim_hash(error: float = None, memory_bits: float = None, **_: object) -> Sized:
+    """The share of planes that disagree has a standard error of at most 1 / (2 sqrt(planes)), so planes = 1 / (4 error^2), rounded up to a multiple of 32;
+    a counter is 16 bits."""
+    if memory_bits is not None:
+        planes = max(32, math.floor(memory_bits / SIMHASH_COUNTER_BITS / 32) * 32)
+    else:
+        planes = max(32, math.ceil(1 / (4 * _target(error) ** 2) / 32) * 32)
+    achieved = 1 / (2 * math.sqrt(planes))
+    return {"planes": planes, "standardError": achieved, "memoryBits": planes * SIMHASH_COUNTER_BITS, "meetsTarget": _meets(error, achieved)}

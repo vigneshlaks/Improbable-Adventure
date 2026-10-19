@@ -14,9 +14,9 @@ def test_a_cuckoo_filter_matches_the_reference_answers_never_forgets_what_it_too
         assert cuckoo.remove(stream(i * 5)) is True
     assert cuckoo.size == v["size"]
     for i, expected in enumerate(v["present"]):
-        assert cuckoo.has(stream(i * 5 + (i % 5))) == expected, "present %d" % i
+        assert cuckoo.might_contain(stream(i * 5 + (i % 5))) == expected, "present %d" % i
     for i, expected in enumerate(v["outside"]):
-        assert cuckoo.has(stream(v["items"] + i)) == expected, "outside %d" % i
+        assert cuckoo.might_contain(stream(v["items"] + i)) == expected, "outside %d" % i
 
     small = CuckooFilter(4, 8)  # 16 places
     taken = [i for i in range(40) if small.add(stream(i))]
@@ -41,12 +41,12 @@ def test_statistical_no_added_item_is_missed_and_a_never_added_item_is_reported_
             if cuckoo.add(value):
                 added.add(value)
         assert len(added) >= 1990, len(added)
-        missed = sum(1 for value in added if not cuckoo.has(value))
+        missed = sum(1 for value in added if not cuckoo.might_contain(value))
         assert missed <= 10, missed  # an add that dropped a fingerprint costs one earlier item
         for _ in range(200):
             stranger = random_u32(rand)
             if stranger in added:
                 continue
             probes += 1
-            false_yes += cuckoo.has(stranger)
+            false_yes += cuckoo.might_contain(stranger)
     assert false_yes / probes <= sized["falsePositiveRate"] * 1.3, (false_yes / probes, sized["falsePositiveRate"])

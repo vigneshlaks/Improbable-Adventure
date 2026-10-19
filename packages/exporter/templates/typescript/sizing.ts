@@ -262,3 +262,90 @@ export function sizeMinHash(workload: Workload): MinHashSizing {
   const standardError = 1 / (2 * Math.sqrt(k));
   return { k, standardError, memoryBits: k * VALUE_BITS, meetsTarget: meets(workload, standardError) };
 }
+
+export interface QuotientSizing extends Sized {
+  quotientBits: number;
+  remainderBits: number;
+  slots: number;
+  falsePositiveRate: number;
+}
+
+/** A Quotient Filter is run up to this share full. */
+const QUOTIENT_MAX_LOAD = 0.9;
+
+/** q = ceil(log2(items / 0.9)); false positives are the load times 2^-r, so r = ceil(log2(load / error)); the table is 2^q (r + 3) bits. Given memory, r is what fits. */
+export function sizeQuotient(workload: Workload): QuotientSizing {
+  const n = need("items", workload.items);
+  const quotientBits = Math.max(2, Math.ceil(Math.log2(n / QUOTIENT_MAX_LOAD)));
+  const slots = 2 ** quotientBits;
+  const load = n / slots;
+  const remainderBits =
+    workload.memoryBits !== undefined ? Math.min(16, Math.max(1, Math.floor(workload.memoryBits / slots) - 3)) : Math.min(16, Math.max(1, Math.ceil(Math.log2(load / target(workload)))));
+  const falsePositiveRate = load * 2 ** -remainderBits;
+  return { quotientBits, remainderBits, slots, falsePositiveRate, memoryBits: slots * (remainderBits + 3), meetsTarget: meets(workload, falsePositiveRate) };
+}
+
+/** The bits of a Spectral Bloom Filter's counter, as in the game. */
+export const SPECTRAL_COUNTER_BITS = 16;
+
+export interface SpectralSizing extends Sized {
+  counters: number;
+  hashes: number;
+  falsePositiveRate: number;
+  /** The most a count is likely to overshoot, as a share of the items added (e k / counters). */
+  overshootShare: number;
+}
+
+/** A Bloom filter's size for the false-positive rate, in 16-bit counters; a count overshoots by at most e k N / counters. */
+export function sizeSpectral(workload: Workload): SpectralSizing {
+  const n = need("items", workload.items);
+  const rateFor = (counters: number) => {
+    const hashes = Math.max(1, Math.round((counters / n) * Math.LN2));
+    return { hashes, rate: (1 - Math.exp((-hashes * n) / counters)) ** hashes };
+  };
+  let counters = workload.memoryBits !== undefined ? Math.max(1, Math.floor(workload.memoryBits / SPECTRAL_COUNTER_BITS)) : undefined;
+  if (counters === undefined) {
+    const wanted = target(workload);
+    counters = Math.ceil((-n * Math.log(wanted)) / Math.LN2 ** 2);
+    while (rateFor(counters).rate > wanted) counters++;
+  }
+  const { hashes, rate } = rateFor(counters);
+  return { counters, hashes, falsePositiveRate: rate, overshootShare: (Math.E * hashes) / counters, memoryBits: counters * SPECTRAL_COUNTER_BITS, meetsTarget: meets(workload, rate) };
+}
+
+export interface ScalableSizing extends Sized {
+  initialCapacity: number;
+  falsePositiveRate: number;
+  layers: number;
+}
+
+/** A Scalable Bloom Filter for an expected number of items: the first layer holds a seventh of them, so three layers (1 + 2 + 4 sevenths) hold them all; it grows past that on its own. */
+export function sizeScalable(workload: Workload): ScalableSizing {
+  const n = need("items", workload.items);
+  const rate = target(workload);
+  const initialCapacity = Math.max(1, Math.ceil(n / 7));
+  let layers = 1;
+  while (initialCapacity * (2 ** layers - 1) < n) layers++;
+  let bits = 0;
+  for (let i = 0; i < layers; i++) {
+    const capacity = initialCapacity * 2 ** i;
+    bits += Math.ceil((-capacity * Math.log(rate * 0.45 * 0.5 ** i)) / Math.LN2 ** 2);
+  }
+  return { initialCapacity, falsePositiveRate: rate, layers, memoryBits: bits, meetsTarget: workload.memoryBits === undefined || bits <= workload.memoryBits };
+}
+
+/** The bits of a SimHash counter, as in the game. */
+export const SIMHASH_COUNTER_BITS = 16;
+
+export interface SimHashSizing extends Sized {
+  planes: number;
+  /** The most the standard error of the estimated angle, as a share of pi, can be. */
+  standardError: number;
+}
+
+/** The share of planes that disagree has a standard error of at most 1 / (2 sqrt(planes)), so planes = 1 / (4 error^2), rounded up to a multiple of 32; a counter is 16 bits. */
+export function sizeSimHash(workload: Workload): SimHashSizing {
+  const planes = workload.memoryBits !== undefined ? Math.max(32, Math.floor(workload.memoryBits / SIMHASH_COUNTER_BITS / 32) * 32) : Math.max(32, Math.ceil(1 / (4 * target(workload) ** 2) / 32) * 32);
+  const standardError = 1 / (2 * Math.sqrt(planes));
+  return { planes, standardError, memoryBits: planes * SIMHASH_COUNTER_BITS, meetsTarget: meets(workload, standardError) };
+}

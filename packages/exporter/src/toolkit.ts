@@ -46,7 +46,7 @@ export function generateToolkit(language: Language, owned: readonly StructureKin
     const { name, needs } = entry;
     wanted.add(`${layout.sourceDir}/${name}.${layout.extension}`);
     wanted.add(`${layout.testDir}/${layout.testName(name)}`);
-    for (const need of needs) wanted.add(`${layout.sourceDir}/${need}.${layout.extension}`);
+    for (const need of needs) wanted.add(`${layout.sourceDir}/${language === "python" ? need.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`) : need}.${layout.extension}`); // a helper file is named by its TypeScript name
   }
   const out: Record<string, string> = {};
   for (const path of [...wanted].sort()) {

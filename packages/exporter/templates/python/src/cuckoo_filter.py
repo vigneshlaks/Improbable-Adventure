@@ -100,7 +100,7 @@ class CuckooFilter:
         self._entries -= 1
         return True
 
-    def has(self, item: Item) -> bool:
+    def might_contain(self, item: Item) -> bool:
         """True if the item may have been added; False means it certainly was not (unless a fingerprint was lost when the table was too full)."""
         fp = self._fingerprint(item)
         first = self._bucket_of(item)

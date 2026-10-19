@@ -11,7 +11,11 @@ import {
   sizeLinearCounting,
   sizeLogLog,
   sizeMinHash,
+  sizeQuotient,
   sizeReservoir,
+  sizeScalable,
+  sizeSimHash,
+  sizeSpectral,
   type SizingConstants,
   type Workload,
 } from "./sizing";
@@ -30,7 +34,7 @@ export interface Row {
 export interface CatalogEntry {
   /** The class name in both languages. */
   cls: string;
-  /** The template file of each language, without extension, and the helper files it needs besides. */
+  /** The template file of each language, without extension, and the helper files it needs besides (named as in TypeScript; Python's are the snake_case of them). */
   typescript: string;
   python: string;
   needs: string[];
@@ -209,5 +213,67 @@ export const CATALOG: Partial<Record<StructureKind, CatalogEntry>> = {
     },
     production: (workload, constants) => sizeMinHash(workload, constants).memoryBits,
     formula: (c) => `k = ceil(1 / (4 error^2)); bits = ${c.valueBits} x k per set; standard error at most 1 / (2 sqrt(k)).`,
+  },
+  quotientFilter: {
+    cls: "QuotientFilter",
+    typescript: "quotientFilter",
+    python: "quotient_filter",
+    needs: [],
+    args: ["quotientBits", "remainderBits"],
+    guide: { use: "You ask \"have I seen this?\", items must be removable, and you want to merge filters from several machines or keep them compact and cache-friendly.", avoid: "The set can outgrow the table: a full table refuses adds. A Bloom Filter is simpler when nothing is ever removed or merged." },
+    size(workload, constants) {
+      const lack = missing(workload, "items", "the item count");
+      if (lack) return lack;
+      const s = sizeQuotient(workload, constants);
+      return { bits: s.memoryBits, args: { quotientBits: s.quotientBits, remainderBits: s.remainderBits }, summary: [`${number(s.slots)} slots of ${s.remainderBits + 3} bits (${size(s.memoryBits)})`, `false-positive rate about ${pct(s.falsePositiveRate)}`] };
+    },
+    production: (workload, constants) => (workload.items === undefined ? null : sizeQuotient(workload, constants).memoryBits),
+    formula: () => "quotient bits q = ceil(log2(items / 0.9)); remainder bits r = ceil(log2(load / error)) with load = items / 2^q; bits = 2^q x (r + 3); false-positive rate about load x 2^-r.",
+  },
+  spectralBloom: {
+    cls: "SpectralBloom",
+    typescript: "spectralBloom",
+    python: "spectral_bloom",
+    needs: [],
+    args: ["counters", "hashes"],
+    guide: { use: "You need both \"have I seen this?\" and \"how many times?\" from one structure, and items must be removable.", avoid: "Counts are huge (16-bit counters stop at 65,535) or memory is tight: a Bloom Filter uses sixteen times fewer bits for the yes or no alone." },
+    size(workload, constants) {
+      const lack = missing(workload, "items", "the item count");
+      if (lack) return lack;
+      const s = sizeSpectral(workload, constants);
+      return { bits: s.memoryBits, args: { counters: s.counters, hashes: s.hashes }, summary: [`${number(s.counters)} counters of ${constants.spectralCounterBits} bits (${size(s.memoryBits)}) and ${s.hashes} hashes`, `false-positive rate ${pct(s.falsePositiveRate)}; a count overshoots by at most ${pct(s.overshootShare)} of all items added`] };
+    },
+    production: (workload, constants) => (workload.items === undefined ? null : sizeSpectral(workload, constants).memoryBits),
+    formula: (c) => `counters m = -n ln(p) / (ln 2)^2; hashes k = round(m / n x ln 2); bits = ${c.spectralCounterBits} x m; false-positive rate (1 - e^(-k n / m))^k; a count overshoots by at most e k N / m.`,
+  },
+  scalableBloom: {
+    cls: "ScalableBloomFilter",
+    typescript: "scalableBloom",
+    python: "scalable_bloom",
+    needs: ["bloomFilter"],
+    args: ["initialCapacity", "falsePositiveRate"],
+    guide: { use: "You ask \"have I seen this?\" about a set whose size you cannot know in advance, and want the false-positive rate to stay under a target as it grows.", avoid: "You know the size: a Bloom Filter sized for it needs less memory. Items cannot be removed." },
+    size(workload, constants) {
+      const lack = missing(workload, "items", "the expected item count");
+      if (lack) return lack;
+      const s = sizeScalable(workload, constants);
+      return { bits: s.memoryBits, args: { initialCapacity: s.initialCapacity, falsePositiveRate: s.falsePositiveRate }, summary: [`a first layer for ${number(s.initialCapacity)} items; about ${s.layers} layers (${size(s.memoryBits)}) for ${number(workload.items as number)} items, more if it grows`, `false-positive rate stays under ${pct(s.falsePositiveRate)}`] };
+    },
+    production: (workload, constants) => (workload.items === undefined ? null : sizeScalable(workload, constants).memoryBits),
+    formula: () => "layer i holds first x 2^i items with a false-positive target of 0.45 x rate x (1/2)^i, so the targets add up to 0.9 of the rate asked for; the first layer holds a seventh of the expected items, so three layers hold them all.",
+  },
+  simHash: {
+    cls: "SimHash",
+    typescript: "simHash",
+    python: "sim_hash",
+    needs: [],
+    args: ["planes"],
+    guide: { use: "You compare large sets or documents by the angle between them and want a fingerprint a few kilobytes long, where \"roughly alike\" is enough.", avoid: "A few items repeat a lot (the repeats dominate the fingerprint), or you need a close estimate of the Jaccard similarity: MinHash is sharper." },
+    size(workload, constants) {
+      const s = sizeSimHash(workload, constants);
+      return { bits: s.memoryBits, args: { planes: s.planes }, summary: [`${number(s.planes)} planes of ${constants.simHashCounterBits} bits (${size(s.memoryBits)})`, `the angle, as a share of pi, has a standard error of at most ${pct(s.standardError)}`] };
+    },
+    production: (workload, constants) => sizeSimHash(workload, constants).memoryBits,
+    formula: (c) => `planes = ceil(1 / (4 error^2)) rounded up to a multiple of 32; bits = ${c.simHashCounterBits} x planes; the share of planes that disagree has a standard error of at most 1 / (2 sqrt(planes)).`,
   },
 };

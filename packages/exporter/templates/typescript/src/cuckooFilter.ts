@@ -108,7 +108,7 @@ export class CuckooFilter {
   }
 
   /** True if the item may have been added; false means it certainly was not (unless a fingerprint was lost when the table was too full). */
-  has(item: Item): boolean {
+  mightContain(item: Item): boolean {
     const fp = this.fingerprint(item);
     const first = this.bucketOf(item);
     return this.slotOf(first, fp) >= 0 || this.slotOf(this.alternate(first, fp), fp) >= 0;
