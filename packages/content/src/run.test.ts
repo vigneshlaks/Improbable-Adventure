@@ -30,7 +30,7 @@ describe("upgrades.json", () => {
 });
 
 describe("fusions.json", () => {
-  it("has the HyperLogLog recipe: LogLog and Linear Counting make a HyperLogLog; rejects a recipe with one input, a repeated input, a result that is also an input, an unknown structure or no summary", () => {
+  it("has the HyperLogLog recipe: LogLog and Linear Counting make a HyperLogLog; rejects a recipe with one input, three inputs, a result that is also an input, an unknown structure or no summary", () => {
     // has the HyperLogLog recipe: LogLog and Linear Counting make a HyperLogLog
     {
       expect(fusions.hyperLogLog).toMatchObject({ inputs: ["logLog", "linearCounting"], result: "hyperLogLog" });
@@ -41,7 +41,8 @@ describe("fusions.json", () => {
       const ok = { name: "X", phase: 1, inputs: ["logLog", "linearCounting"], result: "hyperLogLog", summary: "Makes a thing." };
       expect(() => parseFusions({ x: ok })).not.toThrow();
       expect(() => parseFusions({ x: { ...ok, inputs: ["logLog"] } })).toThrow();
-      expect(() => parseFusions({ x: { ...ok, inputs: ["logLog", "logLog"] } })).toThrow();
+      expect(() => parseFusions({ x: { ...ok, inputs: ["logLog", "logLog"] } })).not.toThrow(); // a kind may fuse with a second copy of itself
+      expect(() => parseFusions({ x: { ...ok, inputs: ["logLog", "linearCounting", "exactMemory"] } })).toThrow();
       expect(() => parseFusions({ x: { ...ok, result: "logLog" } })).toThrow();
       expect(() => parseFusions({ x: { ...ok, result: "skipList" } })).toThrow();
       expect(() => parseFusions({ x: { ...ok, summary: undefined } })).toThrow();
@@ -122,7 +123,8 @@ describe("buildRunConfig", () => {
       expect(config.loadout).toEqual(balance.STARTING_LOADOUT);
       const structureRewards = config.rewards.filter((r) => r.kind === "structure").map((r) => (r.kind === "structure" ? r.structure : ""));
       const fused = Object.values(fusions).map((fusion) => fusion.result);
-      expect(structureRewards.sort()).toEqual(STRUCTURE_KINDS.filter((kind) => !balance.STARTING_LOADOUT.includes(kind) && !fused.includes(kind)).sort());
+      const doubled = Object.values(fusions).filter((fusion) => fusion.inputs[0] === fusion.inputs[1]).map((fusion) => fusion.inputs[0]);
+      expect(structureRewards.sort()).toEqual(STRUCTURE_KINDS.filter((kind) => (!balance.STARTING_LOADOUT.includes(kind) || doubled.includes(kind)) && !fused.includes(kind)).sort());
       expect(structureRewards).not.toContain("hyperLogLog"); // it can only be made, never found
       expect(config.rewards.filter((r) => r.kind === "upgrade").map((r) => r.id).sort()).toEqual(Object.keys(upgrades).map((id) => `upgrade:${id}`).sort());
       for (const reward of config.rewards) expect(reward.weight).toBe(reward.kind === "structure" ? balance.REWARD_WEIGHTS.structure : balance.REWARD_WEIGHTS.upgrade);
@@ -152,6 +154,8 @@ describe("buildRunConfig", () => {
       expect(config.fusions).toEqual([
         { id: "hyperLogLog", inputs: ["logLog", "linearCounting"], result: "hyperLogLog" },
         { id: "topKTracker", inputs: ["countMinSketch", "exactMemory"], result: "topKTracker" },
+        { id: "scalableBloom", inputs: ["bloomFilter", "bloomFilter"], result: "scalableBloom" },
+        { id: "spectralBloom", inputs: ["bloomFilter", "countMinSketch"], result: "spectralBloom" },
       ]);
     }
     // designs each encounter on its own, so the five Minions are not copies of one another

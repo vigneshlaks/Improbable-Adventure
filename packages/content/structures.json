@@ -236,5 +236,41 @@
     "summary": "Tells which sets of values are close copies of the stream, by comparing short signatures.",
     "help": "Keeps, for each of many hash functions, the smallest hash of any value it has seen. Two sets agree on that minimum with exactly the chance of their Jaccard similarity (shared values over values in either), so the share of agreeing slots estimates it, within about 1 over twice the square root of the slots. It flags the copies at or above the threshold, and says how many of the flagged ones are surely real. It ignores deletes, so ghosts (deleted values) still count in its set, which widens its range under Churn.",
     "flavor": "Knows a face by the first thing it would pick out of a crowd."
+  },
+  "scalableBloom": {
+    "name": "Scalable Bloom Filter",
+    "phase": 2,
+    "aliases": [
+      "scalable",
+      "sbf"
+    ],
+    "answers": [
+      "presence"
+    ],
+    "knob": null,
+    "summary": "A stack of Bloom filters that adds a larger, tighter layer whenever one fills, so a stream that grows past the plan does not flood it.",
+    "help": "Starts with one layer in a quarter of the Space and keeps the rest in reserve. When a layer holds as many values as it was sized for, a new layer twice the size and half as likely to flag a stranger is added, and a value is present if any layer says so, so the false-positive rates add up to a bound that holds as the stream grows. The reserve is finite: once it is spent the last layer fills like any Bloom filter. A Bloom filter sized right for the stream beats it; it is for when you do not know the size. It cannot delete.",
+    "flavor": "Never says the room is full; just builds another one."
+  },
+  "spectralBloom": {
+    "name": "Spectral Bloom Filter",
+    "phase": 2,
+    "aliases": [
+      "spectral",
+      "counting"
+    ],
+    "answers": [
+      "presence",
+      "frequency"
+    ],
+    "knob": {
+      "name": "expected items",
+      "min": 16,
+      "max": 100000,
+      "description": "How many different values you expect; it sets how many counters each value uses."
+    },
+    "summary": "A Bloom filter made of counters: Presence and Frequency from one slot, and it handles deletes.",
+    "help": "Every value adds one to each of its counters, and a delete takes one off. Presence asks whether all of a value's counters are above zero; Frequency reads the smallest, which is never below the truth, so strike on it. The counters are 16 bits each, so the same Space buys half as many cells as a Count-Min Sketch of 32-bit counters, and a counter that reaches its top stops and says only \"at least\".",
+    "flavor": "A Bloom filter that learned to count."
   }
 }

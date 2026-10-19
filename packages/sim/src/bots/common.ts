@@ -18,12 +18,15 @@ export function preferredKinds(weakPoint: WeakPoint, traits: StreamTraits): Stru
   switch (weakPoint) {
     case "presence":
       // A Bloom Filter cannot delete, so under Churn it flags the deleted values as well; a Cuckoo Filter can forget them.
-      return traits.churn === "low" ? ["bloomFilter", "exactMemory", "reservoirSampling"] : ["cuckooFilter", "bloomFilter", "exactMemory", "reservoirSampling"];
+      // A Spectral Bloom Filter takes deletes back too, so it is the next choice under Churn; a Scalable Bloom Filter hedges against Growth.
+      return traits.churn === "low"
+        ? [...(traits.growth === "low" ? [] : (["scalableBloom"] as StructureKind[])), "bloomFilter", "spectralBloom", "exactMemory", "reservoirSampling"]
+        : ["cuckooFilter", "bloomFilter", "spectralBloom", "exactMemory", "reservoirSampling"];
     case "frequency":
       // A Top-K Tracker follows the heavy values exactly, so it is worth having once the stream has some; on a flat stream nothing helps much.
       return traits.skew === "low"
-        ? ["countMinSketch", "exactMemory", "reservoirSampling"]
-        : ["topKTracker", "countMinSketch", "exactMemory", "reservoirSampling"];
+        ? ["countMinSketch", "spectralBloom", "exactMemory", "reservoirSampling"]
+        : ["topKTracker", "countMinSketch", "spectralBloom", "exactMemory", "reservoirSampling"];
     case "likeness":
       // MinHash is built for it. Exact Memory compares copies with its table exactly while the table has room.
       return ["minHash", "exactMemory"];

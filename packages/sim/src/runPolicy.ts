@@ -47,7 +47,10 @@ export const sensiblePolicy: RunPolicy = {
     const steadyCountMin = actions.find((a) => a.type === "enchant" && a.enchantmentId === "steady" && a.kind === "countMinSketch");
     if (steadyCountMin) return steadyCountMin;
     // HyperLogLog first; then a Top-K Tracker, which the bots' Frequency taste uses on skewed streams.
-    const fuse = actions.find((a) => a.type === "fuse" && a.recipeId === "hyperLogLog") ?? actions.find((a) => a.type === "fuse" && a.recipeId === "topKTracker");
+    const fuse =
+      actions.find((a) => a.type === "fuse" && a.recipeId === "hyperLogLog") ??
+      actions.find((a) => a.type === "fuse" && a.recipeId === "topKTracker") ??
+      actions.find((a) => a.type === "fuse" && a.recipeId === "spectralBloom");
     if (fuse) return fuse;
     // Seeded goes on the structure a Cunning enemy can hurt most, among those that are free to take it.
     for (const kind of ["bloomFilter", "hyperLogLog", "logLog", "countMinSketch"]) {

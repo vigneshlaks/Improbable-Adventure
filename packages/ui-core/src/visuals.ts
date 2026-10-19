@@ -1,4 +1,4 @@
-import { BloomFilter, CountMinSketch, CountSketch, CuckooFilter, HyperLogLog, KllSketch, KMinimumValues, LogLog, MinHash, restoreStructure, TDigest, TopKTracker, type Json, type StructureConstants, type StructureSnapshot } from "@pda/engine";
+import { BloomFilter, CountMinSketch, CountSketch, CuckooFilter, HyperLogLog, KllSketch, KMinimumValues, LogLog, MinHash, restoreStructure, ScalableBloom, SpectralBloom, TDigest, TopKTracker, type Json, type StructureConstants, type StructureSnapshot } from "@pda/engine";
 import { structureLabel } from "./views";
 
 /** The most cells a visual draws; a bigger structure is shown averaged down to this many. */
@@ -96,6 +96,15 @@ export function structureVisual(snapshot: StructureSnapshot, slot: number, const
     const top = Math.max(1, ...items.map((item) => item.weight));
     // Each bar is a stored item: how tall is how many units it stands for (taller = more), in the order of the values.
     return { ...base, shape: "bars", cells: downsample(items.map((item) => item.weight / top)), columns: 0, caption: `${items.length} stored values, each as tall as the units it stands for`, readout: `rank error about ±${percent(live.rankError)}` };
+  }
+  if (live instanceof ScalableBloom) {
+    const fills = live.layerFills;
+    return { ...base, shape: "meter", cells: fills, columns: 0, caption: `${fills.length} layers (lit = how full), ${live.reserveBits} bits still in reserve`, readout: `false positives about ${percent(live.falsePositiveRate())}` };
+  }
+  if (live instanceof SpectralBloom) {
+    const counters = numbers(state, "counters");
+    const peak = Math.max(1, ...counters);
+    return { ...base, shape: "heatmap", cells: downsample(counters.map((c) => c / peak)), columns: 32, caption: `${counters.length} counters shared by all ${live.params.k} hashes (brighter = higher)`, readout: `overshoot about ${live.errorBand.toFixed(1)}, false positives about ${percent(live.falsePositiveRate)}` };
   }
   if (live instanceof MinHash) {
     const k = live.params.k as number;

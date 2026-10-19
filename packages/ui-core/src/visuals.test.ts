@@ -21,13 +21,13 @@ describe("structureVisual", () => {
         shapes[kind + (enchantment ?? "")] = visual.shape;
         expect(visual.slot).toBe(2);
         expect(visual.cells.length).toBeGreaterThan(0);
-        expect(visual.cells.length).toBeLessThanOrEqual(visual.shape === "heatmap" ? 4096 / 32 : MAX_VISUAL_CELLS);
+        expect(visual.cells.length).toBeLessThanOrEqual(visual.shape === "heatmap" ? 4096 / 16 : MAX_VISUAL_CELLS);
         expect(visual.cells.every((c) => c >= 0 && c <= 1)).toBe(true);
         expect(Math.max(...visual.cells)).toBeGreaterThan(0);
         expect(visual.readout.length).toBeGreaterThan(0);
       }
     }
-    expect(shapes).toMatchObject({ bloomFilter: "meter", countMinSketch: "heatmap", logLog: "bars", hyperLogLog: "bars", countSketch: "heatmap", topKTracker: "heatmap", cuckooFilter: "meter", kMinimumValues: "bars", kllSketch: "bars", tDigest: "bars", minHash: "bars" });
+    expect(shapes).toMatchObject({ bloomFilter: "meter", countMinSketch: "heatmap", logLog: "bars", hyperLogLog: "bars", countSketch: "heatmap", topKTracker: "heatmap", cuckooFilter: "meter", kMinimumValues: "bars", kllSketch: "bars", tDigest: "bars", minHash: "bars", scalableBloom: "meter", spectralBloom: "heatmap" });
     // A heatmap keeps its grid shape, a Bloom readout reports its fill.
     const grid = structureVisual(filled("countMinSketch", 4096), 0, constants);
     expect(grid.columns).toBe(4096 / (32 * constants.cmsDefaultDepth)); // one row per hash, one column per counter

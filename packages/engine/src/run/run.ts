@@ -44,7 +44,6 @@ function validate(config: RunConfig): void {
     need(!recipes.has(fusion.id), `fusion id ${fusion.id} is used twice`);
     recipes.add(fusion.id);
     need(fusion.inputs.length >= 2, `fusion ${fusion.id} needs at least two inputs`);
-    need(new Set(fusion.inputs).size === fusion.inputs.length, `fusion ${fusion.id} lists an input twice`);
     need(!fusion.inputs.includes(fusion.result), `fusion ${fusion.id} would produce one of its own inputs`);
   }
   const enchantmentIds = new Set<string>();
@@ -75,7 +74,7 @@ function startFight(state: RunState, encounter: number): { state: RunState; even
       startingCertainty: state.certainty,
       damageMultiplier: 1 + stats.damagePercent / 100,
     },
-    loadout: [...state.owned],
+    loadout: [...new Set(state.owned)], // a second copy of a kind is only material for a fusion
     enchantments: { ...state.attached },
     enemy: config.encounters[encounter] as FightConfig["enemy"],
     traitTables: config.traitTables,
@@ -111,12 +110,28 @@ export function createRun(seed: string, config: RunConfig): RunState {
   return startFight(base, 0).state;
 }
 
+/** How many copies of a kind the recipes that are still to do need: 2 for a kind that fuses with itself, otherwise 1. */
+function copiesWanted(state: RunState, kind: StructureKind): number {
+  let wanted = 1;
+  for (const fusion of state.config.fusions) {
+    if (state.owned.includes(fusion.result) || state.consumed.includes(fusion.result)) continue;
+    wanted = Math.max(wanted, fusion.inputs.filter((input) => input === kind).length);
+  }
+  return wanted;
+}
+
+/** A structure reward is offered when the kind is not owned or used up, or when a fusion that is still open needs a second copy of it. */
+function wantsAnother(state: RunState, kind: StructureKind): boolean {
+  if (state.consumed.includes(kind)) return false;
+  return state.owned.filter((owned) => owned === kind).length < copiesWanted(state, kind);
+}
+
 /** Draws up to `count` distinct eligible rewards, each in proportion to its weight. */
 function drawOffers(state: RunState): { offers: string[]; rng: RunState["rewardRng"] } {
   const rng = Rng.fromState(state.rewardRng);
   const eligible = state.config.rewards.filter(
     (reward) =>
-      reward.weight > 0 && !(reward.kind === "structure" && (state.owned.includes(reward.structure) || state.consumed.includes(reward.structure))),
+      reward.weight > 0 && !(reward.kind === "structure" && !wantsAnother(state, reward.structure)),
   );
   const offers: string[] = [];
   while (offers.length < state.config.rewardChoices && eligible.length > 0) {
@@ -191,11 +206,19 @@ function chooseReward(state: RunState, index: number, events: Array<GameEvent | 
   return moved.state;
 }
 
-/** The fusions whose inputs are all owned, and whose result is not already owned. */
+/** The fusions whose inputs are all owned (a recipe that names a kind twice needs two copies), and whose result is not already owned. */
 function availableFusions(state: RunState): FusionDef[] {
+  const count = (kinds: readonly StructureKind[], kind: StructureKind) => kinds.filter((k) => k === kind).length;
   return state.config.fusions.filter(
-    (fusion) => fusion.inputs.every((input) => state.owned.includes(input)) && !state.owned.includes(fusion.result),
+    (fusion) => fusion.inputs.every((input) => count(state.owned, input) >= count(fusion.inputs, input)) && !state.owned.includes(fusion.result),
   );
+}
+
+/** The owned kinds with one copy of each recipe input taken out. */
+function withoutInputs(owned: readonly StructureKind[], inputs: readonly StructureKind[]): StructureKind[] {
+  const rest = [...owned];
+  for (const input of inputs) rest.splice(rest.indexOf(input), 1);
+  return rest;
 }
 
 function fuse(state: RunState, recipeId: string, events: Array<GameEvent | RunEvent>): RunState {
@@ -205,14 +228,14 @@ function fuse(state: RunState, recipeId: string, events: Array<GameEvent | RunEv
   // An input's enchantment is not lost with it: it goes back to the inventory, and the result starts without one.
   const attached = { ...state.attached };
   const returned: string[] = [];
-  for (const input of recipe.inputs) {
+  for (const input of new Set(recipe.inputs)) {
     const enchantment = attached[input];
     if (enchantment !== undefined) returned.push(enchantment);
     delete attached[input];
   }
   return {
     ...state,
-    owned: [...state.owned.filter((kind) => !recipe.inputs.includes(kind)), recipe.result],
+    owned: [...withoutInputs(state.owned, recipe.inputs), recipe.result],
     consumed: [...state.consumed, ...recipe.inputs],
     enchantments: [...state.enchantments, ...returned],
     attached,
@@ -231,7 +254,7 @@ function availableEnchantments(state: RunState): Array<{ enchantmentId: string; 
   for (const enchantmentId of heldEnchantments(state)) {
     const def = state.config.enchantments.find((candidate) => candidate.id === enchantmentId);
     if (!def) continue;
-    for (const kind of state.owned) {
+    for (const kind of new Set(state.owned)) {
       if (def.valid.includes(kind) && state.attached[kind] !== enchantmentId) options.push({ enchantmentId, kind });
     }
   }

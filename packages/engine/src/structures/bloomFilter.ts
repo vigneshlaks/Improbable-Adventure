@@ -99,6 +99,16 @@ export class BloomFilter implements Structure {
     }
   }
 
+  /** Whether the filter reports a value present. */
+  has(value: number): boolean {
+    return this.test(value);
+  }
+
+  /** The hash count and size this filter was built with. */
+  get shape(): { m: number; k: number } {
+    return { m: this.m, k: this.k };
+  }
+
   /** False-positive rate right now, estimated from how full the bit array is. */
   currentFalsePositiveRate(): number {
     return Math.pow(this.fill, this.k);

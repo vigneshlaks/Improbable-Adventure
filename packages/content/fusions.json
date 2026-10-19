@@ -18,5 +18,25 @@
     ],
     "result": "topKTracker",
     "summary": "Count-Min Sketch and Exact Memory fuse into a Top-K Tracker: the grid ranks the values and an exact list follows the heaviest, so a skewed stream's favorites are answered tightly. It loses Exact Memory's guarantee for values that are not on the list."
+  },
+  "scalableBloom": {
+    "name": "Scalable Bloom Filter",
+    "phase": 2,
+    "inputs": [
+      "bloomFilter",
+      "bloomFilter"
+    ],
+    "result": "scalableBloom",
+    "summary": "Two Bloom Filters fuse into a Scalable Bloom Filter: layers that tighten as the stream grows. You need a second Bloom Filter, which can turn up as a reward."
+  },
+  "spectralBloom": {
+    "name": "Spectral Bloom Filter",
+    "phase": 2,
+    "inputs": [
+      "bloomFilter",
+      "countMinSketch"
+    ],
+    "result": "spectralBloom",
+    "summary": "A Bloom Filter and a Count-Min Sketch fuse into a Spectral Bloom Filter: a Bloom filter of counters that answers Presence and Frequency, and takes deletes back."
   }
 }

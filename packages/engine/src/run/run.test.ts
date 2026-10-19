@@ -298,12 +298,54 @@ describe("fusions at the rest stop", () => {
     }
     // rejects a recipe that cannot work
     {
-      expect(() => start("x", { fusions: [{ id: "a", inputs: ["logLog", "logLog"], result: "hyperLogLog" }] })).toThrow(RangeError);
       expect(() => start("x", { fusions: [{ id: "a", inputs: ["logLog", "linearCounting"], result: "logLog" }] })).toThrow(RangeError);
       expect(() => start("x", { fusions: [{ id: "a", inputs: ["logLog"], result: "hyperLogLog" }] })).toThrow(RangeError);
       const twice = { id: "a", inputs: ["logLog", "linearCounting"] as const, result: "hyperLogLog" as const };
       expect(() => start("x", { fusions: [twice, twice] })).toThrow(RangeError);
     }
+  });
+});
+
+describe("fusions that need two copies of a kind", () => {
+  const doubled = { id: "scalable", inputs: ["bloomFilter", "bloomFilter"] as StructureKind[], result: "scalableBloom" as StructureKind };
+  const another = { id: "structure:bloomFilter", kind: "structure" as const, structure: "bloomFilter" as const, weight: 1 };
+  const power = { id: "upgrade:power", kind: "upgrade" as const, upgrade: "power", weight: 1 };
+  const config = { fusions: [doubled], rewards: [another, power], loadout: ["exactMemory", "bloomFilter"] as StructureKind[] };
+  const offered = (run: RunState) => (observeRun(run).offers ?? []).map((o) => o.id);
+
+  it("offers a second copy of the kind as a reward, not a third; needs both copies for the fusion and uses both up, so the result takes one slot and the kind is not found again; keeps one copy of a kind in the loadout of a fight", () => {
+    // the first reward offers a second Bloom Filter, though one is owned
+    const reward = until(createRun("twice", runConfig(config)), "reward");
+    expect(offered(reward)).toContain("structure:bloomFilter");
+    // without it there is nothing to fuse
+    const lone = until(reward, "rest", 1);
+    expect(legalActions(lone)).toEqual([{ type: "leaveRest" }]);
+    // with it there is: the fight in between has a single Bloom Filter to deploy, and the rewards stop offering a third
+    const taken = play(reward, { type: "chooseReward", index: offered(reward).indexOf("structure:bloomFilter") }).state;
+    expect(taken.owned.filter((kind) => kind === "bloomFilter")).toHaveLength(2);
+    expect(taken.fight?.config.loadout.filter((kind) => kind === "bloomFilter")).toHaveLength(1);
+    expect(offered(until(taken, "reward"))).not.toContain("structure:bloomFilter");
+    const rest = until(taken, "rest");
+    expect(legalActions(rest)).toEqual([{ type: "fuse", recipeId: "scalable" }, { type: "leaveRest" }]);
+    expect(observeRun(rest).fusions).toEqual([{ id: "scalable", inputs: ["bloomFilter", "bloomFilter"], result: "scalableBloom" }]);
+    // fusing takes both
+    const { state, events } = play(rest, { type: "fuse", recipeId: "scalable" });
+    expect(state.owned).toEqual(["exactMemory", "scalableBloom"]);
+    expect(events).toContainEqual({ type: "fused", recipeId: "scalable", inputs: ["bloomFilter", "bloomFilter"], result: "scalableBloom" });
+    expect(legalActions(state)).toEqual([{ type: "leaveRest" }]);
+    expect(offered(until(play(state, { type: "leaveRest" }).state, "reward"))).not.toContain("structure:bloomFilter");
+  });
+
+  it("returns the enchantment held by a kind that is fused away once, and offers an enchantment on a doubled kind once", () => {
+    const reward = until(createRun("twice-ench", runConfig(config)), "reward");
+    const taken = play(reward, { type: "chooseReward", index: offered(reward).indexOf("structure:bloomFilter") }).state;
+    const rest = { ...until(taken, "rest"), enchantments: ["seeded"] };
+    const attached = play(rest, { type: "enchant", enchantmentId: "seeded", kind: "bloomFilter" }).state;
+    const options = legalActions(attached).filter((a) => a.type === "enchant");
+    expect(options.length).toBeLessThanOrEqual(1); // one entry for the kind, not one per copy
+    const fused = play(attached, { type: "fuse", recipeId: "scalable" }).state;
+    expect(fused.enchantments).toEqual(["seeded"]); // handed back once, not twice
+    expect(fused.attached).toEqual({});
   });
 });
 

@@ -96,6 +96,10 @@ describe("balance.json", () => {
         cuckooMaxKicks: 500,
         kllRankError: 1.6,
         tdigestRankError: 4,
+        scalableBloomFirstShare: 0.25,
+        scalableBloomTarget: 0.005,
+        scalableBloomTightening: 0.5,
+        spectralCounterBits: 16,
       });
     }
     // matches the stand-in constants used by the engine's tests

@@ -11,6 +11,8 @@ import { LinearCounting } from "./linearCounting";
 import { LogLog } from "./logLog";
 import { StableBloomFilter } from "./stableBloomFilter";
 import { MinHash } from "./minHash";
+import { ScalableBloom } from "./scalableBloom";
+import { SpectralBloom } from "./spectralBloom";
 import { TDigest } from "./tDigest";
 import { ReservoirSampling } from "./reservoirSampling";
 import { FADING, type Structure, type StructureConstants, type StructureKind, type StructureOptions, type StructureSnapshot } from "./types";
@@ -25,6 +27,8 @@ export { ExactMemory } from "./exactMemory";
 export { HyperLogLog, MIN_HLL_REGISTERS } from "./hyperLogLog";
 export { KllSketch } from "./kllSketch";
 export { MinHash } from "./minHash";
+export { ScalableBloom } from "./scalableBloom";
+export { SpectralBloom } from "./spectralBloom";
 export { TDigest } from "./tDigest";
 export { KMinimumValues } from "./kMinimumValues";
 export { LinearCounting } from "./linearCounting";
@@ -63,6 +67,10 @@ export function restoreStructure(snapshot: StructureSnapshot, constants: Structu
       return TDigest.fromSnapshot(snapshot, constants);
     case "minHash":
       return MinHash.fromSnapshot(snapshot, constants);
+    case "scalableBloom":
+      return ScalableBloom.fromSnapshot(snapshot, constants);
+    case "spectralBloom":
+      return SpectralBloom.fromSnapshot(snapshot, constants);
     default:
       throw new RangeError(`Cannot restore unknown structure kind: ${String((snapshot as { kind: unknown }).kind)}`);
   }
@@ -98,5 +106,9 @@ export function createStructure(kind: StructureKind, options: StructureOptions, 
       return new TDigest(options, constants);
     case "minHash":
       return new MinHash(options, constants);
+    case "scalableBloom":
+      return new ScalableBloom(options, constants);
+    case "spectralBloom":
+      return new SpectralBloom(options, constants);
   }
 }

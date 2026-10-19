@@ -47,6 +47,10 @@ export const balanceSchema = z.object({
   CUCKOO_MAX_KICKS: z.number().int().positive(),
   KLL_RANK_ERROR: z.number().positive(),
   TDIGEST_RANK_ERROR: z.number().positive(),
+  SCALABLE_BLOOM_FIRST_SHARE: z.number().gt(0).lt(1),
+  SCALABLE_BLOOM_TARGET: z.number().gt(0).lt(1),
+  SCALABLE_BLOOM_TIGHTENING: z.number().gt(0).lt(1),
+  SPECTRAL_COUNTER_BITS: z.number().int().min(2).max(32),
   EXPORT_DEFAULT_ERROR: z.number().gt(0).lt(1),
   /** How a step is scored for reinforcement learning: a reward for each enemy beaten, and costs per turn, per Certainty lost and for losing the run. */
   RL_REWARD: z.object({ enemyDefeated: z.number(), perTurn: z.number().nonnegative(), perCertaintyLost: z.number().nonnegative(), runLoss: z.number().nonnegative() }).strict(),
@@ -132,5 +136,9 @@ export function structureConstants(b: Balance = balance): StructureConstants {
     cuckooMaxKicks: b.CUCKOO_MAX_KICKS,
     kllRankError: b.KLL_RANK_ERROR,
     tdigestRankError: b.TDIGEST_RANK_ERROR,
+    scalableBloomFirstShare: b.SCALABLE_BLOOM_FIRST_SHARE,
+    scalableBloomTarget: b.SCALABLE_BLOOM_TARGET,
+    scalableBloomTightening: b.SCALABLE_BLOOM_TIGHTENING,
+    spectralCounterBits: b.SPECTRAL_COUNTER_BITS,
   };
 }

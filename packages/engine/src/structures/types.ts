@@ -17,6 +17,8 @@ export const STRUCTURE_KINDS = [
   "kllSketch",
   "tDigest",
   "minHash",
+  "scalableBloom",
+  "spectralBloom",
 ] as const;
 
 export type StructureKind = (typeof STRUCTURE_KINDS)[number];
@@ -93,6 +95,12 @@ export interface StructureConstants {
   kllRankError: number;
   /** A t-digest's rank error at quantile q, as a share of the units, is this times sqrt(q (1 - q)) over its compression (calibrated by simulation). */
   tdigestRankError: number;
+  /** A Scalable Bloom Filter: the share of its Space its first layer gets, the false-positive target of that layer, and the factor each later layer tightens it by. */
+  scalableBloomFirstShare: number;
+  scalableBloomTarget: number;
+  scalableBloomTightening: number;
+  /** Bits of each counter of a Spectral Bloom Filter. */
+  spectralCounterBits: number;
 }
 
 /** Anything that survives JSON.stringify and JSON.parse unchanged. */

@@ -24,6 +24,10 @@ export const TEST_CONSTANTS: StructureConstants = {
   cuckooMaxKicks: 500,
   kllRankError: 1.6,
   tdigestRankError: 4,
+  scalableBloomFirstShare: 0.25,
+  scalableBloomTarget: 0.005,
+  scalableBloomTightening: 0.5,
+  spectralCounterBits: 16,
 };
 
 /** Every structure's statistical test runs this many seeded trials. */

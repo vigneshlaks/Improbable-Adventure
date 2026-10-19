@@ -14,7 +14,7 @@ const fusionSchema = z
     summary: z.string().min(1),
   })
   .strict()
-  .refine((fusion) => new Set(fusion.inputs).size === fusion.inputs.length, { message: "an input is listed twice" })
+  .refine((fusion) => fusion.inputs.length === 2, { message: "a recipe has two inputs" })
   .refine((fusion) => !fusion.inputs.includes(fusion.result), { message: "the result is also an input" });
 
 export type FusionInfo = z.infer<typeof fusionSchema>;
