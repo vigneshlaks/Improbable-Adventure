@@ -14,6 +14,7 @@ export const EVENT_TEMPLATES = {
   challengeFrequency: ["value"],
   challengeCount: [],
   challengeRank: ["percent"],
+  challengeLikeness: ["count", "percent"],
   weakPointRevealed: ["weakPoint"],
   strikeFrequencyHit: ["damage", "trueCount", "force"],
   strikeFrequencyBlocked: ["certaintyLost", "trueCount", "force"],
@@ -22,6 +23,7 @@ export const EVENT_TEMPLATES = {
   strikeRankHit: ["damage", "rankPercent", "percent", "value"],
   strikeRankBlocked: ["certaintyLost", "rankPercent", "percent", "value"],
   strikePresence: ["realHits", "decoyHits", "damage", "certaintyLost", "realTotal"],
+  strikeLikeness: ["realHits", "decoyHits", "damage", "certaintyLost", "realTotal"],
   enemyAttacked: ["damage"],
   turnStarted: ["turn"],
   fightWon: ["turn"],
@@ -73,7 +75,7 @@ export const narrationSchema = z
         intro: z.object({ minion: z.string().min(1), elite: z.string().min(1), boss: z.string().min(1) }).strict(),
         calm: z.string().min(1),
         traits: z
-          .object({ variety: perLevel, skew: perLevel, churn: perLevel, growth: perLevel, drift: perLevel })
+          .object({ variety: perLevel, skew: perLevel, churn: perLevel, growth: perLevel, drift: perLevel, likeness: perLevel })
           .strict(),
       })
       .strict(),

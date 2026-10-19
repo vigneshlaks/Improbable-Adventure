@@ -10,6 +10,7 @@ import { KMinimumValues } from "./kMinimumValues";
 import { LinearCounting } from "./linearCounting";
 import { LogLog } from "./logLog";
 import { StableBloomFilter } from "./stableBloomFilter";
+import { MinHash } from "./minHash";
 import { TDigest } from "./tDigest";
 import { ReservoirSampling } from "./reservoirSampling";
 import { FADING, type Structure, type StructureConstants, type StructureKind, type StructureOptions, type StructureSnapshot } from "./types";
@@ -23,6 +24,7 @@ export { TopKTracker, type Candidate } from "./topKTracker";
 export { ExactMemory } from "./exactMemory";
 export { HyperLogLog, MIN_HLL_REGISTERS } from "./hyperLogLog";
 export { KllSketch } from "./kllSketch";
+export { MinHash } from "./minHash";
 export { TDigest } from "./tDigest";
 export { KMinimumValues } from "./kMinimumValues";
 export { LinearCounting } from "./linearCounting";
@@ -59,6 +61,8 @@ export function restoreStructure(snapshot: StructureSnapshot, constants: Structu
       return KllSketch.fromSnapshot(snapshot, constants);
     case "tDigest":
       return TDigest.fromSnapshot(snapshot, constants);
+    case "minHash":
+      return MinHash.fromSnapshot(snapshot, constants);
     default:
       throw new RangeError(`Cannot restore unknown structure kind: ${String((snapshot as { kind: unknown }).kind)}`);
   }
@@ -92,5 +96,7 @@ export function createStructure(kind: StructureKind, options: StructureOptions, 
       return new KllSketch(options, constants);
     case "tDigest":
       return new TDigest(options, constants);
+    case "minHash":
+      return new MinHash(options, constants);
   }
 }

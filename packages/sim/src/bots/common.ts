@@ -4,13 +4,13 @@ import type { BotView } from "./types";
 
 // Building blocks shared by the bots that deploy structures and strike on their answers.
 
-const WEAK_POINTS: WeakPoint[] = ["presence", "frequency", "count", "rank"];
+const WEAK_POINTS: WeakPoint[] = ["presence", "frequency", "count", "rank", "likeness"];
 
 /** The smallest Space worth giving a structure. */
 const MIN_BITS = 256;
 
 /** Structures that cannot be built in even that: a Top-K Tracker needs room for a Count-Min grid and a candidate list (a quarter of its Space, 96 bits an entry). */
-const MIN_BITS_OF: Partial<Record<StructureKind, number>> = { topKTracker: 384, tDigest: 512, kllSketch: 1536 };
+const MIN_BITS_OF: Partial<Record<StructureKind, number>> = { topKTracker: 384, tDigest: 512, kllSketch: 1536, minHash: 256 };
 const minBitsOf = (kind: StructureKind): number => Math.max(MIN_BITS, MIN_BITS_OF[kind] ?? 0);
 
 /** Structures that suit each weak point, best first. Exact Memory and Reservoir Sampling answer anything. */
@@ -24,6 +24,9 @@ export function preferredKinds(weakPoint: WeakPoint, traits: StreamTraits): Stru
       return traits.skew === "low"
         ? ["countMinSketch", "exactMemory", "reservoirSampling"]
         : ["topKTracker", "countMinSketch", "exactMemory", "reservoirSampling"];
+    case "likeness":
+      // MinHash is built for it. Exact Memory compares copies with its table exactly while the table has room.
+      return ["minHash", "exactMemory"];
     case "rank":
       // Both are far sharper than a sample of the same Space. A t-digest wins at the extreme quantiles the tougher enemies ask for.
       return ["tDigest", "kllSketch", "reservoirSampling", "exactMemory"];
@@ -108,7 +111,7 @@ export function numericAnswers(observation: Observation): Answered[] {
 /** The numeric answer from the best-suited structure that has one, using the preference order for the challenge. */
 export function bestNumericAnswer(observation: Observation): Answered | null {
   const challenge = observation.challenge;
-  if (!challenge || challenge.kind === "presence") return null;
+  if (!challenge || challenge.kind === "presence" || challenge.kind === "likeness") return null;
   const answers = numericAnswers(observation);
   for (const kind of preferredKinds(challenge.kind, observation.traits)) {
     const match = answers.find((answer) => answer.structure.kind === kind);
@@ -117,10 +120,10 @@ export function bestNumericAnswer(observation: Observation): Answered | null {
   return answers[0] ?? null;
 }
 
-/** For each deployed structure that answered a Presence challenge, the positions (0-based) it flagged. */
+/** For each deployed structure that answered a Presence or Likeness challenge, the positions (0-based) it flagged. */
 export function flaggedBy(observation: Observation): Array<{ structure: StructureView; positions: number[] }> {
   const challenge = observation.challenge;
-  if (challenge?.kind !== "presence") return [];
+  if (challenge?.kind !== "presence" && challenge?.kind !== "likeness") return [];
   const positionOf = new Map(challenge.targets.map((target, position) => [target, position]));
   return observation.structures.flatMap((structure) =>
     structure.answer && Array.isArray(structure.answer.estimate)
@@ -141,5 +144,5 @@ export const whole = (x: number, how: "round" | "ceil" | "floor" = "round"): num
 
 /** What to do when no structure can help: a presence strike of nothing, or a minimal number. */
 export function blindStrike(observation: Observation): Action {
-  return observation.challenge?.kind === "presence" ? { type: "strikeSubset", targets: [] } : { type: "strikeValue", value: 1 };
+  return observation.challenge?.kind === "presence" || observation.challenge?.kind === "likeness" ? { type: "strikeSubset", targets: [] } : { type: "strikeValue", value: 1 };
 }

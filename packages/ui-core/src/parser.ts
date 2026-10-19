@@ -223,7 +223,7 @@ function parseStrike(tokens: string[], { observation }: ParseContext): ParseResu
   if (problem) return error(problem);
   const challenge = observation.challenge;
   if (!challenge) return error('There is no challenge yet. Type "ready" to let the stream arrive.');
-  return challenge.kind === "presence"
+  return challenge.kind === "presence" || challenge.kind === "likeness"
     ? strikePresence(tokens, observation, challenge.targets)
     : strikeNumber(tokens, observation);
 }

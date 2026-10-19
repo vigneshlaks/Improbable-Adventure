@@ -8,16 +8,23 @@
       "low": { "fraction": 0, "everyTurns": 0 },
       "medium": { "fraction": 0.25, "everyTurns": 4 },
       "high": { "fraction": 0.5, "everyTurns": 3 }
+    },
+    "likeness": {
+      "low": { "min": 0.05, "max": 0.3 },
+      "medium": { "min": 0.35, "max": 0.5 },
+      "high": { "min": 0.5, "max": 0.58 }
     }
   },
 
   "weakPointBaseWeight": 1,
   "rankWeight": 0.2,
+  "likenessWeight": 0,
   "weakPointHints": {
     "variety": { "medium": { "count": 1 }, "high": { "count": 3 } },
     "skew": { "medium": { "frequency": 1 }, "high": { "frequency": 3 } },
     "churn": { "medium": { "presence": 1 }, "high": { "presence": 3 } },
     "growth": { "medium": { "presence": 1 }, "high": { "presence": 2 } },
-    "drift": { "medium": { "frequency": 1 }, "high": { "frequency": 2 } }
+    "drift": { "medium": { "frequency": 1 }, "high": { "frequency": 2 } },
+    "likeness": { "medium": { "likeness": 0.5 }, "high": { "likeness": 1 } }
   }
 }

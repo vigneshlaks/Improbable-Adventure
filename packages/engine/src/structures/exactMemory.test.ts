@@ -114,3 +114,37 @@ describe("ExactMemory rank", () => {
     expect(rank(make(64 * 4), 0.5)).toMatchObject({ estimate: 0, high: Number.POSITIVE_INFINITY });
   });
 });
+
+describe("ExactMemory likeness", () => {
+  const feed = (s: ExactMemory, values: number[]) => values.forEach((value) => s.ingest({ op: "insert", value }));
+  const range = (from: number, to: number) => Array.from({ length: to - from }, (_, i) => from + i);
+
+  it("flags the copies whose exact similarity to its table reaches the threshold, and says which are surely real: all of them while it has not refused anything, and fewer by the values it refused when full; forgets deleted values", () => {
+    // ten values; copy 0 is all of them (1), copy 1 has five of them and five others (5 / 15), copy 2 nine of them and a stranger (9 / 11), copy 3 is empty
+    const copies = [range(1, 11), [...range(1, 6), ...range(100, 105)], [...range(1, 10), 99], []];
+    const challenge = { kind: "likeness" as const, targets: [0, 1, 2, 3], copies, threshold: 0.6 };
+    const s = make(64 * 20);
+    feed(s, range(1, 11));
+    expect(s.query(challenge)).toEqual({ estimate: [0, 2], low: 2, high: 2, confidence: 0.95 });
+    // the equal-to-threshold edge: nine of ten live values and nothing else is 0.9; a threshold of 0.9 flags it
+    expect(s.query({ ...challenge, threshold: 0.9 })).toMatchObject({ estimate: [0] });
+    expect(s.query({ ...challenge, threshold: 9 / 11 })).toMatchObject({ estimate: [0, 2] });
+    // deleting a value removes it from the comparison: with value 10 gone copy 0 shares nine of ten, copy 2 nine of eleven
+    {
+      const t = s.clone();
+      t.ingest({ op: "delete", value: 10 });
+      expect(t.query({ ...challenge, threshold: 0.95 })).toMatchObject({ estimate: [] });
+      expect(t.query(challenge)).toMatchObject({ estimate: [0, 2] });
+    }
+    // a table of ten values given twelve: two refused. A copy at 0.9 might be as low as 9 / (11 + 2); the surely-real count is the flagged ones still reaching the threshold then
+    {
+      const full = make(64 * 10);
+      feed(full, range(1, 13));
+      expect(full.refused).toBe(2);
+      // copy 0 (values 1..10) has I = 10, U = 10: 10 / 12 = 0.83 >= 0.6, surely real; copy 2 has I = 9, U = 11: 9 / 13 = 0.69 >= 0.6, surely real
+      expect(full.query(challenge)).toMatchObject({ estimate: [0, 2], low: 2, high: 2 });
+      // at a threshold of 0.75 copy 0 is surely real (10 / 12 = 0.83) but copy 2 (9 / 13 = 0.69) is only flagged (9 / 11 = 0.82)
+      expect(full.query({ ...challenge, threshold: 0.75 })).toMatchObject({ estimate: [0, 2], low: 1, high: 2 });
+    }
+  });
+});

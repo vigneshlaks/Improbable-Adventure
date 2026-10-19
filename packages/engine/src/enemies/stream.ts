@@ -13,6 +13,8 @@ export interface StreamTraits {
   churn: TraitLevel;
   growth: TraitLevel;
   drift: TraitLevel;
+  /** How close the decoy copies of a Likeness challenge are to the threshold. It does not shape the stream. */
+  likeness: TraitLevel;
 }
 
 export interface DriftParams {
@@ -29,6 +31,8 @@ export interface TraitTables {
   churn: Record<TraitLevel, number>;
   growth: Record<TraitLevel, number>;
   drift: Record<TraitLevel, DriftParams>;
+  /** The range of Jaccard similarity a decoy copy is made with. */
+  likeness: Record<TraitLevel, { min: number; max: number }>;
 }
 
 /** An enemy's stream, fully described by numbers. */

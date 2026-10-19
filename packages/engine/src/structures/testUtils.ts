@@ -1,4 +1,4 @@
-import { issueChallenge } from "../combat/challenges";
+import { issueChallenge, type LikenessSettings } from "../combat/challenges";
 import { LiveSet } from "../enemies/liveSet";
 import { Rng } from "../rng/rng";
 import type { StreamEvent, StructureConstants } from "./types";
@@ -71,12 +71,28 @@ export function churnStream(
   return { events, live };
 }
 
+/** The Likeness settings of the shipped balance, with the decoys of a Likeness trait at Medium. */
+export const LIKENESS: LikenessSettings = { copies: 6, threshold: 0.6, minSet: 12, maxSet: 1000, realMin: 0.66, realMax: 0.95, decoyMin: 0.35, decoyMax: 0.5 };
+
+/** A Likeness challenge as the game builds it from the live set, or null when it cannot be asked. */
+export function likenessChallenge(live: LiveSet, rng: Rng, settings: LikenessSettings = LIKENESS) {
+  const challenge = issueChallenge("likeness", live, rng, {
+    presenceTargets: 12,
+    drawOutsideValue: (r) => 3_000_000_000 + r.int(1_000_000),
+    rankQuantile: 0.5,
+    likeness: settings,
+  });
+  if (challenge && challenge.kind !== "likeness") throw new Error("expected a likeness challenge");
+  return challenge;
+}
+
 /** Presence targets as the game builds them: about half live, the rest ghosts or never-inserted values. */
 export function presenceTargets(live: LiveSet, rng: Rng): number[] {
   const challenge = issueChallenge("presence", live, rng, {
     presenceTargets: 12,
     drawOutsideValue: (r) => 3_000_000_000 + r.int(1_000_000),
     rankQuantile: 0.5,
+    likeness: LIKENESS,
   });
   if (challenge?.kind !== "presence") throw new Error("expected a presence challenge");
   return challenge.targets;

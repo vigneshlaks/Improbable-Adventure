@@ -36,6 +36,11 @@ function challengeLines(challenge: Challenge, { listTargets = true }: NarrateOpt
       return [say("challengeFrequency", { value: challenge.value })];
     case "count":
       return [say("challengeCount")];
+    case "likeness":
+      return [
+        say("challengeLikeness", { count: challenge.copies.length, percent: formatNumber(challenge.threshold * 100) }),
+        ...(listTargets ? challenge.copies.map((copy, position) => `  ${position + 1}) a set of ${copy.length} values`) : []),
+      ];
     case "rank":
       return [say("challengeRank", { percent: formatNumber(challenge.quantile * 100) })];
   }
@@ -75,6 +80,8 @@ export function narrateEvent(event: GameEvent, options: NarrateOptions = {}): st
           const variables = { rankPercent: formatNumber(event.rank * 100), percent: formatNumber(event.quantile * 100), value: formatNumber(event.force) };
           return [event.outcome === "hit" ? say("strikeRankHit", { damage, ...variables }) : say("strikeRankBlocked", { certaintyLost, ...variables })];
         }
+        case "likeness":
+          return [say("strikeLikeness", { realHits: event.realHits, decoyHits: event.decoyHits, damage, certaintyLost, realTotal: event.realTotal })];
         case "presence":
           return [say("strikePresence", { realHits: event.realHits, decoyHits: event.decoyHits, damage, certaintyLost, realTotal: event.realTotal })];
       }
@@ -144,7 +151,7 @@ export function narrateRunStep(events: ReadonlyArray<GameEvent | RunEvent>, opti
   );
 }
 
-const TRAIT_NAMES = ["variety", "skew", "churn", "growth", "drift"] as const;
+const TRAIT_NAMES = ["variety", "skew", "churn", "growth", "drift", "likeness"] as const;
 const title = (word: string) => word.charAt(0).toUpperCase() + word.slice(1);
 
 /** Introduces an enemy and describes each trait that is above Low. */

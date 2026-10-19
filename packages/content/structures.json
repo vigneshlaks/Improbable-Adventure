@@ -10,7 +10,8 @@
       "presence",
       "frequency",
       "count",
-      "rank"
+      "rank",
+      "likeness"
     ],
     "knob": null,
     "summary": "A perfect ledger of every value and how often it appeared.",
@@ -220,5 +221,20 @@
     "summary": "Estimates where a value ranks, sharpest at the extremes: the 1st and 99th percentiles.",
     "help": "Keeps weighted centroids, each the mean of the values it stands for. A centroid may cover many units in the middle of the distribution but only a few at either end, so the tails are tracked closely and the middle more coarsely. The smallest and largest values are kept exactly. It ignores deletes, which remove units at random and so only add noise. For a 99th percentile armor it beats a KLL Sketch of the same Space; for the median they are close.",
     "flavor": "Averages the crowd into a few voices, and keeps the loudest and quietest exactly."
+  },
+  "minHash": {
+    "name": "MinHash",
+    "phase": 2,
+    "aliases": [
+      "minhash",
+      "signature"
+    ],
+    "answers": [
+      "likeness"
+    ],
+    "knob": null,
+    "summary": "Tells which sets of values are close copies of the stream, by comparing short signatures.",
+    "help": "Keeps, for each of many hash functions, the smallest hash of any value it has seen. Two sets agree on that minimum with exactly the chance of their Jaccard similarity (shared values over values in either), so the share of agreeing slots estimates it, within about 1 over twice the square root of the slots. It flags the copies at or above the threshold, and says how many of the flagged ones are surely real. It ignores deletes, so ghosts (deleted values) still count in its set, which widens its range under Churn.",
+    "flavor": "Knows a face by the first thing it would pick out of a crowd."
   }
 }

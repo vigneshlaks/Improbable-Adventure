@@ -29,6 +29,12 @@ const CONFIG: FightConfig = {
     countTol: 0.25,
     rankTol: 0.1,
     presenceTargets: 12,
+    likeCopies: 6,
+    likeThreshold: 0.6,
+    likeMinSet: 12,
+    likeMaxSet: 1000,
+    likeRealMin: 0.66,
+    likeRealMax: 0.95,
     expectedTurns: 5,
     turnLimitPenalty: 20,
     changesPerSlot: 2,
@@ -40,7 +46,7 @@ const CONFIG: FightConfig = {
     hp: 20,
     attack: 3,
     turnLimit: 4,
-    traits: { variety: "low", skew: "high", churn: "low", growth: "low", drift: "low" },
+    traits: { variety: "low", skew: "high", churn: "low", growth: "low", drift: "low", likeness: "low" },
     weakPoints: ["frequency"],
   },
   traitTables: {
@@ -53,6 +59,7 @@ const CONFIG: FightConfig = {
       medium: { fraction: 0.25, everyTurns: 4 },
       high: { fraction: 0.5, everyTurns: 3 },
     },
+    likeness: { low: { min: 0.05, max: 0.3 }, medium: { min: 0.35, max: 0.5 }, high: { min: 0.5, max: 0.58 } },
   },
 };
 

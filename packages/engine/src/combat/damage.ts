@@ -30,6 +30,9 @@ export interface PresenceStrike {
   realTotal: number;
 }
 
+/** A Likeness strike is graded as a Presence one: the copies chosen are real or decoys. */
+export type LikenessStrike = Omit<PresenceStrike, "kind"> & { kind: "likeness" };
+
 export interface FrequencyStrike {
   kind: "frequency";
   outcome: "hit" | "blocked";
@@ -63,7 +66,7 @@ export interface RankStrike {
   quantile: number;
 }
 
-export type StrikeResult = PresenceStrike | FrequencyStrike | CountStrike | RankStrike;
+export type StrikeResult = PresenceStrike | LikenessStrike | FrequencyStrike | CountStrike | RankStrike;
 
 const DECIMALS = 1e6;
 
@@ -144,4 +147,9 @@ export function presenceStrike(rules: DamageRules, real: boolean[], chosen: numb
     certaintyLost: rules.decoyPenalty * decoyHits,
     realTotal: real.filter(Boolean).length,
   };
+}
+
+/** Pays HIT_DAMAGE per real copy flagged and charges DECOY_PENALTY per decoy flagged: the same as Presence. */
+export function likenessStrike(rules: DamageRules, real: boolean[], chosen: number[]): LikenessStrike {
+  return { ...presenceStrike(rules, real, chosen), kind: "likeness" };
 }

@@ -80,6 +80,22 @@ export class ExactMemory implements Structure {
       }
       case "count":
         return { estimate: this.counts.size, low: this.counts.size, high: this.counts.size + missed, confidence };
+      case "likeness": {
+        // The table holds the live values exactly (while it has room). The values it refused may add up to `missed` values to the set it
+        // knows, each in the copy or not, which moves a similarity I / U to between I / (U + missed) and (I + missed) / (U + missed).
+        const flagged: number[] = [];
+        let surelyReal = 0;
+        challenge.copies.forEach((copy, index) => {
+          const distinct = new Set(copy);
+          let shared = 0;
+          for (const value of distinct) if (this.counts.has(value)) shared++;
+          const union = this.counts.size + distinct.size - shared;
+          if (union === 0 || shared / union < challenge.threshold) return;
+          flagged.push(challenge.targets[index] as number);
+          if (shared / (union + missed) >= challenge.threshold) surelyReal++;
+        });
+        return { estimate: flagged, low: surelyReal, high: flagged.length, confidence };
+      }
       case "rank": {
         // The stored values are exact. Inserts it refused are unknown units that may lie on either side, so they move the quantile by at
         // most their share of all the units it has seen.

@@ -10,6 +10,7 @@ const PROBES: Challenge[] = [
   { kind: "frequency", value: 1 },
   { kind: "count" },
   { kind: "rank", quantile: 0.5 },
+  { kind: "likeness", targets: [0], copies: [[1, 2, 3]], threshold: 0.6 },
 ];
 
 describe("structures.json", () => {

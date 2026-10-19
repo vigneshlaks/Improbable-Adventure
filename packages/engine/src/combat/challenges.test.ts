@@ -2,13 +2,14 @@ import { describe, expect, it } from "vitest";
 import { LiveSet } from "../enemies/liveSet";
 import { Rng } from "../rng/rng";
 import type { Challenge } from "../structures/types";
-import { gradeStrike, issueChallenge, trueAnswer, type ChallengeContext } from "./challenges";
+import { gradeStrike, issueChallenge, jaccardToLive, trueAnswer, type ChallengeContext } from "./challenges";
 import type { DamageRules } from "./damage";
 
 const RULES: DamageRules = { base: 20, hitDamage: 5, decoyPenalty: 4, blockPenalty: 3, missPenalty: 3, overshootExp: 2, countTol: 0.25, rankTol: 0.1 };
 
 // Outside values are far from the live values used below, so they can never be mistaken for real ones.
 const CTX: ChallengeContext = { presenceTargets: 12, rankQuantile: 0.5,
+  likeness: { copies: 6, threshold: 0.6, minSet: 12, maxSet: 1000, realMin: 0.66, realMax: 0.95, decoyMin: 0.35, decoyMax: 0.5 },
   drawOutsideValue: (rng) => 1_000_000 + rng.int(5000) };
 
 function liveWith(counts: Record<number, number>, ghosts: number[] = []): LiveSet {
@@ -203,5 +204,113 @@ describe("Rank", () => {
         expect(gradeStrike(armor, live, { value: best.value }, RULES)).toMatchObject({ outcome: "hit", damage: 20 });
       }
     }
+  });
+});
+
+describe("Likeness", () => {
+  const live = liveWith(Object.fromEntries(Array.from({ length: 200 }, (_, i) => [i + 1, (i % 3) + 1])), [900, 901, 902, 903, 904, 905, 906, 907]);
+  const ctx = (decoyMin: number, decoyMax: number): ChallengeContext => ({ ...CTX, likeness: { ...CTX.likeness, decoyMin, decoyMax } });
+  const issue = (set: LiveSet, seed: string, context: ChallengeContext = CTX) => {
+    const challenge = issueChallenge("likeness", set, Rng.fromSeed(seed), context);
+    if (challenge === null) return null;
+    if (challenge.kind !== "likeness") throw new Error("expected a likeness challenge");
+    return challenge;
+  };
+
+  it("shows the configured number of copies named by position; makes about half of them real, with the similarity of each in its band (real copies from the real band, decoys from the trait's band); builds copies from live values plus values that are not live; is deterministic; cannot be asked of too small or too large a set; and measures similarity as shared values over values in either", () => {
+    // K copies, named 0..K-1, carrying the threshold; the real ones about half; each copy's similarity inside its band (a little slack for rounding)
+    const realCounts = new Set<number>();
+    for (let i = 0; i < 40; i++) {
+      const challenge = issue(live, `like-${i}`) as NonNullable<ReturnType<typeof issue>>;
+      expect(challenge.targets).toEqual([0, 1, 2, 3, 4, 5]);
+      expect(challenge.copies).toHaveLength(6);
+      expect(challenge.threshold).toBe(0.6);
+      const answer = trueAnswer(challenge, live);
+      if (answer.kind !== "likeness") throw new Error("expected a likeness answer");
+      const real = answer.real.filter(Boolean).length;
+      expect(real).toBeGreaterThanOrEqual(2);
+      expect(real).toBeLessThanOrEqual(4);
+      realCounts.add(real);
+      answer.similarity.forEach((s, c) => {
+        if (answer.real[c]) expect(s).toBeGreaterThan(0.6);
+        else expect(s).toBeLessThanOrEqual(0.55);
+        expect(s).toBeGreaterThan(0.3);
+        expect(s).toBeLessThan(0.97);
+      });
+      // a copy is distinct values, some live and the rest not live
+      for (const copy of challenge.copies) {
+        expect(new Set(copy).size).toBe(copy.length);
+        expect(copy.filter((v) => live.count(v) > 0).length).toBeGreaterThan(0);
+      }
+    }
+    expect(realCounts.size).toBeGreaterThan(1); // the split varies
+    // real copies are spread over the whole real band (mean of 0.66 and 0.95 is 0.805), and are not always first
+    {
+      let sum = 0;
+      let count = 0;
+      let top = 0;
+      const firstReal = new Set<boolean>();
+      for (let i = 0; i < 60; i++) {
+        const challenge = issue(live, `spread-${i}`) as NonNullable<ReturnType<typeof issue>>;
+        const answer = trueAnswer(challenge, live);
+        if (answer.kind !== "likeness") throw new Error("expected a likeness answer");
+        firstReal.add(answer.real[0] as boolean);
+        answer.similarity.forEach((s, c) => { if (answer.real[c]) { sum += s; count++; if (s > 0.9) top++; } });
+      }
+      expect(Math.abs(sum / count - 0.805)).toBeLessThan(0.02);
+      expect(top / count).toBeGreaterThan(0.1); // the top of the band is reached: a high similarity needs few added values
+      expect(firstReal.size).toBe(2);
+    }
+    // the trait sets how close the decoys sit: Low is far below the threshold, High is just under it
+    for (const [min, max] of [[0.05, 0.3], [0.5, 0.58]] as const) {
+      for (let i = 0; i < 20; i++) {
+        const challenge = issue(live, `band-${i}`, ctx(min, max)) as NonNullable<ReturnType<typeof issue>>;
+        const answer = trueAnswer(challenge, live);
+        if (answer.kind !== "likeness") throw new Error("expected a likeness answer");
+        for (const [c, s] of answer.similarity.entries()) if (!answer.real[c]) { expect(s).toBeGreaterThan(min - 0.04); expect(s).toBeLessThan(max + 0.04); }
+      }
+    }
+    // the values added to a copy are ghosts or never-inserted values, and both turn up
+    {
+      let ghostValues = 0;
+      let outsideValues = 0;
+      for (let i = 0; i < 30; i++) {
+        for (const copy of (issue(live, `mix-${i}`) as NonNullable<ReturnType<typeof issue>>).copies) {
+          for (const v of copy) {
+            if (live.count(v) > 0) continue;
+            if (live.ghosts().includes(v)) ghostValues++;
+            else { outsideValues++; expect(v).toBeGreaterThanOrEqual(1_000_000); }
+          }
+        }
+      }
+      expect(ghostValues).toBeGreaterThan(0);
+      expect(outsideValues).toBeGreaterThan(0);
+    }
+    // deterministic for a given generator
+    expect(issue(live, "same")).toEqual(issue(live, "same"));
+    expect(issue(live, "same")).not.toEqual(issue(live, "other"));
+    // too few or too many live values to ask about (the copies are as large as the set)
+    expect(issue(liveWith({ 1: 5, 2: 5 }), "tiny")).toBeNull();
+    expect(issue(liveWith(Object.fromEntries(Array.from({ length: 11 }, (_, i) => [i + 1, 1]))), "eleven")).toBeNull();
+    expect(issue(liveWith(Object.fromEntries(Array.from({ length: 12 }, (_, i) => [i + 1, 1]))), "twelve")).not.toBeNull();
+    expect(issue(new LiveSet(), "empty")).toBeNull();
+    expect(issue(liveWith(Object.fromEntries(Array.from({ length: 1001 }, (_, i) => [i + 1, 1]))), "huge")).toBeNull();
+    expect(issue(liveWith(Object.fromEntries(Array.from({ length: 1000 }, (_, i) => [i + 1, 1]))), "limit")).not.toBeNull();
+    // similarity is shared values over values in either (ten live values; a copy of five of them and one other: 5 / 11); repeats do not count
+    const ten = liveWith(Object.fromEntries(Array.from({ length: 10 }, (_, i) => [i + 1, 2])));
+    const answer = trueAnswer({ kind: "likeness", targets: [0, 1, 2], copies: [[1, 2, 3, 4, 5, 99], [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], [50, 51]], threshold: 0.6 }, ten);
+    expect(answer).toEqual({ kind: "likeness", real: [false, true, false], similarity: [5 / 11, 1, 0] });
+    expect(jaccardToLive([1, 1, 2, 2], ten)).toBe(2 / 10);
+    // exactly at the threshold is real: six of the ten live values, nothing else, is 6 / 10
+    expect(trueAnswer({ kind: "likeness", targets: [0], copies: [[1, 2, 3, 4, 5, 6]], threshold: 0.6 }, ten)).toMatchObject({ real: [true] });
+  });
+
+  it("grades a strike as Presence does: HIT_DAMAGE per real copy, DECOY_PENALTY per decoy; refuses a strike of the wrong kind", () => {
+    const challenge: Challenge = { kind: "likeness", targets: [0, 1, 2], copies: [[1, 2, 3, 4, 5, 6, 7, 8, 9, 10], [50, 51], [1, 2, 3, 4, 5, 6, 7, 8, 9, 99]], threshold: 0.6 };
+    const ten = liveWith(Object.fromEntries(Array.from({ length: 10 }, (_, i) => [i + 1, 1])));
+    // copy 0 is the live set itself (1), copy 1 shares nothing, copy 2 shares nine of eleven (9 / 11)
+    expect(gradeStrike(challenge, ten, { targets: [0, 2] }, RULES)).toEqual({ kind: "likeness", realHits: 2, decoyHits: 0, damage: 10, certaintyLost: 0, realTotal: 2 });
+    expect(gradeStrike(challenge, ten, { targets: [0, 1] }, RULES)).toMatchObject({ kind: "likeness", realHits: 1, decoyHits: 1, damage: 5, certaintyLost: 4 });
+    expect(() => gradeStrike(challenge, ten, { value: 3 }, RULES)).toThrow(RangeError);
   });
 });

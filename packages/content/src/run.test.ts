@@ -179,7 +179,7 @@ describe("a whole act on the real content", () => {
   function perfectStrike(state: RunState): RunAction {
     const answer = groundTruth(state.fight as NonNullable<RunState["fight"]>).answer;
     if (!answer) throw new Error("no challenge is open");
-    if (answer.kind === "presence") return { type: "strikeSubset", targets: answer.real.flatMap((real, position) => (real ? [position] : [])) };
+    if (answer.kind === "presence" || answer.kind === "likeness") return { type: "strikeSubset", targets: answer.real.flatMap((real, position) => (real ? [position] : [])) };
     return { type: "strikeValue", value: answer.kind === "frequency" ? answer.count : answer.kind === "count" ? answer.distinct : answer.value };
   }
 

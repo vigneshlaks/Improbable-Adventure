@@ -87,6 +87,11 @@ export const balanceSchema = z.object({
   PRESENCE_TARGETS: z.number().int().positive(),
   LIKENESS_COPIES: z.number().int().positive(),
   LIKE_THRESHOLD: z.number().gt(0).lt(1),
+  /** A Likeness challenge needs at least this many distinct live values, and at most this many (its copies are as big as the set). */
+  LIKE_MIN_SET: z.number().int().positive(),
+  LIKE_MAX_SET: z.number().int().positive(),
+  /** The Jaccard similarity a real copy is made with, drawn between these. */
+  LIKE_REAL_BAND: z.object({ min: z.number().gt(0).lt(1), max: z.number().gt(0).lte(1) }).strict(),
 
   CUNNING_SEARCH: z.number().int().positive(),
 

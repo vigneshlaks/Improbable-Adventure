@@ -4,6 +4,7 @@
     "structureRemoved": "{name} is pulled from slot {slot}. {bits} bits return to your budget.",
     "burstIngested": "The stream surges: {events} events arrive.",
     "burstIngestedWithDeletes": "The stream surges: {events} events arrive, {deletes} of them retractions.",
+    "challengeLikeness": "The enemy holds up {count} sets of values. Some are close copies of its stream's live values, with a similarity of at least {percent} percent, and some are look-alikes. Choose which to strike.",
     "challengePresence": "The enemy dangles {count} values before you. Some are really in its stream and some are decoys. Choose which to strike.",
     "challengeFrequency": "The enemy shields itself behind the value {value}. The shield is as strong as the number of times that value has appeared. Judge that count, then strike with that much force.",
     "challengeCount": "The enemy shields itself behind the number of distinct values in its stream. Estimate how many there are.",
@@ -15,6 +16,7 @@
     "strikeCountMiss": "Your estimate is wildly off. You lose {certaintyLost} Certainty. There were {trueDistinct} distinct values; you said {estimate}.",
     "strikeRankHit": "Your value ranks at {rankPercent} percent, against armor at {percent} percent: {damage} damage. The closer to the armor, the harder it hits.",
     "strikeRankBlocked": "Your value ranks at only {rankPercent} percent, below the armor at {percent} percent: the strike is turned aside and you lose {certaintyLost} Certainty.",
+    "strikeLikeness": "You strike {realHits} real and {decoyHits} look-alike sets: {damage} damage, {certaintyLost} Certainty lost. {realTotal} of the sets were real.",
     "strikePresence": "You strike {realHits} real and {decoyHits} decoy targets: {damage} damage, {certaintyLost} Certainty lost. {realTotal} of the targets were real.",
     "enemyAttacked": "The enemy lashes out. You lose {damage} Certainty.",
     "turnStarted": "Turn {turn}.",
@@ -63,6 +65,11 @@
         "low": "keeps the same favorites",
         "medium": "slowly changes its favorites",
         "high": "keeps swapping its favorites"
+      },
+      "likeness": {
+        "low": "sends look-alikes that are plainly different",
+        "medium": "sends look-alikes that are hard to tell apart",
+        "high": "sends look-alikes that are almost the real thing"
       }
     }
   },

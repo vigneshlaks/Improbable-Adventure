@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { eachCase } from "../../engine/src/testCases";
 import { buildFightConfig, narration } from "@pda/content";
-import { createFight, observe, step, STRUCTURE_KINDS, type Action, type FightConfig, type FightState, type GameEvent } from "@pda/engine";
+import { createFight, observe, step, STRUCTURE_KINDS, type Action, type Challenge, type FightConfig, type FightState, type GameEvent } from "@pda/engine";
 import { describeEnemy, formatNumber, narrateEvent, narrateEvents, renderTemplate } from "./narrator";
 import { parseCommand } from "./parser";
 import { renderHelp, renderQuery, renderStatus } from "./views";
@@ -105,7 +105,7 @@ describe("narrateEvent", () => {
 });
 
 describe("describeEnemy", () => {
-  const calm = { variety: "low", skew: "low", churn: "low", growth: "low", drift: "low" } as const;
+  const calm = { variety: "low", skew: "low", churn: "low", growth: "low", drift: "low", likeness: "low" } as const;
 
   it("introduces the tier and says a plain stream looks plain; describes only the traits above Low, with their level", () => {
     // introduces the tier and says a plain stream looks plain
@@ -135,7 +135,7 @@ describe("renderStatus", () => {
           spaceFree: 4096,
           slotsFree: 2,
           weakPoint: "frequency",
-          traits: { variety: "low", skew: "high", churn: "low", growth: "medium", drift: "low" },
+          traits: { variety: "low", skew: "high", churn: "low", growth: "medium", drift: "low", likeness: "low" },
           structures: [view(0, "countMinSketch", null, 4096)],
         }),
       ).join("\n");
@@ -226,6 +226,26 @@ describe("Rank in the story and the query screen", () => {
     expect(text).toMatch(/rank 99 percent/);
     expect(text).toMatch(/\[1\] Reservoir Sampling:/);
     expect(text).toMatch(/5000/);
+  });
+});
+
+describe("Likeness in the story and the query screen", () => {
+  it("tells the threshold and lists the sets by size, narrates a strike without unfilled variables, and the query screen marks the sets a structure flagged by position", () => {
+    const challenge: Challenge = { kind: "likeness", targets: [0, 1, 2], copies: [[1, 2, 3], [4, 5], [6, 7, 8, 9]], threshold: 0.6 };
+    const lines = narrateEvent({ type: "challengeIssued", turn: 2, weakPoint: "likeness", challenge, firstReveal: true });
+    expect(lines.join("\n")).toMatch(/60 percent/);
+    expect(lines.join("\n")).toMatch(/1\) a set of 3 values/);
+    expect(lines.join("\n")).toMatch(/3\) a set of 4 values/);
+    const strike = narrateEvent({ type: "strikeResolved", turn: 2, kind: "likeness", realHits: 2, decoyHits: 1, damage: 10, certaintyLost: 4, realTotal: 3 });
+    expect(strike.join(" ")).toMatch(/2 real and 1 look-alike.*10 damage.*4 Certainty/);
+    expect(unresolved([...lines, ...strike])).toBe(false);
+
+    const flagged = { estimate: [0, 2], low: 1, high: 2, confidence: 0.95 };
+    const text = renderQuery(observation({ phase: "strike", challenge, structures: [view(0, "minHash", flagged)] })).join("\n");
+    expect(text).toMatch(/2\) a set of 2 values\n/);
+    expect(text).toMatch(/1\) a set of 3 values +flagged by slot 1/);
+    expect(text).toMatch(/3\) a set of 4 values +flagged by slot 1/);
+    expect(text).toMatch(/\[1\] MinHash: flags 2 targets/);
   });
 });
 

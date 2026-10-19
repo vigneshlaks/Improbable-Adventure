@@ -1,9 +1,22 @@
 import type { LiveSet } from "../enemies/liveSet";
 import type { Rng } from "../rng/rng";
 import type { Challenge } from "../structures/types";
-import { countStrike, frequencyStrike, presenceStrike, rankStrike, type DamageRules, type StrikeResult } from "./damage";
+import { countStrike, frequencyStrike, likenessStrike, presenceStrike, rankStrike, type DamageRules, type StrikeResult } from "./damage";
 
-export type WeakPoint = "presence" | "frequency" | "count" | "rank";
+export type WeakPoint = "presence" | "frequency" | "count" | "rank" | "likeness";
+
+/** How a Likeness challenge is made: the number of copies, the threshold, the size of set it needs, and where real and decoy copies sit. */
+export interface LikenessSettings {
+  copies: number;
+  threshold: number;
+  minSet: number;
+  maxSet: number;
+  realMin: number;
+  realMax: number;
+  /** The enemy's Likeness trait: the range of similarity a decoy copy is made with. */
+  decoyMin: number;
+  decoyMax: number;
+}
 
 export interface ChallengeContext {
   /** How many targets a Presence challenge shows (PRESENCE_TARGETS). */
@@ -12,6 +25,7 @@ export interface ChallengeContext {
   drawOutsideValue: (rng: Rng) => number;
   /** The quantile of live values a Rank challenge asks about: the enemy's own. */
   rankQuantile: number;
+  likeness: LikenessSettings;
 }
 
 /** What the player commits: a subset of Presence targets by position, or a number (a force or an estimate). */
@@ -23,7 +37,9 @@ export type TrueAnswer =
   | { kind: "frequency"; count: number }
   | { kind: "count"; distinct: number }
   /** The armor's quantile, and the smallest live value that reaches it (the best possible strike). */
-  | { kind: "rank"; quantile: number; value: number };
+  | { kind: "rank"; quantile: number; value: number }
+  /** Which copies are real, and each copy's Jaccard similarity to the live set. */
+  | { kind: "likeness"; real: boolean[]; similarity: number[] };
 
 const MAX_OUTSIDE_ATTEMPTS = 1000;
 
@@ -72,6 +88,66 @@ function issuePresence(live: LiveSet, rng: Rng, context: ChallengeContext): Chal
   return { kind: "presence", targets: shuffle([...real, ...decoys], rng) };
 }
 
+/** The Jaccard similarity of a set of distinct values to the live set: shared values over values in either. */
+export function jaccardToLive(copy: readonly number[], live: LiveSet): number {
+  const distinct = new Set(copy);
+  let shared = 0;
+  for (const value of distinct) if (live.count(value) > 0) shared++;
+  const union = live.distinct + distinct.size - shared;
+  return union === 0 ? 1 : shared / union;
+}
+
+/**
+ * Likeness: K copies, each made to a similarity drawn from a band. A copy keeps `a` live values and adds `b` values that are not
+ * live (ghosts or never-inserted ones), so its Jaccard similarity is a / (L + b) for L live values; `a` is chosen for the similarity
+ * wanted. About half the copies are made above the threshold (the real ones) and the rest from the Likeness trait's band. Whether a copy
+ * is real is then decided by its actual similarity, which rounding can move a little. Needs enough live values to make copies with,
+ * and not so many that the copies are huge.
+ */
+function issueLikeness(live: LiveSet, rng: Rng, context: ChallengeContext): Challenge | null {
+  const { copies, threshold, minSet, maxSet, realMin, realMax, decoyMin, decoyMax } = context.likeness;
+  const values = live.liveValues().sort((a, b) => a - b);
+  const size = values.length;
+  if (size < minSet || size > maxSet) return null;
+  if (!Number.isInteger(copies) || copies < 2) throw new RangeError(`A Likeness challenge needs at least 2 copies, got ${copies}`);
+
+  const realCount = Math.min(copies - 1, Math.max(1, Math.round(copies / 2) + rng.int(3) - 1));
+  const ghostPool = live.ghosts();
+  const made: number[][] = [];
+  for (let i = 0; i < copies; i++) {
+    const [low, high] = i < realCount ? [realMin, realMax] : [decoyMin, decoyMax];
+    const similarity = low + rng.float() * (high - low);
+    const extraMax = Math.floor(Math.min(0.3 * size, (size * (1 - similarity)) / similarity));
+    const extra = rng.int(extraMax + 1);
+    const kept = Math.min(size, Math.max(1, Math.round(similarity * (size + extra))));
+
+    const pool = [...values];
+    const copy: number[] = [];
+    for (let j = 0; j < kept; j++) {
+      const k = j + rng.int(pool.length - j);
+      [pool[j], pool[k]] = [pool[k] as number, pool[j] as number];
+      copy.push(pool[j] as number);
+    }
+    const added = new Set<number>();
+    const ghosts = [...ghostPool];
+    let attempts = 0;
+    while (added.size < extra) {
+      if (ghosts.length > 0 && rng.float() < 0.5) {
+        const index = rng.int(ghosts.length);
+        added.add(ghosts[index] as number);
+        ghosts[index] = ghosts[ghosts.length - 1] as number;
+        ghosts.pop();
+      } else {
+        if (++attempts > MAX_OUTSIDE_ATTEMPTS + extra * 4) throw new RangeError("Could not find enough distinct decoy values");
+        added.add(context.drawOutsideValue(rng));
+      }
+    }
+    made.push(shuffle([...copy, ...added], rng));
+  }
+  shuffle(made, rng);
+  return { kind: "likeness", targets: made.map((_, index) => index), copies: made, threshold };
+}
+
 /**
  * The question for one turn, or null when it cannot be asked (a Frequency challenge needs a live value).
  * Uses the generator `rng`; the caller keeps its position in the saved state.
@@ -86,6 +162,8 @@ export function issueChallenge(kind: WeakPoint, live: LiveSet, rng: Rng, context
       return { kind: "count" };
     case "presence":
       return issuePresence(live, rng, context);
+    case "likeness":
+      return issueLikeness(live, rng, context);
     case "rank": {
       // A heavy value can span more of the ranks than RANK_TOL, so no value would land close to an armor set exactly at the enemy's
       // quantile. The armor is therefore set at the rank of the smallest live value that reaches it: that value is a perfect strike,
@@ -107,6 +185,10 @@ export function trueAnswer(challenge: Challenge, live: LiveSet): TrueAnswer {
       return { kind: "count", distinct: live.distinct };
     case "rank":
       return { kind: "rank", quantile: challenge.quantile, value: live.quantileValue(challenge.quantile) ?? 0 };
+    case "likeness": {
+      const similarity = challenge.copies.map((copy) => jaccardToLive(copy, live));
+      return { kind: "likeness", real: similarity.map((s) => s >= challenge.threshold), similarity };
+    }
   }
 }
 
@@ -123,6 +205,9 @@ export function gradeStrike(challenge: Challenge, live: LiveSet, strike: StrikeI
     case "count":
       if (!("value" in strike)) throw new RangeError("A Count challenge is answered with an estimate");
       return countStrike(rules, answer.distinct, strike.value);
+    case "likeness":
+      if (!("targets" in strike)) throw new RangeError("A Likeness challenge is answered with a subset of its copies");
+      return likenessStrike(rules, answer.real, strike.targets);
     case "rank":
       if (!("value" in strike)) throw new RangeError("A Rank challenge is answered with a value");
       return rankStrike(rules, answer.quantile, live.rankOf(strike.value), strike.value);

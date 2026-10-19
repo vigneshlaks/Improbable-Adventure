@@ -104,6 +104,8 @@ export class ReservoirSampling implements Structure {
         return this.distinct(confidence);
       case "rank":
         return this.rank(challenge.quantile, confidence);
+      case "likeness":
+        return null; // a sample of units says too little about which values are in a set to bound a similarity
     }
   }
 

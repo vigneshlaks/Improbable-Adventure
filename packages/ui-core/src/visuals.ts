@@ -1,4 +1,4 @@
-import { BloomFilter, CountMinSketch, CountSketch, CuckooFilter, HyperLogLog, KllSketch, KMinimumValues, LogLog, restoreStructure, TDigest, TopKTracker, type Json, type StructureConstants, type StructureSnapshot } from "@pda/engine";
+import { BloomFilter, CountMinSketch, CountSketch, CuckooFilter, HyperLogLog, KllSketch, KMinimumValues, LogLog, MinHash, restoreStructure, TDigest, TopKTracker, type Json, type StructureConstants, type StructureSnapshot } from "@pda/engine";
 import { structureLabel } from "./views";
 
 /** The most cells a visual draws; a bigger structure is shown averaged down to this many. */
@@ -96,6 +96,11 @@ export function structureVisual(snapshot: StructureSnapshot, slot: number, const
     const top = Math.max(1, ...items.map((item) => item.weight));
     // Each bar is a stored item: how tall is how many units it stands for (taller = more), in the order of the values.
     return { ...base, shape: "bars", cells: downsample(items.map((item) => item.weight / top)), columns: 0, caption: `${items.length} stored values, each as tall as the units it stands for`, readout: `rank error about ±${percent(live.rankError)}` };
+  }
+  if (live instanceof MinHash) {
+    const k = live.params.k as number;
+    // One bar per slot: how small its minimum hash is (taller = smaller). More values seen pull every minimum down.
+    return { ...base, shape: "bars", cells: downsample(live.signature.map((m) => 1 - m / 2 ** 32)), columns: 0, caption: `${k} minima, one per hash function (taller = a smaller hash)`, readout: `similarity error about ±${percent(1 / (2 * Math.sqrt(k)))}` };
   }
   if (live instanceof TDigest) {
     const centroids = live.summary;

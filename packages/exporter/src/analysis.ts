@@ -3,7 +3,7 @@ import { sizeBloom, sizeCountMin, sizeExact, sizeHyperLogLog, sizeLinearCounting
 
 /** What one strike showed, in words the field report can use. */
 export interface StrikeNote {
-  kind: "presence" | "frequency" | "count" | "rank";
+  kind: "presence" | "frequency" | "count" | "rank" | "likeness";
   good: boolean;
   /** What happened, with the numbers. */
   text: string;
@@ -53,6 +53,11 @@ export function describeStrike(event: StrikeEvent): StrikeNote {
     const good = event.decoyHits === 0;
     const missed = event.realTotal - event.realHits;
     return { kind: "presence", good, text: `Struck ${event.realHits} of ${event.realTotal} real targets and ${event.decoyHits} decoy${event.decoyHits === 1 ? "" : "s"}${missed > 0 ? `, leaving ${missed} real one${missed === 1 ? "" : "s"} unstruck` : ""}.` };
+  }
+  if (event.kind === "likeness") {
+    const good = event.decoyHits === 0;
+    const missed = event.realTotal - event.realHits;
+    return { kind: "likeness", good, text: `Struck ${event.realHits} of ${event.realTotal} real sets and ${event.decoyHits} look-alike${event.decoyHits === 1 ? "" : "s"}${missed > 0 ? `, leaving ${missed} real one${missed === 1 ? "" : "s"} unstruck` : ""}.` };
   }
   if (event.kind === "frequency") {
     const ratio = event.trueCount > 0 ? event.force / event.trueCount : 0;

@@ -90,7 +90,7 @@ function strikeOptions(state: FightState, challenge: Challenge): Action[] {
   const views = observe(state).structures;
   const answers = views.flatMap((view) => (view.answer ? [view.answer] : []));
 
-  if (challenge.kind !== "presence") {
+  if (challenge.kind !== "presence" && challenge.kind !== "likeness") {
     return numericCandidates(answers).map((value) => ({ type: "strikeValue", value }));
   }
 

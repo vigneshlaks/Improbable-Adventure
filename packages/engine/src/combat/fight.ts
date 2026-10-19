@@ -117,6 +117,16 @@ function challengeContext(state: FightState, params: StreamParams): ChallengeCon
     presenceTargets: state.config.rules.presenceTargets,
     drawOutsideValue: (rng) => outsideValue(params, state.seed, rng.int(range)),
     rankQuantile: state.config.enemy.rankQuantile ?? 0.5,
+    likeness: {
+      copies: state.config.rules.likeCopies,
+      threshold: state.config.rules.likeThreshold,
+      minSet: state.config.rules.likeMinSet,
+      maxSet: state.config.rules.likeMaxSet,
+      realMin: state.config.rules.likeRealMin,
+      realMax: state.config.rules.likeRealMax,
+      decoyMin: state.config.traitTables.likeness[state.config.enemy.traits.likeness].min,
+      decoyMax: state.config.traitTables.likeness[state.config.enemy.traits.likeness].max,
+    },
   };
 }
 

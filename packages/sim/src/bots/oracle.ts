@@ -10,6 +10,7 @@ export const oracle: Bot = {
     const answer = view.truth?.answer;
     switch (answer?.kind) {
       case "presence":
+      case "likeness":
         return { type: "strikeSubset", targets: answer.real.flatMap((isReal, position) => (isReal ? [position] : [])) };
       case "frequency":
         return { type: "strikeValue", value: answer.count };

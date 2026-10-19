@@ -18,6 +18,15 @@ export interface FightRules extends DamageRules {
   startingSlots: number;
   /** Targets shown in a Presence challenge. */
   presenceTargets: number;
+  /** Copies shown in a Likeness challenge, and the Jaccard similarity from which a copy is real. */
+  likeCopies: number;
+  likeThreshold: number;
+  /** A Likeness challenge needs at least `likeMinSet` and at most `likeMaxSet` distinct live values. */
+  likeMinSet: number;
+  likeMaxSet: number;
+  /** The similarity a real copy is made with is drawn between these. */
+  likeRealMin: number;
+  likeRealMax: number;
   /** Bursts are sized so the stream totals the enemy's Size over this many turns. */
   expectedTurns: number;
   /** Certainty lost when the fight reaches its turn limit. */

@@ -16,6 +16,7 @@ export const STRUCTURE_KINDS = [
   "kMinimumValues",
   "kllSketch",
   "tDigest",
+  "minHash",
 ] as const;
 
 export type StructureKind = (typeof STRUCTURE_KINDS)[number];
@@ -33,7 +34,12 @@ export type Challenge =
   | { kind: "presence"; targets: number[] }
   | { kind: "frequency"; value: number }
   | { kind: "count" }
-  | { kind: "rank"; quantile: number };
+  | { kind: "rank"; quantile: number }
+  /**
+   * Copies of sets of values, to be told apart by how like the stream's live set each is. `targets` names the copies 0, 1, 2, ... so a
+   * flagged subset reads as in Presence. A copy is real if its Jaccard similarity to the live set is at least `threshold`.
+   */
+  | { kind: "likeness"; targets: number[]; copies: number[][]; threshold: number };
 
 export interface Answer {
   /** A number, or the flagged subset of targets for presence questions. */

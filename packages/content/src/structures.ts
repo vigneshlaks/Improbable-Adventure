@@ -20,7 +20,7 @@ const structureSchema = z
     /** Short names accepted by the `deploy` command. */
     aliases: z.array(z.string().min(1)),
     /** The challenge kinds this structure can answer. */
-    answers: z.array(z.enum(["presence", "frequency", "count", "rank"])).min(1),
+    answers: z.array(z.enum(["presence", "frequency", "count", "rank", "likeness"])).min(1),
     knob: knobSchema.nullable(),
     summary: z.string().min(1),
     help: z.string().min(1),

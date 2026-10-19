@@ -5,7 +5,7 @@ const key = (action: RunAction): string => JSON.stringify(action);
 
 /** The positions (0-based, in the order the targets were shown) each structure flagged, in slot order; a structure that cannot answer Presence is left out. */
 function flaggedPositions(fight: Observation): Array<{ slot: number; positions: number[] }> {
-  if (fight.challenge?.kind !== "presence") return [];
+  if (fight.challenge?.kind !== "presence" && fight.challenge?.kind !== "likeness") return [];
   const positionOf = new Map(fight.challenge.targets.map((target, position) => [target, position]));
   return fight.structures.flatMap((view) =>
     view.answer && Array.isArray(view.answer.estimate) ? [{ slot: view.slot, positions: view.answer.estimate.flatMap((target) => positionOf.get(target) ?? []).sort((x, y) => x - y) }] : [],
@@ -18,7 +18,7 @@ const numeric = (x: number): number | null => (Number.isFinite(x) ? Math.max(0, 
 function strikeAction(fight: Observation, how: StrikeKind, slot: number | undefined): RunAction | null {
   const challenge = fight.challenge;
   if (!challenge) return null;
-  if (challenge.kind === "presence") {
+  if (challenge.kind === "presence" || challenge.kind === "likeness") {
     const flagged = flaggedPositions(fight);
     const subset = (positions: number[]): RunAction | null => (positions.length > 0 ? { type: "strikeSubset", targets: positions } : null);
     switch (how) {

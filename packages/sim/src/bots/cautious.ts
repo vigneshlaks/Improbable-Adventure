@@ -12,7 +12,7 @@ import type { Bot, BotView } from "./types";
 
 function strikeSafely(view: BotView): Action {
   const { observation } = view;
-  if (observation.challenge?.kind === "presence") {
+  if (observation.challenge?.kind === "presence" || observation.challenge?.kind === "likeness") {
     // Only targets that two structures agree on.
     return { type: "strikeSubset", targets: flaggedAtLeast(observation, 2) };
   }

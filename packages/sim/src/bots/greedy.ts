@@ -13,7 +13,7 @@ import type { Bot, BotView } from "./types";
 /** Strikes on the best structure's estimate: everything it flagged, or its estimate as a number. */
 export function strikeOnEstimate(view: BotView): Action {
   const { observation } = view;
-  if (observation.challenge?.kind === "presence") {
+  if (observation.challenge?.kind === "presence" || observation.challenge?.kind === "likeness") {
     const best = flaggedBy(observation)[0];
     return best ? { type: "strikeSubset", targets: best.positions } : blindStrike(observation);
   }

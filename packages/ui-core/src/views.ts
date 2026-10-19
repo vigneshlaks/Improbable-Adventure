@@ -62,14 +62,14 @@ export function renderQuery(observation: Observation): string[] {
   }
 
   const lines: string[] = [];
-  if (challenge.kind === "presence") {
+  if (challenge.kind === "presence" || challenge.kind === "likeness") {
     const byStructure = flagged(observation, challenge.targets);
-    lines.push("Targets:");
+    lines.push(challenge.kind === "presence" ? "Targets:" : `Sets (a set is real if at least ${formatNumber(challenge.threshold * 100)} percent of the values in it or in the stream are shared):`);
     challenge.targets.forEach((target, position) => {
       const slots = [...byStructure].filter(([, positions]) => positions.includes(position)).map(([view]) => view.slot + 1);
       const mark =
         slots.length === 0 ? "" : `   flagged by ${slots.length === 1 ? "slot" : "slots"} ${slots.join(", ")}${slots.length >= 2 ? " (confirmed)" : ""}`;
-      lines.push(`  ${position + 1}) ${target}${mark}`);
+      lines.push(`  ${position + 1}) ${challenge.kind === "presence" ? target : `a set of ${challenge.copies[position]?.length ?? 0} values`}${mark}`);
     });
   } else if (challenge.kind === "frequency") {
     lines.push(`Shield on the value ${challenge.value}: how many times has it appeared?`);
