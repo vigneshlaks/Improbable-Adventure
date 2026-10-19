@@ -301,10 +301,29 @@ The player chooses the Space for each structure and at most one extra knob. The 
 - **Which structure watches which enemy: the slot decides, with no new action.** Even slots (the 1st, 3rd, ...) watch the first enemy, odd slots (2nd, 4th, ...) the second; a structure hears only its enemy's bursts. The player picks the enemy by picking the slot: `deploy <structure> <bits> [knob] on 1|2` takes the first free slot of that parity (without `on`, the next free slot). Each structure answers about its own stream, so one alone cannot answer a challenge about both; a view carries `source` (0 or 1) and `merged`.
 - **Merge** (an enchantment, a reward): in a two-enemy fight, structures of a kind that has it, one on each enemy, are paired in slot order (the first on the first enemy with the first on the second, and so on) and each pair answers with `merge`, the structure of both streams, on both views (`merged: true`). A pair that cannot merge (different Space, or different secret seeds) keeps its own answers. It does nothing in a single fight. Valid on Bloom, Count-Min, LogLog, HyperLogLog, K-Minimum Values, MinHash, t-digest, KLL and Quotient (the spec's list); `merge` was added to MinHash (the smaller minimum in every slot, exactly the MinHash of both streams), KLL (levels together, then compacted) and t-digest (centroids together, merged by the scale function); the others had it. Tested: the merged weights are exact and the merged quantiles are within the calibrated rank error of the union's.
 - **Theta Sketch** (`thetaSketch`, alias `theta`; fusion of two K-Minimum Values; Count): K-Minimum Values inside, with theta (the largest kept hash as a share of the range) shown, and it **merges by itself** (no enchantment) when one watches each enemy. The spec also gives it intersections; no challenge asks for one, so only unions are built.
-- **Where they appear.** `TWIN_CHANCE` (Minion 0, Elite 0.25, Boss 0.5): a drawn extra float at the end of the enemy's design (so existing enemies keep their traits), a second stream of `TWIN_SIZE_SHARE` (0.5) of the tier's size, drawn like a Minion's with the first enemy's Variety (so the union stays small enough for Likeness) and no Likeness or Cunning of its own. The Cunning enemy is the first enemy only: it crafts events into its own stream and aims at the structures that watch it (tested: nothing is crafted against a structure on a second-enemy slot).
+- **Where they appear.** `TWIN_CHANCE` (Minion 0, Elite 0.1, Boss 0.25): a drawn extra float at the end of the enemy's design (so existing enemies keep their traits), a second stream of `TWIN_SIZE_SHARE` (0.5) of the tier's size, drawn like a Minion's with the first enemy's Variety (so the union stays small enough for Likeness) and no Likeness or Cunning of its own. The Cunning enemy is the first enemy only: it crafts events into its own stream and aims at the structures that watch it (tested: nothing is crafted against a structure on a second-enemy slot).
 - **Interfaces.** The status screen says two enemies share the fight and which enemy each structure watches; the story tells of the second enemy and its traits; the query screen labels each answer `(enemy 2)` or `(merged)`. The learning environment's observation has a twin flag and, per slot, which enemy it watches (0.25, 0.5) or that it is merged (1) (the layout grew again). The bots deploy a wanted kind on both enemies (a pair of slots, Space shared; as many kinds as there are pairs of slots), add the two Frequency answers (counts add) and Count answers (an overcount of the shared values), take a merged answer as it is, and unite what a kind flags on either enemy.
 - **The attack's last blow.** Found by the learning-environment test once random play reached it: the event of the enemy's attack that took the last Certainty reported the whole attack, while the fight's reward counted only what was left. `enemyAttacked.damage` is now what was actually taken.
 - **Mutation checks** (14): 10 caught; the others got tests (the union is used for the challenge: a Rank armor for both streams; the union's ghosts; a second pair merging) or are equivalent-ish (the Cunning enemy's heaviest value taken from the union rather than the first stream before its burst only picks which value its Count-Min attack aims at).
+
+**Phase 2 balance, final pass (decided 2026-10-19, M9).** Whole runs, 300 seeds (1 to 300), Greedy / Prober / Cautious, Oracle 100 throughout. The order is the order the content went in; each line is the first measurement after that step.
+
+| Step | Greedy | Prober | Cautious |
+| --- | --- | --- | --- |
+| Start of M9 (MVP, Frequency structures, Cuckoo, KMV) | 43.7 | 26.3 | 9.3 |
+| + Rank enemies (weight 0.2) | 37.3 | 21.3 | 8.7 |
+| + Likeness (trait hints 0.5 and 1) | 35.7 | 26.7 | - |
+| + Cunning, Seeded offered | 37.0 | 24.0 | - |
+| + the Bloom, Dyadic, Quotient, SimHash and Likeness fusions in the reward pool | 33.7 | 24.0 | - |
+| + two-enemy fights at 0.25 / 0.5 for Elite / Boss | 25.0 | 19.7 | - |
+| two-enemy fights off, for comparison | 39.7 | 25.7 | 12.3 |
+| **two-enemy fights at 0.1 / 0.25** | 33.3 | 22.7 | 9.0 |
+| **+ `LATER_STRUCTURE_SHARE` 0.2 (final)** | **30.7** | **23.0** | **10.7** |
+
+- **Two-enemy fights were the biggest single cost** at the first setting (about 15 points of Greedy) because a pair of structures halves each structure's Space, a kind must be deployed twice, and the sums the bots make overcount; the chance was cut to 0.1 and 0.25. A player who merges, or uses Theta Sketches, does better than the bots.
+- **`LATER_STRUCTURE_SHARE` (0.2)**: a structure of a later phase is a fifth as likely to be offered as an MVP one. With twenty-odd structures in the pool, the six MVP structures that the bots live on were crowded out of the three-choice offers; this restores them. Win rates did not move (31.0 at 0.35, 30.7 at 0.2, 31.3 at 0.12); what moved is how often the MVP structures show up in wins.
+- **Spec targets, 300 runs, final:** Random under 5 percent met (0.0); Oracle over 95 met (100); no opener over 40 percent of the Greedy family's wins met (largest bloomFilter 36.8); **missed, as since M4:** Greedy wins 55 to 70 percent (30.7; the Frequency gap, Rank, Likeness, Cunning and two enemies each cost it points that a better player recovers), Greedy's wrong strikes 10 to 30 percent (39), and every MVP structure in at least 15 percent of the Greedy family's wins (LogLog 13.5 percent; the rest above). The weakest point of the game for the bots is that they never attach the right structure for a new enemy kind by reading the enemy's description.
+- **Decision for M10 / later:** the Greedy gap to the spec's 55 to 70 percent is not closed by tuning numbers; it needs either a smarter baseline bot (reading a Cunning, Rank or two-enemy description) or a different starting kit. Left as a documented deviation.
 
 ## Enchantments, upgrades, and fusions
 
@@ -749,6 +768,7 @@ Build in this order; each milestone must pass its acceptance criteria before the
 | M7 Exporter | TypeScript and Python templates, sizing calculator, reports, zip | CI-generated toolkits pass their own tests in both languages |
 | M8 RL bridge | Env server, Gymnasium wrapper, MaskablePPO baseline | Trained agent beats Greedy on held-out seeds |
 | M9 Phase 2 content | Remaining structures, fusions, Likeness and Rank challenges, Cunning | Each new structure passes its statistical test; balance re-tuned |
+| M10 Close the debts | Exporter templates and sizing for every Phase 2 structure, retrained learning agent, a clean first CI run, final docs | Toolkits for every structure pass their own tests in both languages; the agent beats Greedy on held-out seeds; CI green |
 
 ## Working with Claude Code
 

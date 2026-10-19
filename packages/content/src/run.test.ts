@@ -4,6 +4,7 @@ import { balance } from "./balance";
 import { buildRunConfig } from "./run";
 import { enchantments, parseEnchantments, variantName } from "./enchantments";
 import { fusions, parseFusions } from "./fusions";
+import { structures } from "./structures";
 import { parseUpgrades, upgrades } from "./upgrades";
 
 describe("upgrades.json", () => {
@@ -127,7 +128,10 @@ describe("buildRunConfig", () => {
       expect(structureRewards.sort()).toEqual(STRUCTURE_KINDS.filter((kind) => (!balance.STARTING_LOADOUT.includes(kind) || doubled.includes(kind)) && !fused.includes(kind)).sort());
       expect(structureRewards).not.toContain("hyperLogLog"); // it can only be made, never found
       expect(config.rewards.filter((r) => r.kind === "upgrade").map((r) => r.id).sort()).toEqual(Object.keys(upgrades).map((id) => `upgrade:${id}`).sort());
-      for (const reward of config.rewards) expect(reward.weight).toBe(reward.kind === "structure" ? balance.REWARD_WEIGHTS.structure : balance.REWARD_WEIGHTS.upgrade);
+      for (const reward of config.rewards.filter((r) => r.kind !== "enchantment")) {
+        const later = reward.kind === "structure" && structures[reward.structure].phase !== 1;
+        expect(reward.weight).toBeCloseTo(reward.kind === "structure" ? balance.REWARD_WEIGHTS.structure * (later ? balance.LATER_STRUCTURE_SHARE : 1) : balance.REWARD_WEIGHTS.upgrade, 12);
+      }
       expect(config.rewardChoices).toBe(balance.REWARD_CHOICES);
     }
     // passes the enchantments on, and offers as rewards only those marked as rewards, at the enchantment weight

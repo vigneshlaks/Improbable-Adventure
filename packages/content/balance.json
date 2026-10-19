@@ -54,8 +54,9 @@
   "OVERSHOOT_EXP": 1,
   "COUNT_TOL": 0.25,
   "RANK_TOL": 0.1,
-  "TWIN_CHANCE": { "minion": 0, "elite": 0.25, "boss": 0.5 },
+  "TWIN_CHANCE": { "minion": 0, "elite": 0.1, "boss": 0.25 },
   "TWIN_SIZE_SHARE": 0.5,
+  "LATER_STRUCTURE_SHARE": 0.2,
   "RANK_QUANTILES": { "minion": [0.5], "elite": [0.5, 0.9], "boss": [0.9, 0.99] },
 
   "PRESENCE_TARGETS": 12,

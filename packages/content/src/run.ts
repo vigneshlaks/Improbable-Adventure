@@ -4,6 +4,7 @@ import { enchantments as defaultEnchantments, type EnchantmentInfo } from "./enc
 import { generateEnemy } from "./enemies";
 import { fusions as defaultFusions, type FusionInfo } from "./fusions";
 import { fightRules } from "./fight";
+import { structures } from "./structures";
 import { traits as defaultTraits, type Traits } from "./traits";
 import { upgrades as defaultUpgrades, type UpgradeInfo } from "./upgrades";
 
@@ -26,7 +27,12 @@ export function buildRunConfig({ seed, tuning = balance, traitData = defaultTrai
   const rewards: RewardDef[] = [
     // A kind that fuses with itself can be found again, even a starting one, since the fusion needs two copies of it.
     ...STRUCTURE_KINDS.filter((kind) => !fused.has(kind) && (!tuning.STARTING_LOADOUT.includes(kind) || doubled.has(kind))).map(
-      (structure): RewardDef => ({ id: `structure:${structure}`, kind: "structure", structure, weight: tuning.REWARD_WEIGHTS.structure }),
+      (structure): RewardDef => ({
+        id: `structure:${structure}`,
+        kind: "structure",
+        structure,
+        weight: tuning.REWARD_WEIGHTS.structure * (structures[structure].phase === 1 ? 1 : tuning.LATER_STRUCTURE_SHARE),
+      }),
     ),
     ...Object.keys(upgradeData).sort().map((upgrade): RewardDef => ({ id: `upgrade:${upgrade}`, kind: "upgrade", upgrade, weight: tuning.REWARD_WEIGHTS.upgrade })),
     ...Object.keys(enchantmentData)

@@ -95,6 +95,8 @@ export const balanceSchema = z.object({
   /** The chance an enemy of each tier is a multi-enemy fight: a second enemy with a stream of its own, of this share of its size. */
   TWIN_CHANCE: z.object({ minion: z.number().min(0).max(1), elite: z.number().min(0).max(1), boss: z.number().min(0).max(1) }).strict(),
   TWIN_SIZE_SHARE: z.number().positive().max(1),
+  /** A structure of a later phase is this share as likely to be offered as one of the MVP: the new ones are many, and must not crowd the old out. */
+  LATER_STRUCTURE_SHARE: z.number().positive().max(1),
   /** The quantiles an enemy of each tier may put its Rank armor at. */
   RANK_QUANTILES: z.object({ minion: z.array(z.number().gt(0).lt(1)).min(1), elite: z.array(z.number().gt(0).lt(1)).min(1), boss: z.array(z.number().gt(0).lt(1)).min(1) }).strict(),
 
