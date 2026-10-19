@@ -24,6 +24,7 @@ export const STRUCTURE_KINDS = [
   "simHash",
   "lsh",
   "hyperMinHash",
+  "thetaSketch",
 ] as const;
 
 export type StructureKind = (typeof STRUCTURE_KINDS)[number];

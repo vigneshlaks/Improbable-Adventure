@@ -137,17 +137,19 @@ describe("buildRunConfig", () => {
         { id: "steady", valid: [...(enchantments.steady?.valid ?? [])] },
         { id: "fading", valid: [...(enchantments.fading?.valid ?? [])] },
         { id: "light", valid: [...(enchantments.light?.valid ?? [])] },
+        { id: "merge", valid: [...(enchantments.merge?.valid ?? [])] },
       ]);
-      // Seeded, Steady, Fading and Light are offered; one marked as no reward is not.
+      // Seeded, Steady, Fading, Light and Merge are offered; one marked as no reward is not.
       expect(config.rewards.filter((r) => r.kind === "enchantment")).toEqual([
         { id: "enchantment:fading", kind: "enchantment", enchantment: "fading", weight: balance.REWARD_WEIGHTS.enchantment },
         { id: "enchantment:light", kind: "enchantment", enchantment: "light", weight: balance.REWARD_WEIGHTS.enchantment },
+        { id: "enchantment:merge", kind: "enchantment", enchantment: "merge", weight: balance.REWARD_WEIGHTS.enchantment },
         { id: "enchantment:seeded", kind: "enchantment", enchantment: "seeded", weight: balance.REWARD_WEIGHTS.enchantment },
         { id: "enchantment:steady", kind: "enchantment", enchantment: "steady", weight: balance.REWARD_WEIGHTS.enchantment },
       ]);
       const hidden = { ...enchantments, seeded: { ...enchantments.seeded!, reward: false } };
       const without = buildRunConfig({ seed: "run-1", enchantmentData: hidden });
-      expect(without.rewards.filter((r) => r.kind === "enchantment").map((r) => r.id)).toEqual(["enchantment:fading", "enchantment:light", "enchantment:steady"]);
+      expect(without.rewards.filter((r) => r.kind === "enchantment").map((r) => r.id)).toEqual(["enchantment:fading", "enchantment:light", "enchantment:merge", "enchantment:steady"]);
     }
     // passes the recipes on, by id
     {
@@ -159,6 +161,7 @@ describe("buildRunConfig", () => {
         { id: "dyadicCountMin", inputs: ["countMinSketch", "countMinSketch"], result: "dyadicCountMin" },
         { id: "lsh", inputs: ["minHash", "minHash"], result: "lsh" },
         { id: "hyperMinHash", inputs: ["hyperLogLog", "minHash"], result: "hyperMinHash" },
+        { id: "thetaSketch", inputs: ["kMinimumValues", "kMinimumValues"], result: "thetaSketch" },
       ]);
     }
     // designs each encounter on its own, so the five Minions are not copies of one another

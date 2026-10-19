@@ -1,19 +1,58 @@
-import type { Answer, Challenge } from "../structures/types";
+import type { Answer, Challenge, Structure, StructureKind } from "../structures/types";
 import { trueAnswer } from "./challenges";
 import {
   changesLeft,
   liveSetOf,
   loadStructures,
   slotsFree,
+  sourceOfSlot,
   spaceFree,
   deployProblem,
 } from "./internal";
 import type { Action, FightState, GroundTruth, Observation, StructureView } from "./types";
 
+/** The enchantment that lets two instances of a structure, one on each enemy, answer for both. */
+export const MERGE = "merge";
+/** Structures that always answer for both enemies when there is one on each. */
+const MERGES_ITSELF: readonly StructureKind[] = ["thetaSketch"];
+
+/**
+ * In a multi-enemy fight: the answers of structures that are merged with a partner on the other enemy. For each kind that merges (the Merge
+ * enchantment, or built to), the first structure on the first enemy is paired with the first on the second, the second with the second, and so
+ * on, and a pair answers with its merge: the structure of both streams. A pair that cannot merge (different sizes, or different secret seeds)
+ * keeps its own answers.
+ */
+function mergedAnswers(state: FightState, structures: Array<Structure | null>, challenge: Challenge): Map<number, Answer | null> {
+  const answers = new Map<number, Answer | null>();
+  const kinds = new Set<StructureKind>();
+  state.slots.forEach((snapshot) => {
+    if (snapshot && (snapshot.enchantment === MERGE || MERGES_ITSELF.includes(snapshot.kind))) kinds.add(snapshot.kind);
+  });
+  for (const kind of kinds) {
+    const side = (source: 0 | 1) => state.slots.flatMap((snapshot, slot) => (snapshot?.kind === kind && sourceOfSlot(state, slot) === source ? [slot] : []));
+    const left = side(0);
+    const right = side(1);
+    for (let i = 0; i < Math.min(left.length, right.length); i++) {
+      const a = structures[left[i] as number];
+      const b = structures[right[i] as number];
+      if (!a?.merge || !b) continue;
+      try {
+        const answer = a.merge(b).query(challenge);
+        answers.set(left[i] as number, answer);
+        answers.set(right[i] as number, answer);
+      } catch {
+        // different shapes: they stay separate
+      }
+    }
+  }
+  return answers;
+}
+
 /** Everything the player may see right now. The true answers are never included. */
 export function observe(state: FightState): Observation {
   const structures = loadStructures(state);
   const challenge = state.phase === "strike" ? state.challenge : null;
+  const merged = challenge && state.live2 ? mergedAnswers(state, structures, challenge) : new Map<number, Answer | null>();
 
   const views: StructureView[] = [];
   state.slots.forEach((snapshot, slot) => {
@@ -25,7 +64,9 @@ export function observe(state: FightState): Observation {
       params: structure.params,
       spaceBits: snapshot.spaceBits,
       ...(snapshot.enchantment !== undefined ? { enchantment: snapshot.enchantment } : {}),
-      answer: challenge ? structure.query(challenge) : null,
+      answer: merged.has(slot) ? (merged.get(slot) as Answer | null) : challenge ? structure.query(challenge) : null,
+      ...(state.live2 ? { source: sourceOfSlot(state, slot) } : {}),
+      ...(merged.has(slot) ? { merged: true } : {}),
     });
   });
 
@@ -38,6 +79,7 @@ export function observe(state: FightState): Observation {
     slotsFree: slotsFree(state),
     changesLeft: changesLeft(state),
     traits: state.config.enemy.traits,
+    ...(state.config.enemy.second ? { secondTraits: state.config.enemy.second.traits } : {}),
     weakPoint: state.weakPoint,
     challenge,
     structures: views,

@@ -48,5 +48,24 @@ export function generateEnemy(
   // A Rank enemy has an armor at a quantile of its own, drawn from the tiers' list (harder to hit the further up it is).
   const quantiles = tuning.RANK_QUANTILES[tier];
   const rankQuantile = weakPoints.includes("rank") ? (quantiles[rng.int(quantiles.length)] as number) : undefined;
-  return { tier, size: spec.size, hp: spec.hp, attack: spec.attack, turnLimit: spec.turnLimit, traits: levels, weakPoints, ...(rankQuantile === undefined ? {} : { rankQuantile }) };
+  // A multi-enemy fight has a second, smaller enemy: its stream is drawn like a Minion's, with the first one's Variety (so the two streams' values
+  // are of the same kind, and a Likeness challenge about both stays small enough to show).
+  const twin = rng.float() < tuning.TWIN_CHANCE[tier];
+  const second = twin
+    ? {
+        size: Math.max(1, Math.round(spec.size * tuning.TWIN_SIZE_SHARE)),
+        traits: { ...generateEnemy(`${seed}/second-enemy`, "minion", tuning, traitData).traits, variety: levels.variety, likeness: "low" as const, cunning: "low" as const },
+      }
+    : undefined;
+  return {
+    tier,
+    size: spec.size,
+    hp: spec.hp,
+    attack: spec.attack,
+    turnLimit: spec.turnLimit,
+    traits: levels,
+    weakPoints,
+    ...(rankQuantile === undefined ? {} : { rankQuantile }),
+    ...(second ? { second } : {}),
+  };
 }

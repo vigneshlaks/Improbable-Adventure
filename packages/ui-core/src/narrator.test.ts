@@ -357,3 +357,24 @@ describe("a whole fight from typed commands", () => {
     }
   });
 });
+
+describe("two enemies in the story and the status", () => {
+  it("tells of the second enemy and says which enemy each structure watches or that it answers for both", () => {
+    const calm = { variety: "low", skew: "low", churn: "low", growth: "low", drift: "low", likeness: "low", cunning: "low" } as const;
+    const lines = describeEnemy({ tier: "boss", traits: calm, second: { size: 500, traits: { ...calm, skew: "high" } } }).join("\n");
+    expect(lines).toMatch(/second enemy fights beside it/i);
+    expect(lines).toMatch(/Second enemy, Skew \(high\)/);
+    expect(describeEnemy({ tier: "boss", traits: calm }).join("\n")).not.toMatch(/second enemy/i);
+
+    const status = renderStatus(observation({ secondTraits: { ...calm, churn: "medium" }, structures: [{ ...view(0, "bloomFilter"), source: 0 }, { ...view(1, "countMinSketch"), source: 1 }, { ...view(2, "kMinimumValues"), source: 0, merged: true }] })).join("\n");
+    expect(status).toMatch(/Two enemies share this fight/);
+    expect(status).toMatch(/Second enemy: Churn \(medium\)/);
+    expect(status).toMatch(/1\. Bloom Filter \(1024 bits, watching enemy 1\)/);
+    expect(status).toMatch(/2\. Count-Min Sketch \(1024 bits, watching enemy 2\)/);
+    expect(status).toMatch(/3\. K-Minimum Values \(1024 bits, both enemies merged\)/);
+    expect(renderStatus(observation()).join("\n")).not.toMatch(/Two enemies/);
+    const query = renderQuery(observation({ phase: "strike", challenge: { kind: "count" }, secondTraits: calm, structures: [{ ...view(0, "kMinimumValues", answer(40, 35, 45)), source: 0, merged: true }, { ...view(1, "logLog", answer(30, 20, 40)), source: 1 }] })).join("\n");
+    expect(query).toMatch(/\[1\] K-Minimum Values \(merged\):/);
+    expect(query).toMatch(/\[2\] LogLog \(enemy 2\):/);
+  });
+});

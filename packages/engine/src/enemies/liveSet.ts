@@ -38,6 +38,15 @@ export class LiveSet {
     return set;
   }
 
+  /** The live set of two streams together: every unit of both, and the values that are ghosts in one and not live in the other. */
+  static union(a: LiveSet, b: LiveSet): LiveSet {
+    const set = new LiveSet();
+    set.items = [...a.items, ...b.items];
+    for (const item of set.items) set.counts.set(item, (set.counts.get(item) ?? 0) + 1);
+    for (const ghost of [...a.ghostSet, ...b.ghostSet]) if (!set.counts.has(ghost)) set.ghostSet.add(ghost);
+    return set;
+  }
+
   snapshot(): LiveSnapshot {
     return { items: [...this.items], ghosts: [...this.ghostSet] };
   }

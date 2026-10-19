@@ -172,6 +172,16 @@ export class MinHash implements Structure {
     return sketch;
   }
 
+  /** The MinHash of both streams: the smaller minimum in every slot. Needs the same slots and seed. */
+  merge(other: Structure): MinHash {
+    if (!(other instanceof MinHash) || other.k !== this.k || other.seed !== this.seed) throw new Error("MinHashes merge only with same-sized, same-seeded MinHashes");
+    const merged = this.clone();
+    for (let i = 0; i < this.k; i++) merged.minima[i] = Math.min(this.minima[i] as number, other.minima[i] as number);
+    merged.insertCount = this.insertCount + other.insertCount;
+    merged.deleteCount = this.deleteCount + other.deleteCount;
+    return merged;
+  }
+
   clone(): MinHash {
     const copy = new MinHash(this.options, this.constants);
     copy.minima = [...this.minima];

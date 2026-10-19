@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { preferredKinds } from "./bots/common";
+import { bestNumericAnswer, flaggedBy, nextDeployAction, preferredKinds } from "./bots/common";
 import { strikeOnEstimate } from "./bots/greedy";
 import { eachCase } from "../../engine/src/testCases";
 import { balance, buildFightConfig, type TierName } from "@pda/content";
@@ -336,5 +336,46 @@ describe("Likeness for the bots", () => {
     const oracle = getBot("oracle").create();
     const truth = { frequency: null, distinct: 0, answer: { kind: "likeness" as const, real: [true, false, false, true], similarity: [0.9, 0.1, 0.2, 0.7] } };
     expect(oracle({ ...likenessView(), truth }, Rng.fromSeed("oracle"))).toEqual({ type: "strikeSubset", targets: [0, 3] });
+  });
+});
+
+describe("a fight with two enemies, for the bots", () => {
+  const traits = { variety: "low", skew: "low", churn: "low", growth: "low", drift: "low", likeness: "low", cunning: "low" } as const;
+  const viewOf = (structures: Array<{ slot: number; kind: "countMinSketch" | "exactMemory"; source: 0 | 1; merged?: boolean; estimate?: number }>, challenge: BotView["observation"]["challenge"] = { kind: "frequency", value: 5 }, slotsFree = 3 - structures.length): BotView => ({
+    observation: {
+      turn: 2, phase: structures.some((s) => s.estimate !== undefined) ? "strike" : "deploy", certainty: 100, enemyHp: 20, spaceFree: 8192, slotsFree, changesLeft: 6,
+      traits, secondTraits: traits, weakPoint: "frequency", challenge,
+      structures: structures.map((s) => ({
+        slot: s.slot, kind: s.kind, params: {}, spaceBits: 2048, source: s.source, ...(s.merged ? { merged: true } : {}),
+        answer: s.estimate === undefined ? null : { estimate: s.estimate, low: s.estimate - 2, high: s.estimate + 3, confidence: 0.95 },
+      })),
+    },
+    loadout: ["countMinSketch", "exactMemory"],
+    legalActions: () => [],
+    truth: null,
+  });
+
+  it("deploys a wanted structure on each enemy (slots of both parities) before anything else, with the Space shared, and no more kinds than there are pairs of slots; adds the two enemies' Frequency answers, takes a merged answer as it is, and unites what a kind flags on either", () => {
+    const wanted = ["countMinSketch", "exactMemory"] as const;
+    const first = nextDeployAction(viewOf([]), [...wanted]);
+    expect(first).toMatchObject({ type: "deploy", slot: 0, kind: "countMinSketch" });
+    const second = nextDeployAction(viewOf([{ slot: 0, kind: "countMinSketch", source: 0 }]), [...wanted]);
+    expect(second).toMatchObject({ type: "deploy", slot: 1, kind: "countMinSketch" }); // the other enemy's slot
+    expect(nextDeployAction(viewOf([{ slot: 0, kind: "countMinSketch", source: 0 }, { slot: 1, kind: "countMinSketch", source: 1 }]), [...wanted])).toEqual({ type: "endDeploy" }); // three slots hold one pair
+    expect((first as { spaceBits: number }).spaceBits).toBe(4096); // two to deploy: half of 8,192 each
+
+    const sums = viewOf([{ slot: 0, kind: "countMinSketch", source: 0, estimate: 40 }, { slot: 1, kind: "countMinSketch", source: 1, estimate: 25 }]);
+    expect(bestNumericAnswer(sums.observation)).toMatchObject({ estimate: 65, low: 61, high: 71 });
+    const together = viewOf([{ slot: 0, kind: "countMinSketch", source: 0, merged: true, estimate: 70 }, { slot: 1, kind: "countMinSketch", source: 1, merged: true, estimate: 70 }]);
+    expect(bestNumericAnswer(together.observation)).toMatchObject({ estimate: 70, low: 68, high: 73 });
+    // Rank has nothing to add: the first answer stands
+    const rank = viewOf([{ slot: 0, kind: "countMinSketch", source: 0, estimate: 40 }, { slot: 1, kind: "countMinSketch", source: 1, estimate: 25 }], { kind: "rank", quantile: 0.5 });
+    expect(bestNumericAnswer(rank.observation)).toMatchObject({ estimate: 40 });
+
+    const flags = viewOf([{ slot: 0, kind: "exactMemory", source: 0 }, { slot: 1, kind: "exactMemory", source: 1 }], { kind: "presence", targets: [10, 11, 12, 13] });
+    flags.observation.structures[0]!.answer = { estimate: [10, 12], low: 2, high: 2, confidence: 0.95 };
+    flags.observation.structures[1]!.answer = { estimate: [12, 13], low: 2, high: 2, confidence: 0.95 };
+    expect(flaggedBy(flags.observation)).toHaveLength(1);
+    expect(flaggedBy(flags.observation)[0]?.positions).toEqual([0, 2, 3]);
   });
 });

@@ -13,6 +13,8 @@ export function structureLabel(kind: StructureKind, enchantment?: string): strin
   return variant !== own ? variant : `${own} (${enchantments[enchantment]?.name ?? enchantment})`;
 }
 const nameOf = (view: StructureView) => structureLabel(view.kind, view.enchantment);
+/** In a fight with two enemies, which enemy a structure watches (or that it answers for both). */
+const watching = (view: StructureView) => (view.source === undefined ? "" : view.merged ? ", both enemies merged" : `, watching enemy ${view.source + 1}`);
 const percent = (confidence: number) => `${Math.round(confidence * 100)}%`;
 const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? "" : "s"}`;
 
@@ -20,6 +22,12 @@ export function renderStatus(observation: Observation): string[] {
   const traits = TRAIT_NAMES.flatMap((trait) =>
     observation.traits[trait] === "low" ? [] : [`  ${title(trait)} (${observation.traits[trait]})`],
   );
+  const second = observation.secondTraits
+    ? [
+        "Two enemies share this fight. Slots 1, 3, ... watch the first enemy and slots 2, 4, ... the second; a challenge is about both streams together.",
+        ...TRAIT_NAMES.flatMap((trait) => (observation.secondTraits?.[trait] === "low" || trait === "likeness" || trait === "cunning" ? [] : [`  Second enemy: ${title(trait)} (${observation.secondTraits?.[trait]})`])),
+      ]
+    : [];
   return [
     `Turn ${observation.turn}, ${PHASES[observation.phase]}`,
     `Certainty: ${formatNumber(observation.certainty)}`,
@@ -27,8 +35,9 @@ export function renderStatus(observation: Observation): string[] {
     `Space: ${observation.spaceFree} bits free. Slots: ${observation.slotsFree} free. Changes left this turn: ${observation.changesLeft}.`,
     `Weak point: ${observation.weakPoint ?? "unknown"}`,
     ...(traits.length > 0 ? ["Enemy stream:", ...traits] : []),
+    ...second,
     ...(observation.structures.length > 0
-      ? ["Structures:", ...observation.structures.map((view) => `  ${view.slot + 1}. ${nameOf(view)} (${view.spaceBits} bits)`)]
+      ? ["Structures:", ...observation.structures.map((view) => `  ${view.slot + 1}. ${nameOf(view)} (${view.spaceBits} bits${watching(view)})`)]
       : ["No structures deployed."]),
   ];
 }
@@ -81,7 +90,7 @@ export function renderQuery(observation: Observation): string[] {
 
   if (observation.structures.length === 0) return [...lines, "No structures deployed."];
   for (const view of observation.structures) {
-    const prefix = `[${view.slot + 1}] ${nameOf(view)}:`;
+    const prefix = `[${view.slot + 1}] ${nameOf(view)}${view.merged ? " (merged)" : view.source !== undefined ? ` (enemy ${view.source + 1})` : ""}:`;
     const answer = view.answer;
     if (!answer) lines.push(`${prefix} cannot answer this question`);
     else if (Array.isArray(answer.estimate)) {

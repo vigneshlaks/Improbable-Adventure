@@ -37,10 +37,10 @@ export interface Layout {
 }
 
 /** Floats per deployed-structure slot in the observation. */
-export const SLOT_FEATURES = 1 + STRUCTURE_KINDS.length + 1 + 6;
+export const SLOT_FEATURES = 1 + STRUCTURE_KINDS.length + 1 + 6 + 1;
 
 /** Floats that do not depend on the vocabulary: run, tier, owned and attached structures, traits, weak point, challenge. */
-const FIXED_FEATURES = 3 + 3 + 3 + STRUCTURE_KINDS.length * 2 + 3 + 3 + 1 + 7 + 6 + 5 + 3 + 1;
+const FIXED_FEATURES = 3 + 3 + 3 + STRUCTURE_KINDS.length * 2 + 3 + 3 + 1 + 7 + 1 + 6 + 5 + 3 + 1;
 
 function actionLabel(spec: ActionSpec): string {
   switch (spec.type) {

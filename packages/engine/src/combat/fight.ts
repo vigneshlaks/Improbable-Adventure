@@ -12,6 +12,8 @@ import {
   DEFAULT_REWARDS,
   liveSetOf,
   loadStructures,
+  secondStreamParamsOf,
+  sourceOfSlot,
   streamParamsOf,
 } from "./internal";
 import {
@@ -37,6 +39,7 @@ function validateConfig(config: FightConfig): void {
   need(rules.expectedTurns >= 1, "expectedTurns must be >= 1");
   need(Number.isInteger(rules.changesPerSlot) && rules.changesPerSlot >= 1, "changesPerSlot must be a whole number >= 1");
   need(enemy.hp > 0, "enemy hp must be positive");
+  if (enemy.second) need(enemy.second.size > 0, "the second enemy's size must be positive");
   need(enemy.turnLimit >= 1 && Number.isInteger(enemy.turnLimit), "turnLimit must be a whole number >= 1");
   need(enemy.weakPoints.length >= 1, "an enemy needs at least one weak point");
   if (enemy.weakPoints.includes("rank")) {
@@ -58,6 +61,7 @@ export function createFight(seed: string, config: FightConfig): FightState {
     slots: Array.from({ length: config.rules.startingSlots }, () => null),
     stream: createStream(seed),
     live: new LiveSet().snapshot(),
+    ...(config.enemy.second ? { stream2: createStream(`${seed}/second`), live2: new LiveSet().snapshot() } : {}),
     challengeRng: Rng.fromSeed(`${seed}/challenge`).getState(),
     challenge: null,
     weakPoint: null,
@@ -74,11 +78,13 @@ interface Tally {
   runLost: boolean;
 }
 
-function loseCertainty(state: FightState, amount: number, tally: Tally): void {
-  if (amount <= 0) return;
+/** Takes Certainty away, never below zero; returns how much was actually lost. */
+function loseCertainty(state: FightState, amount: number, tally: Tally): number {
+  if (amount <= 0) return 0;
   const before = state.certainty;
   state.certainty = Math.max(0, settle(state.certainty - amount));
   tally.certaintyLost += before - state.certainty;
+  return before - state.certainty;
 }
 
 function endFightLost(state: FightState, events: GameEvent[], reason: "turnLimit" | "certainty", penalty: number, tally: Tally): void {
@@ -96,8 +102,8 @@ function finishTurn(state: FightState, events: GameEvent[], tally: Tally): void 
   state.challenge = null;
   tally.turnEnded = true;
 
-  const damage = state.config.enemy.attack;
-  loseCertainty(state, damage, tally);
+  // The event says what the attack took, which at the end is what was left.
+  const damage = loseCertainty(state, state.config.enemy.attack, tally);
   events.push({ type: "enemyAttacked", turn: state.turn, damage });
   if (state.certainty <= 0) return endFightLost(state, events, "certainty", 0, tally);
 
@@ -141,7 +147,8 @@ function cunningOf(state: FightState): { events: number; decoys: number } {
 /** The Cunning enemy's search: the structures as they are now, the heaviest value, and the next stretch of candidate values. */
 function attackContext(state: FightState, params: StreamParams, coreValue: number | null, offset: number) {
   return {
-    snapshots: state.slots,
+    // The Cunning enemy is the first one: it aims at the structures that watch its own stream.
+    snapshots: state.slots.map((snapshot, slot) => (sourceOfSlot(state, slot) === 0 ? snapshot : null)),
     constants: state.config.constants,
     coreValue,
     budget: state.config.rules.cunningSearch,
@@ -149,13 +156,16 @@ function attackContext(state: FightState, params: StreamParams, coreValue: numbe
   };
 }
 
-/** Ingest: the enemy emits a burst, every deployed structure sees it, and from turn 2 a challenge follows. */
+/** Ingest: the enemy (or both enemies) emit a burst, every deployed structure sees the burst of the enemy it watches, and from turn 2 a challenge follows. */
 function endDeploy(state: FightState, events: GameEvent[], tally: Tally): void {
   const params = streamParamsOf(state.config);
-  const live = liveSetOf(state);
+  const params2 = secondStreamParamsOf(state.config);
+  const live = LiveSet.fromSnapshot(state.live);
+  const live2 = state.live2 ? LiveSet.fromSnapshot(state.live2) : null;
   const cunning = cunningOf(state);
-  const core = live.mode()?.value ?? null; // what a Frequency challenge will shield, as seen before the burst
+  const core = (live2 ? LiveSet.union(live, live2) : live).mode()?.value ?? null; // what a Frequency challenge will shield, as seen before the burst
   const burst = nextBurst(params, state.stream, live);
+  const burst2 = live2 && params2 && state.stream2 ? nextBurst(params2, state.stream2, live2) : null;
   // A Cunning enemy adds events aimed at the structures that are deployed now, found with the public hash seed.
   if (cunning.events > 0) {
     const crafted = craftInserts(attackContext(state, params, core, 0), Math.round(cunning.events * burst.events.length));
@@ -165,15 +175,24 @@ function endDeploy(state: FightState, events: GameEvent[], tally: Tally): void {
     }
   }
 
-  // A structure only learns what streams while it is deployed.
+  // A structure only learns what streams while it is deployed, and only from the enemy it watches.
   const structures = loadStructures(state);
-  for (const event of burst.events) for (const structure of structures) structure?.ingest(event);
+  structures.forEach((structure, slot) => {
+    const heard = sourceOfSlot(state, slot) === 1 && burst2 ? burst2.events : burst.events;
+    for (const event of heard) structure?.ingest(event);
+  });
   state.slots = structures.map((structure) => (structure ? structure.snapshot() : null));
   state.stream = burst.state;
   state.live = live.snapshot();
+  if (burst2 && live2) {
+    state.stream2 = burst2.state;
+    state.live2 = live2.snapshot();
+  }
+  const union = live2 ? LiveSet.union(live, live2) : live;
 
-  const deletes = burst.events.filter((event) => event.op === "delete").length;
-  events.push({ type: "burstIngested", turn: state.turn, events: burst.events.length, inserts: burst.events.length - deletes, deletes });
+  const all = burst2 ? [...burst.events, ...burst2.events] : burst.events;
+  const deletes = all.filter((event) => event.op === "delete").length;
+  events.push({ type: "burstIngested", turn: state.turn, events: all.length, inserts: all.length - deletes, deletes });
 
   // Each turn the search looks through new candidates: one stretch for the inserts and one for the decoys.
   const spent = cunning.events > 0 || cunning.decoys > 0 ? 2 * state.config.rules.cunningSearch : 0;
@@ -184,7 +203,7 @@ function endDeploy(state: FightState, events: GameEvent[], tally: Tally): void {
     const rng = Rng.fromState(state.challengeRng);
     // For Presence, it offers values the player's filters wrongly flag (found in the structures as they are after this burst).
     const decoys = weakPoint === "presence" && cunning.decoys > 0 ? craftDecoys(attackContext(state, params, core, state.config.rules.cunningSearch), state.config.rules.presenceTargets) : [];
-    const challenge = issueChallenge(weakPoint, live, rng, challengeContext(state, params, decoys));
+    const challenge = issueChallenge(weakPoint, union, rng, challengeContext(state, params, decoys));
     state.challengeRng = rng.getState();
 
     state.cunningCursor += spent;

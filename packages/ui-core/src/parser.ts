@@ -82,10 +82,22 @@ function firstFreeSlot(observation: Observation): number | null {
 
 const nameOf = (view: StructureView) => structures[view.kind].name;
 
-function parseDeploy(tokens: string[], { observation, loadout }: ParseContext): ParseResult {
-  const usage = "Usage: deploy <structure> <bits> [knob]";
+function parseDeploy(allTokens: string[], { observation, loadout }: ParseContext): ParseResult {
+  const usage = "Usage: deploy <structure> <bits> [knob] [on <enemy>]";
   const problem = wrongPhase(observation, "deploy");
   if (problem) return error(problem);
+
+  // In a fight with two enemies, "on 1" or "on 2" says which enemy the structure watches.
+  let tokens = allTokens;
+  let enemy: 0 | 1 | null = null;
+  const on = allTokens.lastIndexOf("on");
+  if (on >= 0) {
+    if (!observation.secondTraits) return error("There is only one enemy in this fight, so there is nothing to choose with \"on\".");
+    const which = allTokens[on + 1];
+    if (allTokens.length !== on + 2 || (which !== "1" && which !== "2")) return error(`Say which enemy with "on 1" or "on 2". ${usage}`);
+    enemy = which === "1" ? 0 : 1;
+    tokens = allTokens.slice(0, on);
+  }
 
   // The structure's name is everything before the first number, so multi-word names work.
   const firstNumber = tokens.findIndex(isNumber);
@@ -109,8 +121,15 @@ function parseDeploy(tokens: string[], { observation, loadout }: ParseContext): 
   const spaceBits = Number(bitsToken);
   if (spaceBits > observation.spaceFree) return error(`Only ${observation.spaceFree} bits of Space are free.`);
 
-  const slot = firstFreeSlot(observation);
-  if (slot === null) return error('Every slot is in use. Remove a structure first, for example "remove 1".');
+  // Even slots (the 1st, 3rd, ...) watch the first enemy and odd slots the second; without a choice, the next free slot.
+  const taken = new Set(observation.structures.map((structure) => structure.slot));
+  const slot =
+    enemy === null
+      ? firstFreeSlot(observation)
+      : Array.from({ length: observation.structures.length + observation.slotsFree }, (_, i) => i).find((i) => i % 2 === enemy && !taken.has(i)) ?? null;
+  if (slot === null) {
+    return error(enemy === null ? 'Every slot is in use. Remove a structure first, for example "remove 1".' : `No free slot watches enemy ${enemy + 1}. Remove a structure there first.`);
+  }
 
   let knob: number | undefined;
   if (knobToken !== undefined) {

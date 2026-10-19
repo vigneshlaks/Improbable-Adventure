@@ -55,6 +55,12 @@ export interface EnemyConfig {
   weakPoints: WeakPoint[];
   /** The quantile of live values its Rank challenge asks about (the armor's), needed if Rank is one of its weak points. */
   rankQuantile?: number;
+  /**
+   * A second enemy that fights alongside, with a stream of its own (a multi-enemy fight). The two share one HP, one weak-point list and one
+   * turn limit. Challenges are asked about the two live sets together. A structure watches one stream, by its slot: even slots (1st, 3rd, ...)
+   * watch the first enemy and odd slots the second. Structures with the Merge enchantment, and Theta Sketches, answer for both.
+   */
+  second?: { size: number; traits: StreamTraits };
 }
 
 /** How a step is scored for reinforcement learning. Ignored by the game itself. */
@@ -95,6 +101,9 @@ export interface FightState {
   slots: Array<StructureSnapshot | null>;
   stream: StreamState;
   live: LiveSnapshot;
+  /** The second enemy's stream and live set, in a multi-enemy fight. */
+  stream2?: StreamState;
+  live2?: LiveSnapshot;
   challengeRng: RngState;
   /** The open challenge during the strike phase, otherwise null. */
   challenge: Challenge | null;
@@ -143,6 +152,10 @@ export interface StructureView {
   enchantment?: string;
   /** The structure's answer to the open challenge, or null when it cannot answer or there is none. */
   answer: Answer | null;
+  /** In a multi-enemy fight, the enemy it watches: 0 for the first, 1 for the second. */
+  source?: 0 | 1;
+  /** True when the answer is for both enemies' streams: this structure was merged with its partner on the other enemy. */
+  merged?: boolean;
 }
 
 /** Everything the player may see. The true answers are not included. */
@@ -156,6 +169,8 @@ export interface Observation {
   /** How many more deploys and removals this turn allows. */
   changesLeft: number;
   traits: StreamTraits;
+  /** The second enemy's traits, in a multi-enemy fight. */
+  secondTraits?: StreamTraits;
   weakPoint: WeakPoint | null;
   challenge: Challenge | null;
   structures: StructureView[];

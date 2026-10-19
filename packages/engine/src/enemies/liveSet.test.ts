@@ -115,3 +115,31 @@ describe("LiveSet rank", () => {
     expect(new LiveSet().quantileValue(0.5)).toBeNull();
   });
 });
+
+describe("LiveSet union", () => {
+  it("holds every unit of both sets, counts a value both hold once as distinct, and keeps as ghosts only the values that are live in neither; changes neither set", () => {
+    const a = new LiveSet();
+    const b = new LiveSet();
+    for (const v of [1, 1, 2, 3]) a.insert(v);
+    for (const v of [3, 4, 4]) b.insert(v);
+    const rng = rngFor("union");
+    // a ghost in each: 5 is deleted from a, 6 from b; and 3 is a ghost in a once it is deleted there, though b holds it
+    a.insert(5);
+    b.insert(6);
+    while (a.count(5) > 0) { const removed = a.deleteRandom(rng) as number; if (removed !== 5) a.insert(removed); }
+    while (b.count(6) > 0) { const removed = b.deleteRandom(rng) as number; if (removed !== 6) b.insert(removed); }
+    a.insert(7);
+    while (a.count(7) > 0) { const removed = a.deleteRandom(rng) as number; if (removed !== 7) a.insert(removed); }
+    b.insert(7); // 7 is a ghost in a but live in b
+    const union = LiveSet.union(a, b);
+    expect(union.liveTotal).toBe(8);
+    expect(union.count(1)).toBe(2);
+    expect(union.count(3)).toBe(2); // one unit in each
+    expect(union.count(4)).toBe(2);
+    expect(union.count(7)).toBe(1);
+    expect(union.distinct).toBe(5); // 1, 2, 3, 4, 7
+    expect(union.ghosts().sort((x, y) => x - y)).toEqual([5, 6]); // not 7: b holds it
+    expect(a.liveTotal).toBe(4);
+    expect(b.liveTotal).toBe(4);
+  });
+});

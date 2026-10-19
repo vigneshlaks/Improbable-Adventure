@@ -23,8 +23,20 @@ export function streamParamsOf(config: FightConfig): StreamParams {
   return resolveStreamParams(config.enemy.size, config.enemy.traits, config.traitTables, config.rules.expectedTurns);
 }
 
+/** What is live in the fight: the first enemy's stream, or both enemies' together in a multi-enemy fight. */
 export function liveSetOf(state: FightState): LiveSet {
-  return LiveSet.fromSnapshot(state.live);
+  const first = LiveSet.fromSnapshot(state.live);
+  return state.live2 ? LiveSet.union(first, LiveSet.fromSnapshot(state.live2)) : first;
+}
+
+/** The enemy a slot watches in a multi-enemy fight: even slots the first, odd the second. In a single fight, always the first. */
+export function sourceOfSlot(state: FightState, slot: number): 0 | 1 {
+  return state.live2 && slot % 2 === 1 ? 1 : 0;
+}
+
+export function secondStreamParamsOf(config: FightConfig): StreamParams | null {
+  const second = config.enemy.second;
+  return second ? resolveStreamParams(second.size, second.traits, config.traitTables, config.rules.expectedTurns) : null;
 }
 
 /** Space assigned to deployed structures is charged in full, even if a structure rounds its size down. */

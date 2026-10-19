@@ -357,5 +357,19 @@
     "summary": "MinHash laid out like a HyperLogLog: about four times as many registers for the same Space.",
     "help": "Each value goes to one bucket, as in HyperLogLog, and a register keeps the smallest hash of its bucket in a small coded form (where its first one bit is and the next three bits), eight bits in all. So the same Space holds four times as many registers as a MinHash has slots, and an insert touches one. Two sets agree in a bucket when the union's smallest hash is in both, which has the chance of their Jaccard similarity, or when two different ones happen to have the same code, which it measures with a set of the copy's size from outside the stream and takes out. It ignores deletes, and the same registers count the distinct values.",
     "flavor": "Remembers a fingerprint of the first thing it would pick, in a single byte."
+  },
+  "thetaSketch": {
+    "name": "Theta Sketch",
+    "phase": 2,
+    "aliases": [
+      "theta"
+    ],
+    "answers": [
+      "count"
+    ],
+    "knob": null,
+    "summary": "K-Minimum Values that merge by themselves: counts the union of two enemies' streams.",
+    "help": "Keeps the k smallest hashes of the distinct values it has seen, like K-Minimum Values; the largest of them, as a share of the hash range, is its theta, and every value below theta is in the sketch. Two of them (one watching each enemy in a two-enemy fight) take the k smallest of both and so count the union, with no Merge enchantment. Alone it counts as K-Minimum Values does, with the same error and the same blindness to deletes.",
+    "flavor": "Two small mirrors, put together, show the whole crowd."
   }
 }

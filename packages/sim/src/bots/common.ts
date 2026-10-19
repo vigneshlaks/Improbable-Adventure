@@ -81,6 +81,7 @@ function firstFreeSlot(observation: Observation): number | null {
  */
 export function nextDeployAction(view: BotView, wanted: StructureKind[]): Action {
   const { observation } = view;
+  if (observation.secondTraits) return nextTwinDeployAction(view, wanted);
   const deployed = new Set(observation.structures.map((structure) => structure.kind));
   const missing = wanted.filter((kind) => !deployed.has(kind));
   if (missing.length === 0) return END_DEPLOY;
@@ -92,6 +93,32 @@ export function nextDeployAction(view: BotView, wanted: StructureKind[]): Action
     return { type: "deploy", slot, kind: next, spaceBits: Math.min(share, observation.spaceFree) };
   }
   const unwanted = observation.structures.find((structure) => !wanted.includes(structure.kind));
+  return unwanted ? { type: "remove", slot: unwanted.slot } : END_DEPLOY;
+}
+
+/** The free slot that watches `source` (even slots the first enemy, odd the second) in a fight with two enemies. */
+function firstFreeSlotFor(observation: Observation, source: 0 | 1): number | null {
+  const taken = new Set(observation.structures.map((structure) => structure.slot));
+  for (let slot = source; slot < totalSlots(observation); slot += 2) if (!taken.has(slot)) return slot;
+  return null;
+}
+
+/**
+ * In a fight with two enemies, a challenge is about both streams, so a structure is wanted on each enemy: one pair per wanted kind, with the Space
+ * shared out evenly. A pair needs two slots, so only as many kinds as there are pairs of slots are wanted. A Merge enchantment on the kind makes the pair answer
+ * for both streams (see `combineAnswers`); without it the bot adds the two answers up.
+ */
+function nextTwinDeployAction(view: BotView, wanted: StructureKind[]): Action {
+  const { observation } = view;
+  const pairs = wanted.slice(0, Math.max(1, Math.floor(totalSlots(observation) / 2)));
+  const has = (kind: StructureKind, source: 0 | 1) => observation.structures.some((s) => s.kind === kind && s.source === source);
+  const missing = pairs.flatMap((kind) => ([0, 1] as const).filter((source) => !has(kind, source)).map((source) => ({ kind, source })));
+  if (missing.length === 0) return END_DEPLOY;
+  const next = missing[0] as { kind: StructureKind; source: 0 | 1 };
+  const slot = firstFreeSlotFor(observation, next.source);
+  const share = Math.max(minBitsOf(next.kind), Math.floor(observation.spaceFree / missing.length));
+  if (slot !== null && observation.spaceFree >= minBitsOf(next.kind)) return { type: "deploy", slot, kind: next.kind, spaceBits: Math.min(share, observation.spaceFree) };
+  const unwanted = observation.structures.find((structure) => !pairs.includes(structure.kind));
   return unwanted ? { type: "remove", slot: unwanted.slot } : END_DEPLOY;
 }
 
@@ -118,9 +145,30 @@ export function bestNumericAnswer(observation: Observation): Answered | null {
   const answers = numericAnswers(observation);
   for (const kind of preferredKinds(challenge.kind, observation.traits)) {
     const match = answers.find((answer) => answer.structure.kind === kind);
-    if (match) return match;
+    if (match) return combineAnswers(observation, answers.filter((answer) => answer.structure.kind === kind));
   }
-  return answers[0] ?? null;
+  return answers[0] ? combineAnswers(observation, [answers[0]]) : null;
+}
+
+/**
+ * In a fight with two enemies the answer that counts is about both streams. A merged structure already gives it. Otherwise the answers of one kind
+ * on the two enemies are added up: for Frequency that is the count in the union exactly (counts add), for Count it is an overcount by the values both
+ * enemies send, and for Rank there is nothing to add, so the first answer stands. In a single fight, the first answer.
+ */
+export function combineAnswers(observation: Observation, ofOneKind: Answered[]): Answered {
+  const first = ofOneKind[0] as Answered;
+  if (!observation.secondTraits) return first;
+  const merged = ofOneKind.find((answer) => answer.structure.merged);
+  if (merged) return merged;
+  const kind = observation.challenge?.kind;
+  if (kind !== "frequency" && kind !== "count") return first;
+  const bySource = [0, 1].flatMap((source) => {
+    const match = ofOneKind.find((answer) => answer.structure.source === source);
+    return match ? [match] : [];
+  });
+  if (bySource.length < 2) return first;
+  const sum = (pick: (a: Answered) => number) => bySource.reduce((total, answer) => total + pick(answer), 0);
+  return { structure: first.structure, estimate: sum((a) => a.estimate), low: sum((a) => a.low), high: sum((a) => a.high) };
 }
 
 /** For each deployed structure that answered a Presence or Likeness challenge, the positions (0-based) it flagged. */
@@ -128,11 +176,20 @@ export function flaggedBy(observation: Observation): Array<{ structure: Structur
   const challenge = observation.challenge;
   if (challenge?.kind !== "presence" && challenge?.kind !== "likeness") return [];
   const positionOf = new Map(challenge.targets.map((target, position) => [target, position]));
-  return observation.structures.flatMap((structure) =>
+  const found = observation.structures.flatMap((structure) =>
     structure.answer && Array.isArray(structure.answer.estimate)
       ? [{ structure, positions: structure.answer.estimate.flatMap((target) => positionOf.get(target) ?? []).sort((a, b) => a - b) }]
       : [],
   );
+  if (!observation.secondTraits) return found;
+  // With two enemies the question is about both streams: what one kind flags on either enemy is flagged (a merged pair says the same twice).
+  const byKind = new Map<StructureKind, { structure: StructureView; positions: Set<number> }>();
+  for (const { structure, positions } of found) {
+    const group = byKind.get(structure.kind) ?? { structure, positions: new Set<number>() };
+    for (const position of positions) group.positions.add(position);
+    byKind.set(structure.kind, group);
+  }
+  return [...byKind.values()].map(({ structure, positions }) => ({ structure, positions: [...positions].sort((a, b) => a - b) }));
 }
 
 /** Presence positions flagged by at least `votes` structures. */

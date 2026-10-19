@@ -49,5 +49,23 @@
     ],
     "transforms": {},
     "reward": true
+  },
+  "merge": {
+    "name": "Merge",
+    "phase": 2,
+    "summary": "In a fight with two enemies, two copies of this structure, one watching each enemy, answer together for both streams. It does nothing in a fight with one.",
+    "valid": [
+      "bloomFilter",
+      "countMinSketch",
+      "logLog",
+      "hyperLogLog",
+      "kMinimumValues",
+      "minHash",
+      "tDigest",
+      "kllSketch",
+      "quotientFilter"
+    ],
+    "transforms": {},
+    "reward": true
   }
 }

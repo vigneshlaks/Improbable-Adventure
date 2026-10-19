@@ -68,5 +68,15 @@
     ],
     "result": "hyperMinHash",
     "summary": "A HyperLogLog and a MinHash fuse into HyperMinHash: Likeness in HyperLogLog's registers, four times as many as a MinHash gets from the same Space."
+  },
+  "thetaSketch": {
+    "name": "Theta Sketch",
+    "phase": 2,
+    "inputs": [
+      "kMinimumValues",
+      "kMinimumValues"
+    ],
+    "result": "thetaSketch",
+    "summary": "Two K-Minimum Values fuse into a Theta Sketch: it counts like K-Minimum Values, and when one watches each enemy of a two-enemy fight they answer together for the union by themselves. You need a second K-Minimum Values, which can turn up as a reward."
   }
 }

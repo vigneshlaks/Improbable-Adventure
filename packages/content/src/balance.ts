@@ -92,6 +92,9 @@ export const balanceSchema = z.object({
   OVERSHOOT_EXP: z.number().positive(),
   COUNT_TOL: z.number().positive(),
   RANK_TOL: z.number().positive(),
+  /** The chance an enemy of each tier is a multi-enemy fight: a second enemy with a stream of its own, of this share of its size. */
+  TWIN_CHANCE: z.object({ minion: z.number().min(0).max(1), elite: z.number().min(0).max(1), boss: z.number().min(0).max(1) }).strict(),
+  TWIN_SIZE_SHARE: z.number().positive().max(1),
   /** The quantiles an enemy of each tier may put its Rank armor at. */
   RANK_QUANTILES: z.object({ minion: z.array(z.number().gt(0).lt(1)).min(1), elite: z.array(z.number().gt(0).lt(1)).min(1), boss: z.array(z.number().gt(0).lt(1)).min(1) }).strict(),
 

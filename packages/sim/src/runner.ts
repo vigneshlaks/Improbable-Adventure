@@ -102,7 +102,7 @@ function tallyAnswers(observation: Observation, state: FightState, accuracy: Fig
 function tallyCountDuel(state: FightState, duel: CountDuelTally): void {
   const truth = groundTruth(state).answer;
   if (truth?.kind !== "count" || truth.distinct <= 0) return;
-  const seen = everSeen(state.live);
+  const seen = everSeen({ items: [...state.live.items, ...(state.live2?.items ?? [])], ghosts: [...state.live.ghosts, ...(state.live2?.ghosts ?? [])] });
   const errors = counterErrors(seen, truth.distinct, state.config.rules.startingSpace, state.config.constants);
   duel.challenges++;
   if (errors.logLog < errors.linearCounting) duel.logLogCloser++;

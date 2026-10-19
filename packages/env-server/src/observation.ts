@@ -30,6 +30,7 @@ function slotFeatures(view: StructureView | undefined, totalSpace: number, targe
     numeric ? (Number.isFinite(answer.high) ? squash(answer.high, COUNT_SCALE) : 1) : 0,
     answer ? answer.confidence : 0,
     targets.length > 0 ? flagged / targets.length : 0,
+    view.source === undefined ? 0 : view.merged ? 1 : view.source === 0 ? 0.25 : 0.5, // which enemy it watches (0.25, 0.5), or that it answers for both (1); 0 in a single fight
   ];
 }
 
@@ -61,6 +62,7 @@ export function encodeObservation(state: RunState, layout: Layout): number[] {
   // How many of this turn's deploys and removals are left, as a share of what a turn allows: the agent can see its budget run out.
   out.push(fight && state.fight ? fight.changesLeft / Math.max(1, state.config.rules.changesPerSlot * state.fight.slots.length) : 0);
   out.push(...TRAITS.map((trait) => (fight ? LEVEL[fight.traits[trait]] : 0)));
+  out.push(fight?.secondTraits ? 1 : 0); // a second enemy fights alongside
   out.push(...oneHot([...WEAK_POINTS, "unknown"] as const, fight ? (fight.weakPoint ?? "unknown") : null));
   out.push(...oneHot(WEAK_POINTS, fight?.challenge?.kind));
   const targets = fight?.challenge?.kind === "presence" || fight?.challenge?.kind === "likeness" ? fight.challenge.targets : [];

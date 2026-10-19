@@ -16,6 +16,7 @@ import { LocalitySensitiveHash } from "./localitySensitiveHash";
 import { MinHash } from "./minHash";
 import { QuotientFilter } from "./quotientFilter";
 import { SimHash } from "./simHash";
+import { ThetaSketch } from "./thetaSketch";
 import { ScalableBloom } from "./scalableBloom";
 import { SpectralBloom } from "./spectralBloom";
 import { TDigest } from "./tDigest";
@@ -37,6 +38,7 @@ export { LocalitySensitiveHash } from "./localitySensitiveHash";
 export { MinHash } from "./minHash";
 export { QuotientFilter } from "./quotientFilter";
 export { SimHash } from "./simHash";
+export { ThetaSketch } from "./thetaSketch";
 export { ScalableBloom } from "./scalableBloom";
 export { SpectralBloom } from "./spectralBloom";
 export { TDigest } from "./tDigest";
@@ -91,6 +93,8 @@ export function restoreStructure(snapshot: StructureSnapshot, constants: Structu
       return LocalitySensitiveHash.fromSnapshot(snapshot, constants);
     case "hyperMinHash":
       return HyperMinHash.fromSnapshot(snapshot, constants);
+    case "thetaSketch":
+      return ThetaSketch.fromSnapshot(snapshot, constants);
     default:
       throw new RangeError(`Cannot restore unknown structure kind: ${String((snapshot as { kind: unknown }).kind)}`);
   }
@@ -140,5 +144,7 @@ export function createStructure(kind: StructureKind, options: StructureOptions, 
       return new LocalitySensitiveHash(options, constants);
     case "hyperMinHash":
       return new HyperMinHash(options, constants);
+    case "thetaSketch":
+      return new ThetaSketch(options, constants);
   }
 }

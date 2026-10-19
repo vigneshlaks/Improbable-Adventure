@@ -39,6 +39,7 @@
       "elite": "An elite approaches.",
       "boss": "A boss looms."
     },
+    "second": "A second enemy fights beside it, with a stream of its own. What you are asked is about both streams together: put structures on the slots of each enemy, and merge them to answer for both.",
     "calm": "Its stream looks plain and steady.",
     "traits": {
       "variety": {
@@ -80,8 +81,8 @@
   },
   "commands": {
     "deploy": {
-      "usage": "deploy <structure> <bits> [knob]",
-      "summary": "Place a structure into the next free slot, spending Space."
+      "usage": "deploy <structure> <bits> [knob] [on <enemy>]",
+      "summary": "Place a structure into the next free slot, spending Space. With two enemies, \"on 1\" or \"on 2\" picks the enemy it watches."
     },
     "remove": {
       "usage": "remove <slot>",

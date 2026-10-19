@@ -171,4 +171,19 @@ export class KllSketch implements Structure {
     copy.compactions = this.compactions;
     return copy;
   }
+
+  /** The sketch of both streams: the items of each level together, then compacted. Needs the same k and seed. */
+  merge(other: Structure): KllSketch {
+    if (!(other instanceof KllSketch) || other.k !== this.k || other.seed !== this.seed) throw new Error("KLL sketches merge only with same-sized, same-seeded sketches");
+    const merged = this.clone();
+    other.levels.forEach((level, l) => {
+      while (merged.levels.length <= l) merged.levels.push([]);
+      (merged.levels[l] as number[]).push(...level);
+    });
+    merged.insertCount = this.insertCount + other.insertCount;
+    merged.deleteCount = this.deleteCount + other.deleteCount;
+    merged.compactions = Math.max(this.compactions, other.compactions);
+    merged.compact();
+    return merged;
+  }
 }

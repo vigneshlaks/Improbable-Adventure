@@ -155,12 +155,21 @@ const TRAIT_NAMES = ["variety", "skew", "churn", "growth", "drift", "likeness", 
 const title = (word: string) => word.charAt(0).toUpperCase() + word.slice(1);
 
 /** Introduces an enemy and describes each trait that is above Low. */
-export function describeEnemy(enemy: Pick<EnemyConfig, "tier" | "traits">): string[] {
+export function describeEnemy(enemy: Pick<EnemyConfig, "tier" | "traits"> & Partial<Pick<EnemyConfig, "second">>): string[] {
   const lines = TRAIT_NAMES.flatMap((trait) => {
     const level = enemy.traits[trait];
     return level === "low" ? [] : [`- ${title(trait)} (${level}): ${narration.enemy.traits[trait][level]}.`];
   });
-  return [narration.enemy.intro[enemy.tier], ...(lines.length > 0 ? lines : [narration.enemy.calm])];
+  const second = enemy.second
+    ? [
+        narration.enemy.second,
+        ...TRAIT_NAMES.flatMap((trait) => {
+          const level = enemy.second?.traits[trait];
+          return level === undefined || level === "low" || trait === "likeness" || trait === "cunning" ? [] : [`- Second enemy, ${title(trait)} (${level}): ${narration.enemy.traits[trait][level]}.`];
+        }),
+      ]
+    : [];
+  return [narration.enemy.intro[enemy.tier], ...(lines.length > 0 ? lines : [narration.enemy.calm]), ...second];
 }
 
 export { TRAIT_NAMES, title };

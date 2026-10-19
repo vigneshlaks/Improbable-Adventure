@@ -408,6 +408,13 @@ describe("ending a fight", () => {
       // Four attacks (12), three blocked strikes (9) and the turn-limit penalty (20).
       expect(observe(state).certainty).toBe(100 - 12 - 9 - 20);
     }
+    // the attack that ends it reports what it took: only the Certainty that was left
+    {
+      const frail: FightConfig = { ...CONFIG, rules: { ...CONFIG.rules, startingCertainty: 2 } };
+      const { events } = run(createFight("frail", frail), [endDeploy]);
+      expect(events.find((e) => e.type === "enemyAttacked")).toMatchObject({ damage: 2 }); // the enemy hits for 3
+      expect(events.at(-1)).toMatchObject({ type: "fightLost", reason: "certainty" });
+    }
     // rejects further actions once the fight is over
     {
       const { state } = playGreedy("over");
@@ -612,5 +619,118 @@ describe("a Cunning enemy in a fight", () => {
     expect(open.decoys).toBeGreaterThan(3);
     expect(secret.flagged).toBeLessThan(open.flagged / 2);
     expect(calm.flagged).toBeLessThan(open.flagged / 2);
+  });
+});
+
+describe("a fight with two enemies", () => {
+  const second = { size: 1000, traits: { ...CONFIG.enemy.traits, skew: "low" as const, cunning: "low" as const, likeness: "low" as const } };
+  const twin = (weakPoint: "count" | "frequency", extra: Partial<FightConfig> = {}): FightConfig => ({
+    ...CONFIG,
+    loadout: ["exactMemory", "countMinSketch", "thetaSketch", "kMinimumValues", "logLog"],
+    enemy: { ...CONFIG.enemy, turnLimit: 12, weakPoints: [weakPoint], traits: { ...CONFIG.enemy.traits, skew: "low" }, second },
+    ...extra,
+  });
+  const deploy = (slot: number, kind: "exactMemory" | "countMinSketch" | "thetaSketch" | "kMinimumValues", spaceBits = 4096): Action => ({ type: "deploy", slot, kind, spaceBits });
+  const sizes = (s: FightState) => groundTruth(s).distinct;
+
+  it("feeds each enemy's stream to the structures on its slots (even slots the first enemy, odd the second), grades challenges against both streams together, and keeps a single-enemy fight's state as it was", () => {
+    const solo = createFight("twin", CONFIG);
+    expect(solo).not.toHaveProperty("stream2");
+    expect(solo).not.toHaveProperty("live2");
+
+    let state = createFight("twin", twin("count", { rules: { ...CONFIG.rules, startingSlots: 4, startingSpace: 65536 } }));
+    expect(state.live2).toBeDefined();
+    state = run(state, [deploy(0, "exactMemory", 16384), deploy(1, "exactMemory", 16384), deploy(2, "exactMemory", 16384), endDeploy, endDeploy]).state;
+    const views = observe(state).structures;
+    expect(views.map((v) => v.source)).toEqual([0, 1, 0]);
+    const seen = (slot: number) => (views[slot]?.answer?.estimate as number);
+    expect(seen(0)).toBe(seen(2)); // two structures on the first enemy heard the same stream
+    expect(seen(0)).toBeGreaterThan(20);
+    expect(seen(1)).toBeGreaterThan(20);
+    // the truth is both streams' distinct values together (Exact Memory is exact, and the two universes hardly overlap)
+    expect(sizes(state)).toBeGreaterThan(Math.max(seen(0), seen(1)));
+    expect(sizes(state)).toBeLessThanOrEqual(seen(0) + seen(1));
+    expect(sizes(state)).toBeGreaterThanOrEqual(seen(0) + seen(1) - 8);
+    expect(observe(state).secondTraits).toEqual(second.traits);
+    // the whole state survives JSON and a replay of the same actions gives the same state
+    expect(JSON.parse(JSON.stringify(state))).toEqual(state);
+    const again = run(createFight("twin", twin("count", { rules: { ...CONFIG.rules, startingSlots: 4, startingSpace: 65536 } })), [deploy(0, "exactMemory", 16384), deploy(1, "exactMemory", 16384), deploy(2, "exactMemory", 16384), endDeploy, endDeploy]).state;
+    expect(again).toEqual(state);
+    // the burst event reports both enemies' events
+    const first = run(createFight("twin", twin("count")), [endDeploy]).events.find((e) => e.type === "burstIngested") as { events: number };
+    const alone = run(createFight("twin", { ...twin("count"), enemy: { ...twin("count").enemy, second: undefined } }), [endDeploy]).events.find((e) => e.type === "burstIngested") as { events: number };
+    expect(first.events).toBe(alone.events + Math.round(second.size / CONFIG.rules.expectedTurns));
+  });
+
+  it("poses a Rank challenge about both streams together: the best value for the union's quantile is a perfect strike, and one for the first enemy alone is not", () => {
+    const rank = twin("count", { enemy: { ...twin("count").enemy, weakPoints: ["rank"], rankQuantile: 0.5, second: { ...second, size: 4000, traits: { ...second.traits, variety: "low" } } } });
+    const state = run(createFight("twin-rank", rank), [endDeploy, endDeploy]).state;
+    const truth = groundTruth(state).answer;
+    if (truth?.kind !== "rank") throw new Error("expected a rank challenge");
+    const struck = run(state, [{ type: "strikeValue", value: truth.value }]).events.find((e) => e.type === "strikeResolved");
+    expect(struck).toMatchObject({ kind: "rank", outcome: "hit", damage: CONFIG.rules.base });
+  });
+
+  it("is attacked only through the structures that watch the first enemy: a Cunning first enemy crafts nothing against a structure on the second enemy's slot", () => {
+    const base = twin("count", { rules: { ...CONFIG.rules, startingSlots: 3, startingSpace: 16384 }, enemy: { ...twin("count").enemy, traits: { ...CONFIG.enemy.traits, skew: "low", cunning: "high" } } });
+    const burst = (state: FightState) => (run(state, [endDeploy]).events.find((e) => e.type === "burstIngested") as { events: number }).events;
+    const deployed = (slot: number) => burst(run(createFight("twin-cunning", base), [{ type: "deploy", slot, kind: "logLog", spaceBits: 1024 }]).state);
+    const plain = burst(createFight("twin-cunning", { ...base, enemy: { ...base.enemy, traits: { ...base.enemy.traits, cunning: "low" } } }));
+    expect(deployed(1)).toBe(plain); // slot 1 watches the second enemy: nothing is crafted against it
+    expect(deployed(0)).toBeGreaterThan(plain); // slot 0 watches the first: the burst has its crafted events
+  });
+
+  it("answers for both enemies when two structures are merged: the Merge enchantment on two Count-Min Sketches, or two Theta Sketches by themselves; and keeps the answers separate for a pair that cannot merge", () => {
+    const play = (config: FightConfig, actions: Action[]) => run(createFight("twin-merge", config), [...actions, endDeploy, endDeploy]).state;
+    const wide = { rules: { ...CONFIG.rules, startingSlots: 3, startingSpace: 32768 } };
+    // Count-Min with Merge: a Frequency challenge about the heavier value of the two streams together
+    {
+      const merge = twin("frequency", { ...wide, enchantments: { countMinSketch: "merge" } });
+      const merged = play(merge, [deploy(0, "countMinSketch", 8192), deploy(1, "countMinSketch", 8192)]);
+      const separate = play(twin("frequency", wide), [deploy(0, "countMinSketch", 8192), deploy(1, "countMinSketch", 8192)]);
+      const truth = groundTruth(merged).frequency?.count as number;
+      const challenge = observe(merged).challenge;
+      expect(challenge).toEqual({ kind: "frequency", value: groundTruth(merged).frequency?.value }); // the shielded value is the heaviest of both streams together
+      const [a, b] = observe(merged).structures;
+      expect(a?.merged).toBe(true);
+      expect(b?.merged).toBe(true);
+      expect(a?.answer).toEqual(b?.answer); // one answer, for both
+      expect(a?.answer?.estimate as number).toBeGreaterThanOrEqual(truth); // never under the union's count
+      const [c, d] = observe(separate).structures;
+      expect(c?.merged).toBeUndefined();
+      const parts = (c?.answer?.estimate as number) + (d?.answer?.estimate as number);
+      expect(c?.answer?.estimate as number).toBeLessThan(truth + 1); // one enemy's sketch alone cannot see the other's units
+      expect(parts).toBeGreaterThanOrEqual(truth);
+    }
+    // Theta Sketches merge with no enchantment: both answer the union's distinct count
+    {
+      const state = play(twin("count", wide), [deploy(0, "thetaSketch", 16384), deploy(1, "thetaSketch", 16384)]);
+      const [a, b] = observe(state).structures;
+      expect(a?.merged).toBe(true);
+      expect(a?.answer).toEqual(b?.answer);
+      expect(a?.answer?.estimate).toBe(groundTruth(state).distinct); // exact while it holds every value (about 500, k = 512)
+      // a plain K-Minimum Values pair does not merge by itself
+      const kmv = play(twin("count", wide), [deploy(0, "kMinimumValues", 16384), deploy(1, "kMinimumValues", 16384)]);
+      expect(observe(kmv).structures[0]?.merged).toBeUndefined();
+    }
+    // two pairs: the first on the first enemy with the first on the second, the second with the second
+    {
+      const four = twin("count", { rules: { ...CONFIG.rules, startingSlots: 4, startingSpace: 32768 } });
+      const state = play(four, [deploy(0, "thetaSketch", 8192), deploy(1, "thetaSketch", 8192), deploy(2, "thetaSketch", 8192), deploy(3, "thetaSketch", 8192)]);
+      expect(observe(state).structures.map((v) => v.merged)).toEqual([true, true, true, true]);
+    }
+    // a pair of different sizes cannot merge: they keep their own answers
+    {
+      const state = play(twin("count", wide), [deploy(0, "thetaSketch", 16384), deploy(1, "thetaSketch", 8192)]);
+      const [a, b] = observe(state).structures;
+      expect(a?.merged).toBeUndefined();
+      expect(b?.merged).toBeUndefined();
+      expect(a?.answer?.estimate).not.toEqual(groundTruth(state).distinct);
+    }
+    // two structures on the same enemy are not partners
+    {
+      const state = play(twin("count", wide), [deploy(0, "thetaSketch", 16384), deploy(2, "thetaSketch", 8192)]);
+      expect(observe(state).structures.every((v) => v.merged === undefined)).toBe(true);
+    }
   });
 });

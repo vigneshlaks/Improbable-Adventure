@@ -208,4 +208,19 @@ export class TDigest implements Structure {
     copy.deleteCount = this.deleteCount;
     return copy;
   }
+
+  /** The digest of both streams: the centroids and unmerged values of both, merged by the scale function. Needs the same slots. */
+  merge(other: Structure): TDigest {
+    if (!(other instanceof TDigest) || other.slots !== this.slots) throw new Error("t-digests merge only with same-sized digests");
+    const merged = this.clone();
+    merged.centroids = [...merged.centroids, ...other.centroids.map((c) => ({ ...c }))];
+    merged.buffer = [...merged.buffer, ...other.buffer];
+    merged.minValue = Math.min(this.minValue, other.minValue);
+    merged.maxValue = Math.max(this.maxValue, other.maxValue);
+    merged.insertCount = this.insertCount + other.insertCount;
+    merged.deleteCount = this.deleteCount + other.deleteCount;
+    merged.centroids = merged.merged();
+    merged.buffer = [];
+    return merged;
+  }
 }

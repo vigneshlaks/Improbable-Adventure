@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { eachCase } from "../../engine/src/testCases";
-import type { Observation, StructureKind } from "@pda/engine";
+import type { Observation, StructureKind, StructureView } from "@pda/engine";
 import { parseCommand, type ParseResult } from "./parser";
 import { answer, observation, view } from "./testUtils";
 
@@ -66,6 +66,18 @@ describe("deploy", () => {
     {
       const obs = observation({ slotsFree: 1, structures: [view(0, "bloomFilter"), view(2, "logLog")] });
       expect(parse("deploy exact 512", obs)).toMatchObject({ action: { slot: 1 } });
+    }
+    // with two enemies, "on 1" or "on 2" picks the enemy by the slot: the first free even slot watches the first enemy, the first free odd slot the second
+    {
+      const two = (structures: StructureView[]) => observation({ slotsFree: 4 - structures.length, secondTraits: observation().traits, structures });
+      expect(parse("deploy exact 512 on 2", two([]))).toMatchObject({ action: { type: "deploy", slot: 1, kind: "exactMemory", spaceBits: 512 } });
+      expect(parse("deploy exact 512 on 1", two([view(0, "bloomFilter")]))).toMatchObject({ action: { slot: 2 } });
+      expect(parse("deploy count-min sketch 4096 3 on 2", two([view(1, "bloomFilter")]))).toMatchObject({ action: { slot: 3, knob: 3 } });
+      expect(parse("deploy exact 512", two([view(0, "bloomFilter")]))).toMatchObject({ action: { slot: 1 } }); // without a choice, the next free slot
+      expect(errorOf(parse("deploy exact 512 on 2", two([view(1, "bloomFilter"), view(3, "logLog")])))).toMatch(/No free slot watches enemy 2/);
+      expect(errorOf(parse("deploy exact 512 on 3", two([])))).toMatch(/on 1" or "on 2/);
+      expect(errorOf(parse("deploy exact 512 on", two([])))).toMatch(/on 1" or "on 2/);
+      expect(errorOf(parse("deploy exact 512 on 1"))).toMatch(/only one enemy/);
     }
     // explains a mistake
     {
