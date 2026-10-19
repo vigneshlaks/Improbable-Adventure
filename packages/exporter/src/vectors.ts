@@ -1,5 +1,5 @@
-import { BloomFilter, CountMinSketch, CountSketch, CuckooFilter, DyadicCountMin, HyperLogLog, KllSketch, kllCapacity, KMinimumValues, TDigest, TopKTracker, LinearCounting, LogLog, MinHash, QuotientFilter, SimHash, SpectralBloom, murmur3String, murmur3U32, doubleHashIndices, PUBLIC_HASH_SEED, type StructureConstants } from "@pda/engine";
-import { sizeBloom, sizeCountMin, sizeCountSketch, sizeCuckoo, sizeDyadic, sizeExact, sizeHyperLogLog, sizeKll, sizeKmv, sizeTDigest, sizeTopK, sizeLinearCounting, sizeLogLog, sizeMinHash, sizeQuotient, sizeReservoir, sizeScalable, sizeSimHash, sizeSpectral, sizingConstants } from "./sizing";
+import { BloomFilter, CountMinSketch, CountSketch, CuckooFilter, DyadicCountMin, HyperLogLog, KllSketch, kllCapacity, KMinimumValues, TDigest, TopKTracker, LinearCounting, LocalitySensitiveHash, LogLog, MinHash, HyperMinHash, ThetaSketch, QuotientFilter, SimHash, SpectralBloom, murmur3String, murmur3U32, doubleHashIndices, PUBLIC_HASH_SEED, type StructureConstants } from "@pda/engine";
+import { sizeBloom, sizeCountMin, sizeCountSketch, sizeCuckoo, sizeDyadic, sizeExact, sizeHyperLogLog, sizeHyperMinHash, sizeKll, sizeLsh, sizeKmv, sizeTDigest, sizeTopK, sizeLinearCounting, sizeLogLog, sizeMinHash, sizeQuotient, sizeReservoir, sizeScalable, sizeSimHash, sizeSpectral, sizingConstants } from "./sizing";
 
 /** The i-th value of the fixed test stream every language's tests replay: spread across the 32-bit range. */
 export const stream = (i: number): number => Math.imul(i + 1, 2654435761) >>> 0;
@@ -132,6 +132,42 @@ export function buildVectors(constants: StructureConstants): Record<string, unkn
   for (let i = 0; i < 200; i++) topK.ingest({ op: "delete", value: topKValue(i * 3) });
   const topKAnswer = (value: number) => topK.query({ kind: "frequency", value }) as { low: number; high: number };
 
+  const lshK = 128;
+  const lsh = new LocalitySensitiveHash({ spaceBits: 32 * lshK }, constants);
+  for (let i = 0; i < 300; i++) lsh.ingest({ op: "insert", value: stream(i) });
+  const lshCopies = [
+    { from: 0, to: 300 },
+    { from: 30, to: 330 },
+    { from: 100, to: 400 },
+    { from: 150, to: 450 },
+    { from: 200, to: 500 },
+    { from: 250, to: 550 },
+    { from: 400, to: 700 },
+  ].map((c) => ({ ...c, candidate: lsh.isCandidate(Array.from({ length: c.to - c.from }, (_, i) => stream(c.from + i)), 0.6) }));
+
+  const hmhBits = 8;
+  const hmh = new HyperMinHash({ spaceBits: 8 * 2 ** hmhBits }, constants);
+  for (let i = 0; i < 400; i++) hmh.ingest({ op: "insert", value: stream(i) });
+  const hmhReference = hmh.registersOf(Array.from({ length: 400 }, (_, i) => 3_500_000_000 + i));
+  const hmhCases = [
+    { from: 0, to: 400 },
+    { from: 100, to: 500 },
+    { from: 200, to: 600 },
+    { from: 600, to: 1000 },
+  ].map((c) => {
+    const copy = Array.from({ length: c.to - c.from }, (_, i) => stream(c.from + i));
+    const result = hmh.assessCopy(copy, hmhReference);
+    return { ...c, similarity: result.similarity, collision: result.collision, agreeShare: result.agreeShare, used: result.used };
+  });
+  const hmhRegisters = (hmh.snapshot().state.registers as number[]).slice(0, 40);
+
+  const thetaK = 64;
+  const thetaLeft = new ThetaSketch({ spaceBits: 32 * thetaK }, constants);
+  const thetaRight = new ThetaSketch({ spaceBits: 32 * thetaK }, constants);
+  for (let i = 0; i < 1500; i++) thetaLeft.ingest({ op: "insert", value: stream(i) });
+  for (let i = 1000; i < 2500; i++) thetaRight.ingest({ op: "insert", value: stream(i) });
+  const thetaCount = (sketch: ThetaSketch) => sketch.query({ kind: "count" })?.estimate;
+
   const sizingCases = [
     { fn: "sizeBloom", input: { items: 1000, error: 0.01 }, output: sizeBloom({ items: 1000, error: 0.01 }, sc) },
     { fn: "sizeBloom", input: { items: 1000, memoryBits: 4793 }, output: sizeBloom({ items: 1000, memoryBits: 4793 }, sc) },
@@ -171,6 +207,11 @@ export function buildVectors(constants: StructureConstants): Record<string, unkn
     { fn: "sizeDyadic", input: { memoryBits: 10000000 }, output: sizeDyadic({ memoryBits: 10000000 }, sc) },
     { fn: "sizeTopK", input: { error: 0.01 }, output: sizeTopK({ error: 0.01 }, sc) },
     { fn: "sizeTopK", input: { memoryBits: 30000 }, output: sizeTopK({ memoryBits: 30000 }, sc) },
+    { fn: "sizeLsh", input: { error: 0.01 }, output: sizeLsh({ error: 0.01 }, sc) },
+    { fn: "sizeLsh", input: { error: 0.1 }, output: sizeLsh({ error: 0.1 }, sc) },
+    { fn: "sizeLsh", input: { memoryBits: 4096 }, output: sizeLsh({ memoryBits: 4096 }, sc) },
+    { fn: "sizeHyperMinHash", input: { error: 0.02 }, output: sizeHyperMinHash({ error: 0.02 }, sc) },
+    { fn: "sizeHyperMinHash", input: { memoryBits: 8192 }, output: sizeHyperMinHash({ memoryBits: 8192 }, sc) },
   ];
 
   return {
@@ -224,6 +265,17 @@ export function buildVectors(constants: StructureConstants): Record<string, unkn
       capacity: topK.params.candidates,
       candidates: topK.candidates.slice(0, 8).map((c) => ({ item: c.value, low: c.low, high: c.high })),
       estimates: Array.from({ length: 12 }, (_, i) => ({ item: stream(i * 5), ...topKAnswer(stream(i * 5)) })),
+    },
+    lsh: { k: lshK, threshold: 0.6, recall: 0.9, rows: lsh.rowsFor(0.6), items: { from: 0, to: 300 }, copies: lshCopies },
+    hyperMinHash: { indexBits: hmhBits, items: 400, cardinality: hmh.distinctEver(0.95).estimate, registers: hmhRegisters, cases: hmhCases },
+    theta: {
+      k: thetaK,
+      left: { from: 0, to: 1500 },
+      right: { from: 1000, to: 2500 },
+      thetaLeft: thetaLeft.theta,
+      countLeft: thetaCount(thetaLeft),
+      countUnion: thetaCount(thetaLeft.merge(thetaRight) as ThetaSketch),
+      hashes: thetaLeft.hashes.slice(0, 6),
     },
     sizing: sizingCases,
   };

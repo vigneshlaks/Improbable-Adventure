@@ -9,7 +9,9 @@ import {
   sizeExact,
   sizeHyperLogLog,
   sizeKll,
+  sizeHyperMinHash,
   sizeKmv,
+  sizeLsh,
   sizeLinearCounting,
   sizeLogLog,
   sizeMinHash,
@@ -335,5 +337,47 @@ export const CATALOG: Partial<Record<StructureKind, CatalogEntry>> = {
     },
     production: (workload, constants) => sizeTopK(workload, constants).memoryBits,
     formula: (c) => `candidates = ceil(1 / error), each ${c.valueBits + 2 * c.counterBits} bits (the item and two bounds); the sketch has width ceil(e / error) and depth ceil(ln(1 / (1 - confidence))).`,
+  },
+  lsh: {
+    cls: "LshIndex",
+    typescript: "lshIndex",
+    python: "lsh_index",
+    needs: ["minHash"],
+    args: ["k"],
+    guide: { use: "You store many sets and want the ones alike a query set (near-duplicates, similar documents) without comparing against all of them.", avoid: "You have only a few sets to compare, or need the exact similarity: MinHash alone compares two sets directly." },
+    size(workload, constants) {
+      const s = sizeLsh(workload, constants);
+      return { bits: s.memoryBits, args: { k: s.k }, summary: [`${number(s.k)} minima per set, cut into ${number(s.bands)} bands of ${s.rows} (${size(s.memoryBits)} per set)`, `a pair at similarity 0.6 is found with chance ${pct(s.recall)}, a pair at 0.4 with chance ${pct(s.falseAlarm)}`] };
+    },
+    production: (workload, constants) => sizeLsh(workload, constants).memoryBits,
+    formula: (c) => `${c.valueBits} bits per minimum; for rows r, bands b = ceil(ln(error) / ln(1 - 0.6^r)) give a pair at 0.6 a chance 1 - (1 - 0.6^r)^b of at least 1 - error; the r with the smallest chance for a pair at 0.4 is chosen; k = r b.`,
+  },
+  hyperMinHash: {
+    cls: "HyperMinHash",
+    typescript: "hyperMinHash",
+    python: "hyper_min_hash",
+    needs: [],
+    args: ["indexBits"],
+    guide: { use: "You compare the similarity of huge sets and also count their different items, and memory is tight: registers are a quarter the size of MinHash's slots.", avoid: "The sets are small (a few thousand items), where MinHash is simpler and as exact, or items are removed." },
+    size(workload, constants) {
+      const s = sizeHyperMinHash(workload, constants);
+      return { bits: s.memoryBits, args: { indexBits: s.indexBits }, summary: [`${number(s.registers)} registers (${size(s.memoryBits)})`, `similarity standard error about ${pct(s.standardError)}`] };
+    },
+    production: (workload, constants) => sizeHyperMinHash(workload, constants).memoryBits,
+    formula: (c) => `registers = 2^ceil(log2(1 / (4 error^2))) of ${5 + c.hyperMinHashMantissaBits} bits; standard error about 1 / (2 sqrt(registers)).`,
+  },
+  thetaSketch: {
+    cls: "ThetaSketch",
+    typescript: "thetaSketch",
+    python: "theta_sketch",
+    needs: ["kMinimumValues"],
+    args: ["k"],
+    guide: { use: "You count different items across several streams and need unions and intersections (users on both sites, items in A and B).", avoid: "A single stream's count is all you need (HyperLogLog is smaller), or items are removed." },
+    size(workload, constants) {
+      const s = sizeKmv(workload, constants);
+      return { bits: s.memoryBits, args: { k: s.k }, summary: [`k = ${number(s.k)} hashes (${size(s.memoryBits)})`, `standard error ${pct(s.standardError)} of the union; exact until ${number(s.k)} different items`] };
+    },
+    production: (workload, constants) => sizeKmv(workload, constants).memoryBits,
+    formula: (c) => `As K-Minimum Values: k = ceil(1 / error^2) + 2; bits = ${c.valueBits} x k; the intersection's error is relative to the union.`,
   },
 };

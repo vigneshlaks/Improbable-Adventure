@@ -1036,6 +1036,156 @@
       }
     ]
   },
+  "lsh": {
+    "k": 128,
+    "threshold": 0.6,
+    "recall": 0.9,
+    "rows": 4,
+    "items": {
+      "from": 0,
+      "to": 300
+    },
+    "copies": [
+      {
+        "from": 0,
+        "to": 300,
+        "candidate": true
+      },
+      {
+        "from": 30,
+        "to": 330,
+        "candidate": true
+      },
+      {
+        "from": 100,
+        "to": 400,
+        "candidate": true
+      },
+      {
+        "from": 150,
+        "to": 450,
+        "candidate": false
+      },
+      {
+        "from": 200,
+        "to": 500,
+        "candidate": false
+      },
+      {
+        "from": 250,
+        "to": 550,
+        "candidate": false
+      },
+      {
+        "from": 400,
+        "to": 700,
+        "candidate": false
+      }
+    ]
+  },
+  "hyperMinHash": {
+    "indexBits": 8,
+    "items": 400,
+    "cardinality": 428.5379669943479,
+    "registers": [
+      26,
+      15,
+      0,
+      56,
+      24,
+      0,
+      0,
+      29,
+      22,
+      15,
+      11,
+      22,
+      0,
+      32,
+      0,
+      25,
+      29,
+      11,
+      13,
+      21,
+      13,
+      15,
+      23,
+      21,
+      0,
+      34,
+      37,
+      0,
+      20,
+      17,
+      27,
+      14,
+      17,
+      25,
+      24,
+      9,
+      13,
+      16,
+      26,
+      22
+    ],
+    "cases": [
+      {
+        "from": 0,
+        "to": 400,
+        "similarity": 1,
+        "collision": 0.020242914979757085,
+        "agreeShare": 1,
+        "used": 208
+      },
+      {
+        "from": 100,
+        "to": 500,
+        "similarity": 0.5348314195860454,
+        "collision": 0.020242914979757085,
+        "agreeShare": 0.5442477876106194,
+        "used": 226
+      },
+      {
+        "from": 200,
+        "to": 600,
+        "similarity": 0.3180927614705044,
+        "collision": 0.020242914979757085,
+        "agreeShare": 0.33189655172413796,
+        "used": 232
+      },
+      {
+        "from": 600,
+        "to": 1000,
+        "similarity": 0,
+        "collision": 0.020242914979757085,
+        "agreeShare": 0.012195121951219513,
+        "used": 246
+      }
+    ]
+  },
+  "theta": {
+    "k": 64,
+    "left": {
+      "from": 0,
+      "to": 1500
+    },
+    "right": {
+      "from": 1000,
+      "to": 2500
+    },
+    "thetaLeft": 0.05144923203624785,
+    "countLeft": 1224.5080734269118,
+    "countUnion": 2054.65866997158,
+    "hashes": [
+      1386528,
+      3808176,
+      9864645,
+      16007011,
+      24350913,
+      26240207
+    ]
+  },
   "sizing": [
     {
       "fn": "sizeBloom",
@@ -1550,6 +1700,77 @@
         "errorShare": 0.01161658901050874,
         "confidence": 0.950212931632136,
         "memoryBits": 29952,
+        "meetsTarget": true
+      }
+    },
+    {
+      "fn": "sizeLsh",
+      "input": {
+        "error": 0.01
+      },
+      "output": {
+        "k": 23325240,
+        "rows": 24,
+        "bands": 971885,
+        "recall": 0.9900000247152171,
+        "falseAlarm": 0.0002735238716726762,
+        "memoryBits": 746407680,
+        "meetsTarget": true
+      }
+    },
+    {
+      "fn": "sizeLsh",
+      "input": {
+        "error": 0.1
+      },
+      "output": {
+        "k": 11662632,
+        "rows": 24,
+        "bands": 485943,
+        "recall": 0.9000003604952164,
+        "falseAlarm": 0.0001367714297473288,
+        "memoryBits": 373204224,
+        "meetsTarget": true
+      }
+    },
+    {
+      "fn": "sizeLsh",
+      "input": {
+        "memoryBits": 4096
+      },
+      "output": {
+        "k": 126,
+        "rows": 3,
+        "bands": 42,
+        "recall": 0.9999635854763866,
+        "falseAlarm": 0.9378293157836783,
+        "memoryBits": 4032,
+        "meetsTarget": true
+      }
+    },
+    {
+      "fn": "sizeHyperMinHash",
+      "input": {
+        "error": 0.02
+      },
+      "output": {
+        "indexBits": 10,
+        "registers": 1024,
+        "standardError": 0.015625,
+        "memoryBits": 8192,
+        "meetsTarget": true
+      }
+    },
+    {
+      "fn": "sizeHyperMinHash",
+      "input": {
+        "memoryBits": 8192
+      },
+      "output": {
+        "indexBits": 10,
+        "registers": 1024,
+        "standardError": 0.015625,
+        "memoryBits": 8192,
         "meetsTarget": true
       }
     }

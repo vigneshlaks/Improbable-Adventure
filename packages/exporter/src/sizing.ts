@@ -449,3 +449,71 @@ export function sizeTopK(workload: Workload, constants: SizingConstants): TopKSi
   const errorShare = Math.E / width;
   return { width, depth, capacity, errorShare, confidence: 1 - Math.exp(-depth), memoryBits: width * depth * constants.counterBits + capacity * entryBits, meetsTarget: meets(workload, errorShare) };
 }
+
+/** The chance that some band of `rows` rows agrees for two sets of similarity s, with `bands` bands. */
+export function lshChance(similarity: number, rows: number, bands: number): number {
+  return 1 - (1 - similarity ** rows) ** bands;
+}
+
+/** The similarity an LSH index is built to find, and the similarity at which it is asked to turn most pairs away. */
+const LSH_THRESHOLD = 0.6;
+const LSH_FAR = 0.4;
+
+export interface LshSizing extends Sized {
+  /** The minima in a signature, and how they are cut into bands. */
+  k: number;
+  rows: number;
+  bands: number;
+  /** The chance a pair exactly at the threshold (0.6) is found, and the chance a pair at 0.4 is found anyway. */
+  recall: number;
+  falseAlarm: number;
+}
+
+/**
+ * LSH: `error` is the share of pairs at the threshold the index may miss. Over the row counts, the bands needed for that recall are b = ceil(ln(error) / ln(1 - t^r));
+ * the row count that turns most pairs at 0.4 away is chosen, and the signature is k = r b minima of 32 bits. Given memory, k is what fits and the rows are the most
+ * that still find a pair at the threshold with the chance 1 - error.
+ */
+export function sizeLsh(workload: Workload, constants: SizingConstants): LshSizing {
+  const miss = target(workload, constants);
+  let rows = 1;
+  let bands = 1;
+  if (workload.memoryBits !== undefined) {
+    const k = Math.max(1, Math.floor(workload.memoryBits / constants.valueBits));
+    for (let r = 1; r <= k; r++) {
+      if (lshChance(LSH_THRESHOLD, r, Math.floor(k / r)) >= 1 - miss) rows = r;
+      else break;
+    }
+    bands = Math.floor(k / rows);
+  } else {
+    let best = Number.POSITIVE_INFINITY;
+    for (let r = 1; r <= 24; r++) {
+      const b = Math.max(1, Math.ceil(Math.log(miss) / Math.log(1 - LSH_THRESHOLD ** r)));
+      const alarm = lshChance(LSH_FAR, r, b);
+      if (alarm < best - 1e-12) {
+        best = alarm;
+        rows = r;
+        bands = b;
+      }
+    }
+  }
+  const k = rows * bands;
+  const recall = lshChance(LSH_THRESHOLD, rows, bands);
+  return { k, rows, bands, recall, falseAlarm: lshChance(LSH_FAR, rows, bands), memoryBits: k * constants.valueBits, meetsTarget: workload.error === undefined || recall >= 1 - workload.error };
+}
+
+export interface HyperMinHashSizing extends Sized {
+  indexBits: number;
+  registers: number;
+  /** About the most the standard error of an estimated similarity can be: 1 / (2 sqrt(registers)). */
+  standardError: number;
+}
+
+/** HyperMinHash: registers of 8 bits, a power of two of them; the standard error is about 1 / (2 sqrt(registers)), so registers = 2^ceil(log2(1 / (4 error^2))). */
+export function sizeHyperMinHash(workload: Workload, constants: SizingConstants): HyperMinHashSizing {
+  const registerBits = 5 + constants.hyperMinHashMantissaBits;
+  const indexBits = Math.max(4, workload.memoryBits !== undefined ? Math.floor(Math.log2(workload.memoryBits / registerBits)) : Math.ceil(Math.log2(1 / (4 * target(workload, constants) ** 2))));
+  const registers = 2 ** indexBits;
+  const standardError = 1 / (2 * Math.sqrt(registers));
+  return { indexBits, registers, standardError, memoryBits: registers * registerBits, meetsTarget: meets(workload, standardError) };
+}

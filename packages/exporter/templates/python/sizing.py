@@ -366,3 +366,54 @@ def size_top_k(error: float = None, memory_bits: float = None, **_: object) -> S
         capacity = math.ceil(1 / _target(error))
     achieved = math.e / width
     return {"width": width, "depth": depth, "capacity": capacity, "errorShare": achieved, "confidence": 1 - math.exp(-depth), "memoryBits": width * depth * COUNTER_BITS + capacity * entry_bits, "meetsTarget": _meets(error, achieved)}
+
+
+def _lsh_chance(similarity: float, rows: int, bands: int) -> float:
+    """The chance that some band of `rows` rows agrees for two sets of similarity s, with `bands` bands."""
+    return 1 - (1 - similarity**rows) ** bands
+
+
+#: The similarity an LSH index is built to find, and the similarity at which it is asked to turn most pairs away.
+LSH_THRESHOLD = 0.6
+LSH_FAR = 0.4
+
+
+def size_lsh(error: float = None, memory_bits: float = None, **_: object) -> Sized:
+    """LSH: `error` is the share of pairs at the threshold the index may miss. Over the row counts, the bands needed for that recall are
+    b = ceil(ln(error) / ln(1 - t^r)); the row count that turns most pairs at 0.4 away is chosen, and the signature is k = r b minima of 32 bits. Given memory,
+    k is what fits and the rows are the most that still find a pair at the threshold with the chance 1 - error."""
+    miss = _target(error)
+    rows = bands = 1
+    if memory_bits is not None:
+        k = max(1, math.floor(memory_bits / VALUE_BITS))
+        for r in range(1, k + 1):
+            if _lsh_chance(LSH_THRESHOLD, r, k // r) >= 1 - miss:
+                rows = r
+            else:
+                break
+        bands = k // rows
+    else:
+        best = math.inf
+        for r in range(1, 25):
+            b = max(1, math.ceil(math.log(miss) / math.log(1 - LSH_THRESHOLD**r)))
+            alarm = _lsh_chance(LSH_FAR, r, b)
+            if alarm < best - 1e-12:
+                best, rows, bands = alarm, r, b
+    k = rows * bands
+    recall = _lsh_chance(LSH_THRESHOLD, rows, bands)
+    return {"k": k, "rows": rows, "bands": bands, "recall": recall, "falseAlarm": _lsh_chance(LSH_FAR, rows, bands), "memoryBits": k * VALUE_BITS, "meetsTarget": error is None or recall >= 1 - error}
+
+
+#: The bits of a HyperMinHash register: 5 for the position of the first one bit and 3 of mantissa, as in the game.
+HYPERMINHASH_REGISTER_BITS = 8
+
+
+def size_hyper_min_hash(error: float = None, memory_bits: float = None, **_: object) -> Sized:
+    """HyperMinHash: registers of 8 bits, a power of two of them; the standard error is about 1 / (2 sqrt(registers)), so registers = 2^ceil(log2(1 / (4 error^2)))."""
+    if memory_bits is not None:
+        index_bits = max(4, math.floor(math.log2(memory_bits / HYPERMINHASH_REGISTER_BITS)))
+    else:
+        index_bits = max(4, math.ceil(math.log2(1 / (4 * _target(error) ** 2))))
+    registers = 2**index_bits
+    achieved = 1 / (2 * math.sqrt(registers))
+    return {"indexBits": index_bits, "registers": registers, "standardError": achieved, "memoryBits": registers * HYPERMINHASH_REGISTER_BITS, "meetsTarget": _meets(error, achieved)}
