@@ -292,3 +292,77 @@ def size_sim_hash(error: float = None, memory_bits: float = None, **_: object) -
         planes = max(32, math.ceil(1 / (4 * _target(error) ** 2) / 32) * 32)
     achieved = 1 / (2 * math.sqrt(planes))
     return {"planes": planes, "standardError": achieved, "memoryBits": planes * SIMHASH_COUNTER_BITS, "meetsTarget": _meets(error, achieved)}
+
+
+def _kll_level(k: int, depth: int) -> int:
+    """What the level `depth` below the top of a KLL Sketch holds: k x (2/3)^depth rounded up, none below 2, worked out in whole numbers."""
+    return max(2, -(-k * 2**depth // 3**depth))
+
+
+#: The levels a KLL Sketch plans for (it takes streams of k x 2^23 items), and the rank error coefficient found by simulation.
+KLL_LEVELS = 24
+KLL_RANK_ERROR = 1.6
+
+
+def size_kll(error: float = None, memory_bits: float = None, **_: object) -> Sized:
+    def bits_for(k: int) -> int:
+        return VALUE_BITS * sum(_kll_level(k, depth) for depth in range(KLL_LEVELS))
+
+    if memory_bits is not None:
+        low = high = 2  # the largest k whose levels fit, by bisection (the memory grows with k)
+        while bits_for(high) <= memory_bits and high < 2**40:
+            high *= 2
+        while low < high - 1:
+            mid = (low + high) // 2
+            if bits_for(mid) <= memory_bits:
+                low = mid
+            else:
+                high = mid
+        k = low
+    else:
+        k = max(2, math.ceil(KLL_RANK_ERROR / _target(error)))
+    achieved = KLL_RANK_ERROR / k
+    return {"k": k, "rankError": achieved, "memoryBits": bits_for(k), "meetsTarget": _meets(error, achieved)}
+
+
+def size_t_digest(error: float = None, memory_bits: float = None, **_: object) -> Sized:
+    """A t-digest's rank error at quantile q is 4 sqrt(q (1 - q)) / compression, so at the median 2 / compression; a centroid is a 32-bit mean and a 32-bit weight."""
+    if memory_bits is not None:
+        compression = max(8, math.floor(memory_bits / (2 * COUNTER_BITS)))
+    else:
+        compression = max(8, math.ceil(2 / _target(error)))
+    achieved = 2 / compression
+    return {"compression": compression, "rankError": achieved, "memoryBits": compression * 2 * COUNTER_BITS, "meetsTarget": _meets(error, achieved)}
+
+
+DYADIC_BITS = 32
+DYADIC_EXACT_MAX = 64
+
+
+def size_dyadic(error: float = None, memory_bits: float = None, **_: object) -> Sized:
+    """Dyadic Count-Min over 32-bit values: the levels with more than 64 intervals (26 of the 32) are Count-Min Sketches, so a rank is the sum of up to that
+    many overshoots of e / width of the items each; width = ceil(26 e / error). The chance that any of them is off by more than its band is at most 26 e^-depth
+    (a union bound), so depth = ceil(ln(26 / (1 - confidence))). The 6 exact levels hold 126 counters."""
+    sketch_levels = sum(1 for j in range(DYADIC_BITS) if 2 ** (DYADIC_BITS - j) > DYADIC_EXACT_MAX)
+    exact_bits = sum(2 ** (DYADIC_BITS - j) for j in range(DYADIC_BITS) if 2 ** (DYADIC_BITS - j) <= DYADIC_EXACT_MAX) * COUNTER_BITS
+    depth = max(1, math.ceil(math.log(sketch_levels / (1 - CONFIDENCE))))
+    if memory_bits is not None:
+        width = max(1, math.floor((memory_bits - exact_bits) / (sketch_levels * depth * COUNTER_BITS)))
+    else:
+        width = math.ceil(sketch_levels * math.e / _target(error))
+    achieved = sketch_levels * math.e / width
+    return {"bits": DYADIC_BITS, "width": width, "depth": depth, "rankError": achieved, "confidence": CONFIDENCE, "memoryBits": sketch_levels * width * depth * COUNTER_BITS + exact_bits, "meetsTarget": _meets(error, achieved)}
+
+
+def size_top_k(error: float = None, memory_bits: float = None, **_: object) -> Sized:
+    """A Count-Min Sketch of width e / error and depth ln(1 / (1 - confidence)), and a list of 1 / error candidates of three 32-bit numbers each (the item and two bounds)."""
+    entry_bits = VALUE_BITS + 2 * COUNTER_BITS
+    depth = max(1, math.ceil(math.log(1 / (1 - CONFIDENCE))))
+    if memory_bits is not None:
+        capacity = max(1, math.floor(memory_bits * 0.25 / entry_bits))
+        width = max(1, math.floor((memory_bits - capacity * entry_bits) / (depth * COUNTER_BITS)))
+    else:
+        width = math.ceil(math.e / _target(error))
+        capacity = math.ceil(1 / _target(error))
+    achieved = math.e / width
+    return {"width": width, "depth": depth, "capacity": capacity, "errorShare": achieved, "confidence": 1 - math.exp(-depth), "memoryBits": width * depth * COUNTER_BITS + capacity * entry_bits, "meetsTarget": _meets(error, achieved)}

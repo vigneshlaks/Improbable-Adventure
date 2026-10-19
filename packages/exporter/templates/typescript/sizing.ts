@@ -349,3 +349,103 @@ export function sizeSimHash(workload: Workload): SimHashSizing {
   const standardError = 1 / (2 * Math.sqrt(planes));
   return { planes, standardError, memoryBits: planes * SIMHASH_COUNTER_BITS, meetsTarget: meets(workload, standardError) };
 }
+
+/** What the level `depth` below the top of a KLL Sketch holds: k x (2/3)^depth rounded up, none below 2, worked out in whole numbers. */
+function kllLevel(k: number, depth: number): number {
+  return Math.max(2, Math.floor((k * 2 ** depth + 3 ** depth - 1) / 3 ** depth));
+}
+
+/** The levels a KLL Sketch plans for (it takes streams of k x 2^23 items), and the rank error coefficient found by simulation. */
+const KLL_LEVELS = 24;
+export const KLL_RANK_ERROR = 1.6;
+
+export interface KllSizing extends Sized {
+  k: number;
+  /** The rank error as a share of the items (the 95th percentile of the error, found by simulation): 1.6 / k. */
+  rankError: number;
+}
+
+export function sizeKll(workload: Workload): KllSizing {
+  const bitsFor = (k: number) => VALUE_BITS * Array.from({ length: KLL_LEVELS }, (_, depth) => kllLevel(k, depth)).reduce((a, b) => a + b, 0);
+  let k = Math.max(2, Math.ceil(KLL_RANK_ERROR / target(workload)));
+  if (workload.memoryBits !== undefined) {
+    let low = 2; // the largest k whose levels fit, by bisection (the memory grows with k)
+    let high = 2;
+    while (bitsFor(high) <= workload.memoryBits && high < 2 ** 40) high *= 2;
+    while (low < high - 1) {
+      const mid = Math.floor((low + high) / 2);
+      if (bitsFor(mid) <= workload.memoryBits) low = mid;
+      else high = mid;
+    }
+    k = low;
+  }
+  const rankError = KLL_RANK_ERROR / k;
+  return { k, rankError, memoryBits: bitsFor(k), meetsTarget: meets(workload, rankError) };
+}
+
+export interface TDigestSizing extends Sized {
+  compression: number;
+  /** The rank error at the median, where it is largest, as a share of the values: 2 / compression. In the tails it is much smaller. */
+  rankError: number;
+}
+
+/** A t-digest's rank error at quantile q is 4 sqrt(q (1 - q)) / compression, so at the median 2 / compression; a centroid is a 32-bit mean and a 32-bit weight. */
+export function sizeTDigest(workload: Workload): TDigestSizing {
+  const compression = workload.memoryBits !== undefined ? Math.max(8, Math.floor(workload.memoryBits / (2 * COUNTER_BITS))) : Math.max(8, Math.ceil(2 / target(workload)));
+  const rankError = 2 / compression;
+  return { compression, rankError, memoryBits: compression * 2 * COUNTER_BITS, meetsTarget: meets(workload, rankError) };
+}
+
+export interface DyadicSizing extends Sized {
+  /** The bits of the value used: all 32. */
+  bits: number;
+  width: number;
+  depth: number;
+  /** The most the rank of a value overshoots, as a share of the items, with probability `confidence`. */
+  rankError: number;
+  confidence: number;
+}
+
+const DYADIC_BITS = 32;
+const DYADIC_EXACT_MAX = 64;
+
+/**
+ * Dyadic Count-Min over 32-bit values: the levels with more than 64 intervals (26 of the 32) are Count-Min Sketches, so a rank is the sum of up to that many
+ * overshoots of e / width of the items each; width = ceil(26 e / error). The chance that any of them is off by more than its band is at most 26 e^-depth
+ * (a union bound), so depth = ceil(ln(26 / (1 - confidence))). The 6 exact levels hold 126 counters.
+ */
+export function sizeDyadic(workload: Workload): DyadicSizing {
+  const levels = Array.from({ length: DYADIC_BITS }, (_, j) => j);
+  const sketchLevels = levels.filter((j) => 2 ** (DYADIC_BITS - j) > DYADIC_EXACT_MAX).length;
+  const exactBits = levels.filter((j) => 2 ** (DYADIC_BITS - j) <= DYADIC_EXACT_MAX).reduce((sum, j) => sum + 2 ** (DYADIC_BITS - j), 0) * COUNTER_BITS;
+  const depth = Math.max(1, Math.ceil(Math.log(sketchLevels / (1 - CONFIDENCE))));
+  const width =
+    workload.memoryBits !== undefined
+      ? Math.max(1, Math.floor((workload.memoryBits - exactBits) / (sketchLevels * depth * COUNTER_BITS)))
+      : Math.ceil((sketchLevels * Math.E) / target(workload));
+  const rankError = (sketchLevels * Math.E) / width;
+  return { bits: DYADIC_BITS, width, depth, rankError, confidence: CONFIDENCE, memoryBits: sketchLevels * width * depth * COUNTER_BITS + exactBits, meetsTarget: meets(workload, rankError) };
+}
+
+export interface TopKSizing extends Sized {
+  width: number;
+  depth: number;
+  capacity: number;
+  /** The sketch's overshoot as a share of the items, with probability `confidence`. */
+  errorShare: number;
+  confidence: number;
+}
+
+/** A Count-Min Sketch of width e / error and depth ln(1 / (1 - confidence)), and a list of 1 / error candidates of three 32-bit numbers each (the item and two bounds). */
+export function sizeTopK(workload: Workload): TopKSizing {
+  const entryBits = VALUE_BITS + 2 * COUNTER_BITS;
+  const depth = Math.max(1, Math.ceil(Math.log(1 / (1 - CONFIDENCE))));
+  let width = Math.ceil(Math.E / target(workload));
+  let capacity = Math.ceil(1 / target(workload));
+  if (workload.memoryBits !== undefined) {
+    capacity = Math.max(1, Math.floor((workload.memoryBits * 0.25) / entryBits));
+    width = Math.max(1, Math.floor((workload.memoryBits - capacity * entryBits) / (depth * COUNTER_BITS)));
+  }
+  const errorShare = Math.E / width;
+  return { width, depth, capacity, errorShare, confidence: 1 - Math.exp(-depth), memoryBits: width * depth * COUNTER_BITS + capacity * entryBits, meetsTarget: meets(workload, errorShare) };
+}

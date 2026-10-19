@@ -1,5 +1,5 @@
-import { BloomFilter, CountMinSketch, CountSketch, CuckooFilter, HyperLogLog, KMinimumValues, LinearCounting, LogLog, MinHash, QuotientFilter, SimHash, SpectralBloom, murmur3String, murmur3U32, doubleHashIndices, PUBLIC_HASH_SEED, type StructureConstants } from "@pda/engine";
-import { sizeBloom, sizeCountMin, sizeCountSketch, sizeCuckoo, sizeExact, sizeHyperLogLog, sizeKmv, sizeLinearCounting, sizeLogLog, sizeMinHash, sizeQuotient, sizeReservoir, sizeScalable, sizeSimHash, sizeSpectral, sizingConstants } from "./sizing";
+import { BloomFilter, CountMinSketch, CountSketch, CuckooFilter, DyadicCountMin, HyperLogLog, KllSketch, kllCapacity, KMinimumValues, TDigest, TopKTracker, LinearCounting, LogLog, MinHash, QuotientFilter, SimHash, SpectralBloom, murmur3String, murmur3U32, doubleHashIndices, PUBLIC_HASH_SEED, type StructureConstants } from "@pda/engine";
+import { sizeBloom, sizeCountMin, sizeCountSketch, sizeCuckoo, sizeDyadic, sizeExact, sizeHyperLogLog, sizeKll, sizeKmv, sizeTDigest, sizeTopK, sizeLinearCounting, sizeLogLog, sizeMinHash, sizeQuotient, sizeReservoir, sizeScalable, sizeSimHash, sizeSpectral, sizingConstants } from "./sizing";
 
 /** The i-th value of the fixed test stream every language's tests replay: spread across the 32-bit range. */
 export const stream = (i: number): number => Math.imul(i + 1, 2654435761) >>> 0;
@@ -102,6 +102,36 @@ export function buildVectors(constants: StructureConstants): Record<string, unkn
     { from: 0, to: 120 },
   ].map((c) => ({ ...c, differing: sim.differing(simCopy(c.from, c.to)), similarity: SimHash.similarityAt(sim.differing(simCopy(c.from, c.to)), sim.effectiveSize(), c.to - c.from) }));
 
+  const kllK = 40;
+  const kll = new KllSketch({ spaceBits: 32 * kllCapacity(kllK, 24) }, constants);
+  if (kll.params.k !== kllK) throw new Error("The KLL vector expects k of 40");
+  const kllValues = Array.from({ length: 20000 }, (_, i) => stream(i));
+  for (const value of kllValues) kll.ingest({ op: "insert", value });
+  const kllQuantiles = [0.01, 0.1, 0.5, 0.9, 0.99];
+  const kllProbes = [stream(3), stream(77), stream(1234), stream(19999)];
+  const kllItems = kll.items;
+  const kllTotal = kllItems.reduce((sum, item) => sum + item.weight, 0);
+
+  const digestCompression = 64;
+  const digest = new TDigest({ spaceBits: 64 * digestCompression }, constants);
+  for (let i = 0; i < 5000; i++) digest.ingest({ op: "insert", value: stream(i) });
+  const digestQuantiles = [0.001, 0.01, 0.1, 0.5, 0.9, 0.99, 0.999];
+
+  const dyadic = new DyadicCountMin({ spaceBits: 8192, knob: 3 }, constants);
+  for (let i = 0; i < 900; i++) dyadic.ingest({ op: "insert", value: stream(i) });
+  for (let i = 0; i < 100; i++) dyadic.ingest({ op: "delete", value: stream(i) });
+  const dyadicQuantiles = [0.1, 0.3, 0.5, 0.9, 0.99].map((quantile) => {
+    const answer = dyadic.query({ kind: "rank", quantile }) as { estimate: number; low: number; high: number };
+    return { quantile, estimate: answer.estimate, low: answer.low, high: Number.isFinite(answer.high) ? answer.high : null };
+  });
+
+  const topKSpace = 12288;
+  const topK = new TopKTracker({ spaceBits: topKSpace, knob: 4 }, constants);
+  const topKValue = (i: number) => stream(Math.floor(60 * (((i * 7919) % 1000) / 1000) ** 2));
+  for (let i = 0; i < 3000; i++) topK.ingest({ op: "insert", value: topKValue(i) });
+  for (let i = 0; i < 200; i++) topK.ingest({ op: "delete", value: topKValue(i * 3) });
+  const topKAnswer = (value: number) => topK.query({ kind: "frequency", value }) as { low: number; high: number };
+
   const sizingCases = [
     { fn: "sizeBloom", input: { items: 1000, error: 0.01 }, output: sizeBloom({ items: 1000, error: 0.01 }, sc) },
     { fn: "sizeBloom", input: { items: 1000, memoryBits: 4793 }, output: sizeBloom({ items: 1000, memoryBits: 4793 }, sc) },
@@ -133,6 +163,14 @@ export function buildVectors(constants: StructureConstants): Record<string, unkn
     { fn: "sizeScalable", input: { items: 500, error: 0.05, memoryBits: 1000 }, output: sizeScalable({ items: 500, error: 0.05, memoryBits: 1000 }, sc) },
     { fn: "sizeSimHash", input: { error: 0.03 }, output: sizeSimHash({ error: 0.03 }, sc) },
     { fn: "sizeSimHash", input: { memoryBits: 8192 }, output: sizeSimHash({ memoryBits: 8192 }, sc) },
+    { fn: "sizeKll", input: { error: 0.01 }, output: sizeKll({ error: 0.01 }, sc) },
+    { fn: "sizeKll", input: { memoryBits: 20000 }, output: sizeKll({ memoryBits: 20000 }, sc) },
+    { fn: "sizeTDigest", input: { error: 0.01 }, output: sizeTDigest({ error: 0.01 }, sc) },
+    { fn: "sizeTDigest", input: { memoryBits: 10000 }, output: sizeTDigest({ memoryBits: 10000 }, sc) },
+    { fn: "sizeDyadic", input: { error: 0.05 }, output: sizeDyadic({ error: 0.05 }, sc) },
+    { fn: "sizeDyadic", input: { memoryBits: 10000000 }, output: sizeDyadic({ memoryBits: 10000000 }, sc) },
+    { fn: "sizeTopK", input: { error: 0.01 }, output: sizeTopK({ error: 0.01 }, sc) },
+    { fn: "sizeTopK", input: { memoryBits: 30000 }, output: sizeTopK({ memoryBits: 30000 }, sc) },
   ];
 
   return {
@@ -171,6 +209,22 @@ export function buildVectors(constants: StructureConstants): Record<string, unkn
       falsePositiveRate: spectral.falsePositiveRate,
     },
     simHash: { planes: simPlanes, items: 300, effectiveSize: sim.effectiveSize(), repeatsEffectiveSize: simRepeats.effectiveSize(), cases: simCases },
+    kll: {
+      k: kllK,
+      items: 20000,
+      quantiles: kllQuantiles.map((quantile) => ({ quantile, value: kll.quantile(quantile) })),
+      ranks: kllProbes.map((value) => ({ value, rank: kllItems.filter((item) => item.value <= value).reduce((sum, item) => sum + item.weight, 0) / kllTotal })),
+      stored: kllItems.length,
+    },
+    tDigest: { compression: digestCompression, items: 5000, centroids: digest.summary.length, quantiles: digestQuantiles.map((quantile) => ({ quantile, value: digest.query({ kind: "rank", quantile })?.estimate })) },
+    dyadic: { bits: 8, width: dyadic.params.width, depth: dyadic.params.depth, items: 900, removed: 100, quantiles: dyadicQuantiles },
+    topK: {
+      width: topK.params.width,
+      depth: topK.params.depth,
+      capacity: topK.params.candidates,
+      candidates: topK.candidates.slice(0, 8).map((c) => ({ item: c.value, low: c.low, high: c.high })),
+      estimates: Array.from({ length: 12 }, (_, i) => ({ item: stream(i * 5), ...topKAnswer(stream(i * 5)) })),
+    },
     sizing: sizingCases,
   };
 }

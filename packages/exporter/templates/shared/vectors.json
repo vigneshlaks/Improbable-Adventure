@@ -784,6 +784,258 @@
       }
     ]
   },
+  "kll": {
+    "k": 40,
+    "items": 20000,
+    "quantiles": [
+      {
+        "quantile": 0.01,
+        "value": 36958128
+      },
+      {
+        "quantile": 0.1,
+        "value": 563072127
+      },
+      {
+        "quantile": 0.5,
+        "value": 2265204391
+      },
+      {
+        "quantile": 0.9,
+        "value": 3872427759
+      },
+      {
+        "quantile": 0.99,
+        "value": 4231918457
+      }
+    ],
+    "ranks": [
+      {
+        "value": 2027808452,
+        "rank": 0.4764
+      },
+      {
+        "value": 887559150,
+        "rank": 0.1872
+      },
+      {
+        "value": 1168117987,
+        "rank": 0.258
+      },
+      {
+        "value": 2919441440,
+        "rank": 0.6628
+      }
+    ],
+    "stored": 69
+  },
+  "tDigest": {
+    "compression": 64,
+    "items": 5000,
+    "centroids": 42,
+    "quantiles": [
+      {
+        "quantile": 0.001,
+        "value": 7365731
+      },
+      {
+        "quantile": 0.01,
+        "value": 46051972
+      },
+      {
+        "quantile": 0.1,
+        "value": 434113932
+      },
+      {
+        "quantile": 0.5,
+        "value": 2148145152
+      },
+      {
+        "quantile": 0.9,
+        "value": 3863644920
+      },
+      {
+        "quantile": 0.99,
+        "value": 4249888495
+      },
+      {
+        "quantile": 0.999,
+        "value": 4289136900
+      }
+    ]
+  },
+  "dyadic": {
+    "bits": 8,
+    "width": 32,
+    "depth": 3,
+    "items": 900,
+    "removed": 100,
+    "quantiles": [
+      {
+        "quantile": 0.1,
+        "estimate": 419430399,
+        "low": 402653184,
+        "high": 1157627903
+      },
+      {
+        "quantile": 0.3,
+        "estimate": 1291845631,
+        "low": 1275068416,
+        "high": 2030043135
+      },
+      {
+        "quantile": 0.5,
+        "estimate": 2097151999,
+        "low": 2080374784,
+        "high": 2835349503
+      },
+      {
+        "quantile": 0.9,
+        "estimate": 3875536895,
+        "low": 3858759680,
+        "high": null
+      },
+      {
+        "quantile": 0.99,
+        "estimate": 4244635647,
+        "low": 4227858432,
+        "high": null
+      }
+    ]
+  },
+  "topK": {
+    "width": 72,
+    "depth": 4,
+    "capacity": 32,
+    "candidates": [
+      {
+        "item": 2654435761,
+        "low": 362,
+        "high": 362
+      },
+      {
+        "item": 1013904226,
+        "low": 149,
+        "high": 149
+      },
+      {
+        "item": 3668339987,
+        "low": 116,
+        "high": 116
+      },
+      {
+        "item": 2027808452,
+        "low": 99,
+        "high": 99
+      },
+      {
+        "item": 387276917,
+        "low": 83,
+        "high": 83
+      },
+      {
+        "item": 3041712678,
+        "low": 78,
+        "high": 78
+      },
+      {
+        "item": 1401181143,
+        "low": 70,
+        "high": 70
+      },
+      {
+        "item": 4055616904,
+        "low": 66,
+        "high": 66
+      }
+    ],
+    "estimates": [
+      {
+        "item": 2654435761,
+        "estimate": 362,
+        "low": 362,
+        "high": 362,
+        "confidence": 0.9816843611112658
+      },
+      {
+        "item": 3041712678,
+        "estimate": 78,
+        "low": 78,
+        "high": 78,
+        "confidence": 0.9816843611112658
+      },
+      {
+        "item": 3428989595,
+        "estimate": 55.5,
+        "low": 55,
+        "high": 56,
+        "confidence": 0.9816843611112658
+      },
+      {
+        "item": 3816266512,
+        "estimate": 45.5,
+        "low": 44,
+        "high": 47,
+        "confidence": 0.9816843611112658
+      },
+      {
+        "item": 4203543429,
+        "estimate": 35,
+        "low": 32,
+        "high": 38,
+        "confidence": 0.9816843611112658
+      },
+      {
+        "item": 295853050,
+        "estimate": 36.5,
+        "low": 34,
+        "high": 39,
+        "confidence": 0.9816843611112658
+      },
+      {
+        "item": 683129967,
+        "estimate": 30,
+        "low": 0,
+        "high": 30,
+        "confidence": 0.9816843611112658
+      },
+      {
+        "item": 1070406884,
+        "estimate": 30,
+        "low": 0,
+        "high": 30,
+        "confidence": 0.9816843611112658
+      },
+      {
+        "item": 1457683801,
+        "estimate": 28,
+        "low": 0,
+        "high": 28,
+        "confidence": 0.9816843611112658
+      },
+      {
+        "item": 1844960718,
+        "estimate": 25.5,
+        "low": 13,
+        "high": 38,
+        "confidence": 0.9816843611112658
+      },
+      {
+        "item": 2232237635,
+        "estimate": 26,
+        "low": 0,
+        "high": 26,
+        "confidence": 0.9816843611112658
+      },
+      {
+        "item": 2619514552,
+        "estimate": 25,
+        "low": 0,
+        "high": 25,
+        "confidence": 0.9816843611112658
+      }
+    ]
+  },
   "sizing": [
     {
       "fn": "sizeBloom",
@@ -1190,6 +1442,114 @@
         "planes": 512,
         "standardError": 0.022097086912079608,
         "memoryBits": 8192,
+        "meetsTarget": true
+      }
+    },
+    {
+      "fn": "sizeKll",
+      "input": {
+        "error": 0.01
+      },
+      "output": {
+        "k": 160,
+        "rankError": 0.01,
+        "memoryBits": 16224,
+        "meetsTarget": true
+      }
+    },
+    {
+      "fn": "sizeKll",
+      "input": {
+        "memoryBits": 20000
+      },
+      "output": {
+        "k": 200,
+        "rankError": 0.008,
+        "memoryBits": 20000,
+        "meetsTarget": true
+      }
+    },
+    {
+      "fn": "sizeTDigest",
+      "input": {
+        "error": 0.01
+      },
+      "output": {
+        "compression": 200,
+        "rankError": 0.01,
+        "memoryBits": 12800,
+        "meetsTarget": true
+      }
+    },
+    {
+      "fn": "sizeTDigest",
+      "input": {
+        "memoryBits": 10000
+      },
+      "output": {
+        "compression": 156,
+        "rankError": 0.01282051282051282,
+        "memoryBits": 9984,
+        "meetsTarget": true
+      }
+    },
+    {
+      "fn": "sizeDyadic",
+      "input": {
+        "error": 0.05
+      },
+      "output": {
+        "bits": 32,
+        "width": 1414,
+        "depth": 7,
+        "rankError": 0.049982551301227134,
+        "confidence": 0.95,
+        "memoryBits": 8239168,
+        "meetsTarget": true
+      }
+    },
+    {
+      "fn": "sizeDyadic",
+      "input": {
+        "memoryBits": 10000000
+      },
+      "output": {
+        "bits": 32,
+        "width": 1716,
+        "depth": 7,
+        "rankError": 0.041186088309985526,
+        "confidence": 0.95,
+        "memoryBits": 9998016,
+        "meetsTarget": true
+      }
+    },
+    {
+      "fn": "sizeTopK",
+      "input": {
+        "error": 0.01
+      },
+      "output": {
+        "width": 272,
+        "depth": 3,
+        "capacity": 100,
+        "errorShare": 0.009993683192864136,
+        "confidence": 0.950212931632136,
+        "memoryBits": 35712,
+        "meetsTarget": true
+      }
+    },
+    {
+      "fn": "sizeTopK",
+      "input": {
+        "memoryBits": 30000
+      },
+      "output": {
+        "width": 234,
+        "depth": 3,
+        "capacity": 78,
+        "errorShare": 0.01161658901050874,
+        "confidence": 0.950212931632136,
+        "memoryBits": 29952,
         "meetsTarget": true
       }
     }

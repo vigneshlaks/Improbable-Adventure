@@ -14,8 +14,6 @@ import {
   type StructureSnapshot,
 } from "./types";
 
-/** Every level but the top is smaller than the one above it by this factor (KLL's geometric capacities). */
-const SHRINK = 2 / 3;
 /** The smallest a level can be. */
 const MIN_LEVEL = 2;
 /** The most levels a sketch plans room for: with k items in the top level that covers streams of k x 2^(LEVELS - 1) units. */
@@ -23,10 +21,20 @@ const PLANNED_LEVELS = 24;
 /** Mixed into the seed to get the coin a compaction flips. */
 const COIN_SALT = 0x6a09e667;
 
+/**
+ * What a level `depth` below the top holds: k x (2/3)^depth rounded up, none below MIN_LEVEL. Worked out in whole numbers (ceil(k x 2^depth / 3^depth)),
+ * since a power of 2/3 is not exact and a result a hair under a whole number would round the other way on another machine.
+ */
+export function levelCapacity(k: number, depth: number): number {
+  const numerator = k * 2 ** depth;
+  const denominator = 3 ** depth;
+  return Math.max(MIN_LEVEL, Math.floor((numerator + denominator - 1) / denominator));
+}
+
 /** The items a sketch with top-level size `k` and `levels` levels can hold: k, then k x 2/3, and so on, none below MIN_LEVEL. */
 export function kllCapacity(k: number, levels: number): number {
   let total = 0;
-  for (let depth = 0; depth < levels; depth++) total += Math.max(MIN_LEVEL, Math.ceil(k * SHRINK ** depth));
+  for (let depth = 0; depth < levels; depth++) total += levelCapacity(k, depth);
   return total;
 }
 
@@ -86,7 +94,7 @@ export class KllSketch implements Structure {
   }
 
   private capacityOf(level: number): number {
-    return Math.max(MIN_LEVEL, Math.ceil(this.k * SHRINK ** (this.levels.length - 1 - level)));
+    return levelCapacity(this.k, this.levels.length - 1 - level);
   }
 
   private compact(): void {

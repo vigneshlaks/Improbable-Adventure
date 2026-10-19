@@ -5,8 +5,10 @@ import {
   sizeCountMin,
   sizeCountSketch,
   sizeCuckoo,
+  sizeDyadic,
   sizeExact,
   sizeHyperLogLog,
+  sizeKll,
   sizeKmv,
   sizeLinearCounting,
   sizeLogLog,
@@ -16,6 +18,8 @@ import {
   sizeScalable,
   sizeSimHash,
   sizeSpectral,
+  sizeTDigest,
+  sizeTopK,
   type SizingConstants,
   type Workload,
 } from "./sizing";
@@ -275,5 +279,61 @@ export const CATALOG: Partial<Record<StructureKind, CatalogEntry>> = {
     },
     production: (workload, constants) => sizeSimHash(workload, constants).memoryBits,
     formula: (c) => `planes = ceil(1 / (4 error^2)) rounded up to a multiple of 32; bits = ${c.simHashCounterBits} x planes; the share of planes that disagree has a standard error of at most 1 / (2 sqrt(planes)).`,
+  },
+  kllSketch: {
+    cls: "KllSketch",
+    typescript: "kllSketch",
+    python: "kll_sketch",
+    needs: [],
+    args: ["k"],
+    guide: { use: "You need quantiles (the median, percentiles, the rank of a value) of a stream of numbers, with the same absolute error everywhere, in kilobytes, and sketches from several machines must merge.", avoid: "You care most about the extreme tails (a t-digest is sharper there), or the stream is short enough to sort." },
+    size(workload, constants) {
+      const s = sizeKll(workload, constants);
+      return { bits: s.memoryBits, args: { k: s.k }, summary: [`k = ${number(s.k)} (${size(s.memoryBits)})`, `a quantile's rank is off by at most ${pct(s.rankError)} of the items for 95 percent of queries`] };
+    },
+    production: (workload, constants) => sizeKll(workload, constants).memoryBits,
+    formula: (c) => `k = ceil(${c.kllRankError} / error); the levels hold k, 2k/3, 4k/9, ... (none under 2) items of ${c.valueBits} bits each, 24 levels planned; rank error about ${c.kllRankError} / k, the 95th percentile of the error found by simulation.`,
+  },
+  tDigest: {
+    cls: "TDigest",
+    typescript: "tDigest",
+    python: "t_digest",
+    needs: [],
+    args: ["compression"],
+    guide: { use: "You need percentiles of a stream of numbers, especially the extremes (the 99th, the 99.9th: tail latencies), in kilobytes, and digests from several machines must merge.", avoid: "You need the same accuracy in the middle as in the tails (a KLL Sketch has that), or a guaranteed bound: its error is calibrated, not proved." },
+    size(workload, constants) {
+      const s = sizeTDigest(workload, constants);
+      return { bits: s.memoryBits, args: { compression: s.compression }, summary: [`compression ${number(s.compression)} (${size(s.memoryBits)})`, `a quantile's rank is off by at most ${pct(s.rankError)} of the values at the median, much less in the tails`] };
+    },
+    production: (workload, constants) => sizeTDigest(workload, constants).memoryBits,
+    formula: (c) => `compression = ceil(2 / error); bits = 2 x ${c.counterBits} x compression (a mean and a weight per centroid); rank error at quantile q about 4 sqrt(q (1 - q)) / compression.`,
+  },
+  dyadicCountMin: {
+    cls: "DyadicCountMin",
+    typescript: "dyadicCountMin",
+    python: "dyadic_count_min",
+    needs: ["countMinSketch"],
+    args: ["bits", "width", "depth"],
+    guide: { use: "You need ranks and quantiles of whole numbers in a known range from counters that also take removals, and the same sketches are already in use for counts.", avoid: "A KLL Sketch or t-digest answers quantiles in far less memory, and a stream with no removals does not need counters." },
+    size(workload, constants) {
+      const s = sizeDyadic(workload, constants);
+      return { bits: s.memoryBits, args: { bits: s.bits, width: s.width, depth: s.depth }, summary: [`${s.bits} bits of the value, sketches of ${number(s.width)} columns by ${s.depth} rows on the levels with many intervals (${size(s.memoryBits)})`, `a rank is never too low and is too high by at most ${pct(s.rankError)} of the items, with probability ${pct(s.confidence)}`] };
+    },
+    production: (workload, constants) => sizeDyadic(workload, constants).memoryBits,
+    formula: () => "26 of the 32 levels are Count-Min Sketches: width w = ceil(26 e / error); depth d = ceil(ln(26 / (1 - confidence))) (a union bound over the levels); the 6 levels with 64 intervals or fewer are exact counters.",
+  },
+  topKTracker: {
+    cls: "TopKTracker",
+    typescript: "topKTracker",
+    python: "top_k_tracker",
+    needs: ["countMinSketch"],
+    args: ["width", "depth", "capacity"],
+    guide: { use: "You want the heaviest items of a stream (heavy hitters, top queries, hot keys) with tight bounds on their counts, and some items are far heavier than the rest.", avoid: "No item stands out (a flat stream): the sketch's error then swamps every count and the list has nothing to hold on to." },
+    size(workload, constants) {
+      const s = sizeTopK(workload, constants);
+      return { bits: s.memoryBits, args: { width: s.width, depth: s.depth, capacity: s.capacity }, summary: [`a list of ${number(s.capacity)} candidates over a sketch of ${number(s.width)} columns by ${s.depth} rows (${size(s.memoryBits)})`, `an item with at least ${pct(2 * s.errorShare)} of the stream is on the list; a count off the list overshoots by at most ${pct(s.errorShare)} of the items`] };
+    },
+    production: (workload, constants) => sizeTopK(workload, constants).memoryBits,
+    formula: (c) => `candidates = ceil(1 / error), each ${c.valueBits + 2 * c.counterBits} bits (the item and two bounds); the sketch has width ceil(e / error) and depth ceil(ln(1 / (1 - confidence))).`,
   },
 };

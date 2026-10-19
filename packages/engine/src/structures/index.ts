@@ -31,7 +31,7 @@ export { CuckooFilter } from "./cuckooFilter";
 export { TopKTracker, type Candidate } from "./topKTracker";
 export { ExactMemory } from "./exactMemory";
 export { HyperLogLog, MIN_HLL_REGISTERS } from "./hyperLogLog";
-export { KllSketch } from "./kllSketch";
+export { KllSketch, kllCapacity } from "./kllSketch";
 export { DyadicCountMin } from "./dyadicCountMin";
 export { HyperMinHash } from "./hyperMinHash";
 export { LocalitySensitiveHash } from "./localitySensitiveHash";
