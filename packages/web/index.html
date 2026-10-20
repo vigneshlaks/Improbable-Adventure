@@ -9,10 +9,14 @@
     <header>
       <h1>Probabilistic Data Adventure</h1>
       <span id="seed"></span>
+      <button id="mode" type="button" aria-pressed="false">Text screen (T)</button>
       <button id="new-run" type="button">New run</button>
       <button id="theme" type="button" aria-label="Switch light and dark theme"></button>
     </header>
-    <main>
+    <main id="play-main">
+      <div id="play"></div>
+    </main>
+    <main id="text-main" hidden>
       <section id="game" aria-label="Game">
         <div id="transcript" role="log" aria-live="polite"></div>
         <div id="chips"></div>
@@ -20,39 +24,41 @@
           <label id="prompt" for="line"></label>
           <input id="line" type="text" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="send" />
         </form>
-        <div id="ended" hidden>
-          <button id="download" type="button">Download replay</button>
-          <button id="export-toggle" type="button" aria-expanded="false" aria-controls="export-form">Export toolkit</button>
-        </div>
-        <form id="export-form" hidden>
-          <p>Working code and a decision guide for the structures you used, sized for your real workload. Leave any field blank.</p>
-          <label>Language
-            <select id="export-language">
-              <option value="typescript">TypeScript</option>
-              <option value="python">Python</option>
-            </select>
-          </label>
-          <label>Items added (with repeats)
-            <input id="export-items" inputmode="numeric" placeholder="e.g. 1,000,000" />
-          </label>
-          <label>Different items
-            <input id="export-distinct" inputmode="numeric" placeholder="e.g. 50,000" />
-          </label>
-          <label>Acceptable error (%)
-            <input id="export-error" inputmode="decimal" placeholder="e.g. 1" />
-          </label>
-          <label>Memory budget (KiB)
-            <input id="export-memory" inputmode="numeric" placeholder="e.g. 64" />
-          </label>
-          <button type="submit" id="export-build">Build zip</button>
-          <p id="export-status" role="status"></p>
-        </form>
       </section>
       <details id="panel-box" open>
         <summary>Structures</summary>
         <aside id="panel" aria-label="Structures"></aside>
       </details>
     </main>
+    <section id="finish">
+    <div id="ended" hidden>
+      <button id="download" type="button">Download replay</button>
+      <button id="export-toggle" type="button" aria-expanded="false" aria-controls="export-form">Export toolkit</button>
+    </div>
+    <form id="export-form" hidden>
+      <p>Working code and a decision guide for the structures you used, sized for your real workload. Leave any field blank.</p>
+      <label>Language
+        <select id="export-language">
+          <option value="typescript">TypeScript</option>
+          <option value="python">Python</option>
+        </select>
+      </label>
+      <label>Items added (with repeats)
+        <input id="export-items" inputmode="numeric" placeholder="e.g. 1,000,000" />
+      </label>
+      <label>Different items
+        <input id="export-distinct" inputmode="numeric" placeholder="e.g. 50,000" />
+      </label>
+      <label>Acceptable error (%)
+        <input id="export-error" inputmode="decimal" placeholder="e.g. 1" />
+      </label>
+      <label>Memory budget (KiB)
+        <input id="export-memory" inputmode="numeric" placeholder="e.g. 64" />
+      </label>
+      <button type="submit" id="export-build">Build zip</button>
+      <p id="export-status" role="status"></p>
+    </form>
+    </section>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

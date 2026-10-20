@@ -1,5 +1,5 @@
 import { buildRunConfig, contentHash, narration, structureConstants } from "@pda/content";
-import { IllegalActionError, observeRun, RunRecorder, type Replay, type RunConfig, type RunEvent, type RunState } from "@pda/engine";
+import { IllegalActionError, observeRun, RunRecorder, type Replay, type RunObservation, type RunConfig, type RunEvent, type RunState } from "@pda/engine";
 import { describeEnemy, formatNumber, narrateRunStep } from "./narrator";
 import { parseRunCommand } from "./parser";
 import { renderHelp, renderQuery, renderRest, renderRewards, renderRunStatus } from "./views";
@@ -20,6 +20,10 @@ export interface RunSession extends Session {
   structures(): StructureVisual[];
   /** Commands that make sense right now, for buttons. */
   suggestions(): string[];
+  /** What a player may see of the run right now. */
+  observe(): RunObservation;
+  /** The tier of every fight in the act, in order: all the player is told about a fight before it starts. */
+  tiers(): Array<RunObservation["tier"]>;
 }
 
 /** A whole act played by typing lines. Like `Session` it holds no I/O, so a script of lines gives a transcript. */
@@ -57,6 +61,10 @@ export function createRunSession({ seed, config = buildRunConfig({ seed }) }: Ru
       const constants = structureConstants();
       return (state.fight?.slots ?? []).flatMap((snapshot, slot) => (snapshot ? [structureVisual(snapshot, slot, constants)] : []));
     },
+
+    observe: () => observeRun(state),
+
+    tiers: () => config.encounters.map((enemy) => enemy.tier),
 
     suggestions() {
       const run = observeRun(state);
@@ -111,7 +119,7 @@ export function createRunSession({ seed, config = buildRunConfig({ seed }) }: Ru
             state = result.state;
             // On a challenge turn the query screen lists the Presence targets with the structures' flags, so the story does not.
             const lines = [...(parsed.kind === "action" && parsed.note ? [parsed.note] : []), ...narrate(result.events, state.fight?.phase !== "strike")];
-            return { lines: [...lines, ...screen()], done: over() };
+            return { lines: [...lines, ...screen()], story: lines, done: over() };
           } catch (error) {
             if (error instanceof IllegalActionError) return { lines: [error.message], done: false };
             throw error;

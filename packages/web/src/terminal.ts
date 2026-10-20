@@ -3,6 +3,8 @@ import type { RunSession } from "@pda/ui-core";
 export interface Terminal {
   /** Starts the transcript over for a new session. */
   attach(session: RunSession): void;
+  /** Brings the screen up to date after play elsewhere: prints lines and redraws the prompt. */
+  sync(lines: string[], over: boolean): void;
 }
 
 /** The text side of the page: a transcript, the prompt, a line of input with history, and buttons for likely commands. */
@@ -70,6 +72,12 @@ export function createTerminal(parts: {
   });
 
   return {
+    sync(lines, over) {
+      ended = over;
+      if (lines.length > 0) print(lines);
+      refresh();
+      if (!ended) input.focus();
+    },
     attach(next) {
       session = next;
       ended = false;

@@ -1,6 +1,7 @@
 import { structureConstants } from "@pda/content";
 import { buildToolkit, sizingConstants, toolkitZip, type Language } from "@pda/exporter";
 import { createRunSession } from "@pda/ui-core";
+import { createPlay } from "./play";
 import { renderPanel } from "./panel";
 import { createTerminal } from "./terminal";
 import { templatesFor } from "./templates";
@@ -17,6 +18,11 @@ let seed = new URLSearchParams(location.search).get("seed") || freshSeed();
 let current = createRunSession({ seed });
 
 const ended = byId<HTMLElement>("ended");
+const showEnded = (session: { replay(): unknown }, over: boolean) => (ended.hidden = !over || session.replay() === null);
+const play = createPlay({
+  root: byId("play"),
+  onChange: showEnded,
+});
 const terminal = createTerminal({
   transcript: byId("transcript"),
   chips: byId("chips"),
@@ -25,8 +31,33 @@ const terminal = createTerminal({
   input: byId<HTMLInputElement>("line"),
   onChange(session, over) {
     renderPanel(byId("panel"), session.structures());
-    ended.hidden = !over || session.replay() === null;
+    showEnded(session, over);
   },
+});
+
+// Two screens on one session: the picture (the default, played with keys) and the text screen, where every command works.
+type Mode = "play" | "text";
+let mode: Mode = new URLSearchParams(location.search).get("mode") === "text" ? "text" : "play";
+function setMode(next: Mode) {
+  mode = next;
+  byId("play-main").hidden = mode !== "play";
+  byId("text-main").hidden = mode !== "text";
+  byId("mode").textContent = mode === "play" ? "Text screen (T)" : "Picture screen (T)";
+  byId("mode").setAttribute("aria-pressed", String(mode === "text"));
+  const url = new URL(location.href);
+  if (mode === "text") url.searchParams.set("mode", "text");
+  else url.searchParams.delete("mode");
+  history.replaceState(null, "", url);
+  if (mode === "text") terminal.sync(current.handle("status").lines, current.observe().phase === "won" || current.observe().phase === "lost");
+  else play.render();
+}
+byId("mode").addEventListener("click", () => setMode(mode === "play" ? "text" : "play"));
+document.addEventListener("keydown", (event) => {
+  const typing = event.target instanceof HTMLInputElement || event.target instanceof HTMLSelectElement;
+  if (!typing && !event.ctrlKey && !event.metaKey && !event.altKey && (event.key === "t" || event.key === "T")) {
+    event.preventDefault();
+    setMode(mode === "play" ? "text" : "play");
+  } else if (mode === "play" && play.press(event)) event.preventDefault();
 });
 
 function start(next: string) {
@@ -37,6 +68,7 @@ function start(next: string) {
   url.searchParams.set("seed", seed);
   history.replaceState(null, "", url);
   terminal.attach(current);
+  play.attach(current);
   byId<HTMLFormElement>("export-form").hidden = true;
   byId("export-toggle").setAttribute("aria-expanded", "false");
   byId("export-status").textContent = "";
@@ -99,3 +131,4 @@ narrow.addEventListener("change", foldPanel);
 foldPanel();
 initTheme(byId<HTMLButtonElement>("theme"));
 start(seed);
+setMode(mode);

@@ -21,6 +21,8 @@ export interface SessionOptions {
 
 export interface Reply {
   lines: string[];
+  /** Just the story of what happened, without the screen of choices that follows it (the picture screen draws those itself). */
+  story?: string[];
   /** True once the fight is over or the player quit. */
   done: boolean;
 }
