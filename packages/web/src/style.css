@@ -1,35 +1,39 @@
 :root {
-  --bg: #fafaf7;
+  --bg: #fbf6f5;
   --surface: #ffffff;
-  --text: #1d1f23;
-  --muted: #5d6470;
-  --line: #d9dbe0;
-  --accent: #1f6f5c;
+  --text: #261a1b;
+  --muted: #6e5c5e;
+  --line: #e4d3d4;
+  --accent: #b3261e;
   --accent-text: #ffffff;
-  --lit: 31, 111, 92;
-  --echo: #2a4d9b;
-  --minion: #1f6f5c;
-  --elite: #a86a00;
-  --boss: #b3261e;
+  --lit: 179, 38, 30;
+  --echo: #8c2f39;
+  --minion: #9a6a68;
+  --elite: #b86a00;
+  --boss: #7d1410;
   --good: #1f6f5c;
   --bad: #b3261e;
+  --hp: #d9822b;
+  --space: #9a7a72;
   color-scheme: light;
 }
 :root[data-theme="dark"] {
-  --bg: #14161a;
-  --surface: #1c1f25;
-  --text: #e6e8ec;
-  --muted: #9aa1ad;
-  --line: #2f343d;
-  --accent: #5fc4a8;
-  --accent-text: #0f1a16;
-  --lit: 95, 196, 168;
-  --echo: #8fb0ff;
-  --minion: #5fc4a8;
+  --bg: #170f10;
+  --surface: #211617;
+  --text: #f1e6e6;
+  --muted: #b39b9d;
+  --line: #3b2a2c;
+  --accent: #ff6b61;
+  --accent-text: #2a0d0b;
+  --lit: 255, 107, 97;
+  --echo: #ff9d95;
+  --minion: #c99a96;
   --elite: #e0a23a;
-  --boss: #ff7b72;
+  --boss: #ff4d42;
   --good: #5fc4a8;
-  --bad: #ff7b72;
+  --bad: #ff6b61;
+  --hp: #ffa24d;
+  --space: #b99890;
   color-scheme: dark;
 }
 
@@ -152,9 +156,9 @@ kbd {
 
 .bar { position: relative; height: 18px; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; background: var(--bg); }
 .bar .fill { height: 100%; background: var(--accent); transition: width 0.5s ease; }
-.bar .bar-label { position: absolute; inset: 0; display: grid; place-items: center; font-size: 0.72rem; color: var(--text); text-shadow: 0 0 3px var(--bg); }
-.bar.hp .fill { background: var(--bad); }
-.bar.space .fill { background: var(--echo); }
+.bar .bar-label { position: absolute; inset: 0; display: grid; place-items: center; font-size: 0.72rem; color: #fff; text-shadow: 0 0 3px rgba(0, 0, 0, 0.85), 0 0 1px rgba(0, 0, 0, 0.85); }
+.bar.hp .fill { background: var(--hp); }
+.bar.space .fill { background: var(--space); }
 .bar.armor .fill { background: var(--elite); }
 .bar.hurt { animation: shake 0.4s; }
 .bar.hit { animation: shake 0.4s; }
