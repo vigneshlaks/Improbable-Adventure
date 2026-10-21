@@ -84,7 +84,7 @@ describe("handle", () => {
         session.handle("ready");
         return text(session.handle("ready").lines);
       });
-      const presence = found.find((out) => /dangles 12 values/.test(out));
+      const presence = found.find((out) => /shows you 12 values/.test(out));
       expect(presence).toBeDefined();
       expect(presence!.match(/^ *1\) \d+/gm)).toHaveLength(1);
     }

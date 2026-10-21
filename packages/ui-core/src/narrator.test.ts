@@ -40,7 +40,7 @@ describe("narrateEvent", () => {
         "Bloom Filter takes slot 1 with 2048 bits.",
       ]);
       expect(narrateEvent({ type: "structureRemoved", slot: 2, kind: "logLog", spaceBits: 640 })).toEqual([
-        "LogLog is pulled from slot 3. 640 bits return to your budget.",
+        "LogLog is removed from slot 3. 640 bits return to your budget.",
       ]);
     }
     // mentions retractions only when there were some
@@ -64,7 +64,7 @@ describe("narrateEvent", () => {
     // lists Presence targets by number, from 1
     {
       const lines = narrateEvent({ type: "challengeIssued", turn: 2, weakPoint: "presence", challenge: { kind: "presence", targets: [11, 22, 33] }, firstReveal: false });
-      expect(lines.join("\n")).toMatch(/dangles 3 values/);
+      expect(lines.join("\n")).toMatch(/shows you 3 values/);
       expect(lines.slice(-3)).toEqual(["  1) 11", "  2) 22", "  3) 33"]);
     }
     // describes each strike outcome, and tells the player what was true
@@ -90,12 +90,12 @@ describe("narrateEvent", () => {
     {
       const event: GameEvent = { type: "challengeIssued", turn: 2, weakPoint: "presence", challenge: { kind: "presence", targets: [11, 22] }, firstReveal: false };
       expect(narrateEvents([event], { listTargets: false }).join("\n")).not.toMatch(/1\) 11/);
-      expect(narrateEvents([event], { listTargets: false }).join("\n")).toMatch(/dangles 2 values/);
+      expect(narrateEvents([event], { listTargets: false }).join("\n")).toMatch(/shows you 2 values/);
       expect(narrateEvents([event]).join("\n")).toMatch(/1\) 11/);
     }
     // narrates the enemy's attack, the turn and the ending
     {
-      expect(narrateEvent({ type: "enemyAttacked", turn: 2, damage: 3 })).toEqual(["The enemy lashes out. You lose 3 Certainty."]);
+      expect(narrateEvent({ type: "enemyAttacked", turn: 2, damage: 3 })).toEqual(["The enemy hits back. You lose 3 Certainty."]);
       expect(narrateEvent({ type: "turnStarted", turn: 3 })).toEqual(["Turn 3."]);
       expect(narrateEvent({ type: "fightWon", turn: 4 })).toEqual(["The enemy collapses. You win on turn 4."]);
       expect(narrateEvent({ type: "fightLost", turn: 8, reason: "turnLimit", certaintyLost: 20 }).join(" ")).toMatch(/overflow costs 20 Certainty/);

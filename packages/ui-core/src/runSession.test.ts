@@ -83,7 +83,7 @@ describe("a fight in the run", () => {
       session.handle("deploy bloom 4096");
       session.handle("ready");
       const out = text(session.handle("ready").lines);
-      expect(out).toMatch(/dangles 12 values/);
+      expect(out).toMatch(/shows you 12 values/);
       expect(out.match(/^ *1\) \d+/gm)).toHaveLength(1);
     }
     // refuses the choices that belong to other screens, saying why
