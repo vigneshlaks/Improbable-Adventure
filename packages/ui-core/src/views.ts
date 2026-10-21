@@ -138,10 +138,10 @@ export function renderHelp(topic?: string, loadout?: readonly StructureKind[]): 
 
 
 /** The rewards on offer, numbered from 1 as the player types them. */
-export function renderRewards(offers: readonly RewardView[]): string[] {
+export function renderRewards(offers: readonly RewardView[], owned: readonly StructureKind[] = []): string[] {
   return offers.map((offer, position) => {
     let text: string;
-    if (offer.kind === "structure") text = `${structures[offer.structure].name} (new structure): ${structures[offer.structure].summary}`;
+    if (offer.kind === "structure") text = `${structures[offer.structure].name} (${owned.includes(offer.structure) ? "second copy, for a fusion that needs two" : "new structure"}): ${structures[offer.structure].summary}`;
     else if (offer.kind === "enchantment") text = `${enchantments[offer.enchantment]?.name ?? offer.enchantment} (enchantment): ${enchantments[offer.enchantment]?.summary ?? ""}`;
     else text = `${upgrades[offer.upgrade]?.name ?? offer.upgrade} (upgrade): ${upgrades[offer.upgrade]?.summary ?? ""}`;
     return `  ${position + 1}) ${text}`;

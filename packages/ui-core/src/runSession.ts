@@ -48,7 +48,7 @@ export function createRunSession({ seed, config = buildRunConfig({ seed }) }: Ru
   /** What the player needs to see next: the challenge and the answers, the rewards, or the rest stop. */
   function screen(): string[] {
     const run = observeRun(state);
-    if (run.phase === "reward") return ["", ...renderRewards(run.offers ?? [])];
+    if (run.phase === "reward") return ["", ...renderRewards(run.offers ?? [], run.owned)];
     if (run.phase === "rest") return ["", ...renderRest(run)];
     if (run.fight?.phase === "strike") return ["", ...renderQuery(run.fight)];
     return [];

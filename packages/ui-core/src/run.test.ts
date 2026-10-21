@@ -134,6 +134,7 @@ describe("renderRewards", () => {
     expect(text).toMatch(/1\) Count-Min Sketch \(new structure\)/);
     expect(text).toMatch(/2\) Power \(upgrade\): Every strike deals more damage/);
     expect(text).toMatch(/3\) LogLog \(new structure\)/);
+    expect(renderRewards(offers, ["countMinSketch"]).join("\n")).toMatch(/1\) Count-Min Sketch \(second copy, for a fusion that needs two\)/);
   });
 });
 

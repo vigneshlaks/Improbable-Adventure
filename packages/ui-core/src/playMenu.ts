@@ -163,7 +163,7 @@ function rewardMenu(run: RunObservation): Menu {
   return {
     heading: "Choose a reward.",
     options: (run.offers ?? []).map((offer, i) => {
-      if (offer.kind === "structure") return { key: key(i), label: structures[offer.structure].name, detail: `new structure: ${structures[offer.structure].summary}`, command: `choose ${i + 1}` };
+      if (offer.kind === "structure") return { key: key(i), label: structures[offer.structure].name, detail: `${run.owned.includes(offer.structure) ? "second copy, for a fusion that needs two" : "new structure"}: ${structures[offer.structure].summary}`, command: `choose ${i + 1}` };
       if (offer.kind === "enchantment") return { key: key(i), label: enchantments[offer.enchantment]?.name ?? offer.enchantment, detail: `enchantment: ${enchantments[offer.enchantment]?.summary ?? ""}`, command: `choose ${i + 1}` };
       return { key: key(i), label: upgrades[offer.upgrade]?.name ?? offer.upgrade, detail: `upgrade: ${upgrades[offer.upgrade]?.summary ?? ""}`, command: `choose ${i + 1}` };
     }),

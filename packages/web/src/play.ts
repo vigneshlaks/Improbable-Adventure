@@ -226,7 +226,7 @@ export function createPlay(parts: { root: HTMLElement; onChange(session: RunSess
     }
     bay.append(list);
     const hint = element("p", "hint");
-    bay.append(hint);
+    if (!detailed) bay.append(hint);
     list.addEventListener("mouseover", (event) => {
       const target = (event.target as HTMLElement).closest("button");
       hint.textContent = target?.title ?? "";
