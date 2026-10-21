@@ -821,7 +821,7 @@ Read SPEC.md before any task. It is the source of truth; if code and spec disagr
 
 ## Open questions
 
-- Game title. "Probabilistic Data Structure Roguelike" is a placeholder.
+- Game title (decided 2026-10-21): "improbable adventure", in lower case. "Probabilistic Data Structure Roguelike" was a placeholder and stays only in this document's heading.
 - Does Certainty carry across the whole run (current spec) or reset per act?
 - Should Exact Memory stay in the starting loadout, or be a reward so early fights force sketch use? (Kept for now: removing it cost Frequency fights; see the starting loadout.)
 - Weak point reveal: on the first challenge (current spec), or only through probing?
